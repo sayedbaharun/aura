@@ -1,0 +1,121 @@
+Create a WhatsApp-integrated booking system with an AI receptionist that handles appointments autonomously.
+
+DATABASE SCHEMA:
+Create 3 tables with RLS policies allowing public access:
+
+1. whatsapp_messages table:
+   - id (uuid, primary key)
+   - phone_number (text, required)
+   - message_content (text, required)
+   - sender (text, required - 'user' or 'assistant')
+   - message_type (text, required)
+   - ai_response (text, nullable)
+   - processed (boolean, default false)
+   - received_at (timestamp, default now())
+
+2. appointments table:
+   - id (uuid, primary key)
+   - phone_number (text, required)
+   - patient_name (text, nullable)
+   - appointment_date (timestamp, nullable)
+   - appointment_type (text, nullable)
+   - status (text, default 'pending')
+   - notes (text, nullable)
+   - created_at (timestamp, default now())
+   - updated_at (timestamp, default now())
+   Add trigger for updated_at using update_updated_at_column()
+
+3. clinic_settings table:
+   - id (uuid, primary key)
+   - clinic_name (text, default 'Our Dental Clinic')
+   - clinic_address (text, nullable)
+   - clinic_phone (text, nullable)
+   - clinic_email (text, nullable)
+   - working_hours (text, nullable)
+   - services (text[], nullable)
+   - about_clinic (text, nullable)
+   - whatsapp_webhook_url (text, nullable)
+   - created_at (timestamp, default now())
+   - updated_at (timestamp, default now())
+   Add trigger for updated_at
+
+EDGE FUNCTION (supabase/functions/whatsapp-webhook/index.ts):
+Create a webhook that:
+- Has verify_jwt = false in config.toml
+- Supports BOTH Twilio and Facebook WhatsApp formats
+- Parses incoming webhook data (JSON, form-urlencoded, plain text)
+- Extracts phone_number and message from either format:
+  * Twilio: Body/body and From/from fields
+  * Facebook: entry[0].changes[0].value.messages[0]
+- Stores incoming user messages in whatsapp_messages table
+- Fetches clinic_settings and last 20 messages for conversation history
+- Calls Lovable AI (https://ai.gateway.lovable.dev/v1/chat/completions) with model "google/gemini-2.5-flash"
+- System prompt: "You are Sarah, a friendly and professional AI receptionist for [clinic_name]. Help patients by answering questions about services, hours, and booking appointments. Use clinic info: [all clinic details]. Be warm, concise, and professional."
+- Provides 5 tools: check_availability, view_appointments, book_appointment, cancel_appointment, reschedule_appointment
+- Each tool has proper JSON schema with required fields
+- Handles tool calls by executing Supabase queries
+- Stores AI response in whatsapp_messages table
+- Returns response formatted as TwiML XML for WhatsApp
+
+FRONTEND - DASHBOARD PAGE (/dashboard):
+Create a dashboard with 3 tabs using Tabs component:
+
+1. MESSAGES TAB:
+   - Card with "Recent Messages" title
+   - ScrollArea with height 600px
+   - Fetch whatsapp_messages, order by received_at desc, limit 50
+   - Refresh every 5 seconds
+   - Display each message with:
+     * User messages: secondary background with Phone icon
+     * AI messages: primary background with Bot icon
+     * Show phone_number, sender badge, timestamp (format: 'MMM d, HH:mm')
+     * Display message_content
+
+2. APPOINTMENTS TAB:
+   - Toggle buttons for Calendar/List view
+   - CALENDAR VIEW:
+     * Use Calendar component from shadcn
+     * Show appointments on calendar with highlighted dates (bg-primary/20)
+     * Side panel showing appointments for selected date
+     * Display: patient_name, phone_number, appointment_date (time only), appointment_type, status badge, notes
+   - LIST VIEW:
+     * ScrollArea with all appointments
+     * Cards showing full appointment details
+     * Status badges: confirmed (green), pending (yellow), cancelled (red)
+     * Format appointment_date as 'PPP p'
+   - Refresh every 5 seconds
+
+3. SETTINGS TAB:
+   - Display webhook URL: ${VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook
+   - Copy to clipboard button
+   - Setup instructions for Twilio
+   - Form to edit clinic settings:
+     * clinic_name, clinic_address, clinic_phone, clinic_email
+     * working_hours (textarea)
+     * services (textarea, comma-separated)
+     * about_clinic (textarea)
+   - Save button that updates clinic_settings table
+   - Show toast on success/error
+
+LANDING PAGE (/):
+Create a beautiful landing page with:
+- Hero section explaining the AI WhatsApp receptionist
+- Features section highlighting 24/7 availability, appointment booking, instant responses
+- CTA button linking to /dashboard
+- Use gradients and modern design with semantic tokens
+
+DESIGN REQUIREMENTS:
+- Use HSL colors from index.css
+- Semantic tokens: primary, secondary, accent, success, destructive
+- Beautiful shadows: shadow-card class
+- Responsive design with mobile support
+- Use lucide-react icons: Calendar, Phone, MessageSquare, Bot, User, Clock
+- date-fns for formatting
+- React Query with 5s refetch intervals
+
+ROUTING:
+- / → Landing page
+- /dashboard → Dashboard with tabs
+- Make sure routes are in App.tsx
+
+This should handle WhatsApp messages from either Twilio or Meta Business API, respond intelligently using AI with conversation memory, and provide a complete dashboard for managing appointments and settings.
