@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWhatsappMessageSchema, insertAppointmentSchema, insertClinicSettingsSchema } from "@shared/schema";
+import { insertWhatsappMessageSchema, insertAppointmentSchema, insertAssistantSettingsSchema } from "@shared/schema";
 import { z } from "zod";
+import { processMessage } from "./ai-assistant";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all messages
@@ -109,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get clinic settings
+  // Get assistant settings
   app.get("/api/settings", async (req, res) => {
     try {
       const settings = await storage.getSettings();
@@ -119,10 +120,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update clinic settings
+  // Update assistant settings
   app.put("/api/settings", async (req, res) => {
     try {
-      const updates = insertClinicSettingsSchema.partial().parse(req.body);
+      const updates = insertAssistantSettingsSchema.partial().parse(req.body);
       const settings = await storage.updateSettings(updates);
       res.json(settings);
     } catch (error) {
@@ -134,30 +135,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // WhatsApp Webhook - This endpoint will receive messages from Twilio or Facebook
+  // WhatsApp Webhook - Supports Twilio, Facebook/Meta, and MessageBird/Bird
   app.post("/api/whatsapp-webhook", async (req, res) => {
     try {
       let phoneNumber: string | undefined;
       let messageText: string | undefined;
+      let webhookType: 'twilio' | 'facebook' | 'messagebird' | 'unknown' = 'unknown';
 
       // Parse different webhook formats
       if (req.body.From || req.body.from) {
         // Twilio format
+        webhookType = 'twilio';
         phoneNumber = req.body.From || req.body.from;
         messageText = req.body.Body || req.body.body;
       } else if (req.body.entry && Array.isArray(req.body.entry) && req.body.entry[0]?.changes) {
         // Facebook/Meta format
+        webhookType = 'facebook';
         const changes = req.body.entry[0].changes;
         if (changes && Array.isArray(changes) && changes[0]?.value?.messages) {
           const message = changes[0].value.messages[0];
           phoneNumber = message.from;
           messageText = message.text?.body;
         }
+      } else if (req.body.contact && req.body.message) {
+        // MessageBird/Bird format
+        webhookType = 'messagebird';
+        phoneNumber = req.body.contact.msisdn || req.body.contact.id;
+        messageText = req.body.message.content?.text;
       }
 
       if (!phoneNumber || !messageText) {
+        console.log("Invalid webhook data:", req.body);
         return res.status(400).json({ error: "Invalid webhook data" });
       }
+
+      console.log(`Received ${webhookType} message from ${phoneNumber}: ${messageText}`);
 
       // Store the incoming user message
       await storage.createMessage({
@@ -168,243 +180,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         processed: false,
       });
 
-      // Get clinic settings for AI context
-      const settings = await storage.getSettings();
-      
-      // Get conversation history
-      const conversationHistory = await storage.getMessagesByPhone(phoneNumber, 20);
-
-      // Build AI system prompt
-      const clinicInfo = settings ? `
-Clinic: ${settings.clinicName}
-${settings.clinicAddress ? `Address: ${settings.clinicAddress}` : ''}
-${settings.clinicPhone ? `Phone: ${settings.clinicPhone}` : ''}
-${settings.clinicEmail ? `Email: ${settings.clinicEmail}` : ''}
-${settings.workingHours ? `Hours: ${settings.workingHours}` : ''}
-${settings.services ? `Services: ${settings.services.join(', ')}` : ''}
-${settings.aboutClinic ? `About: ${settings.aboutClinic}` : ''}
-      `.trim() : 'Clinic information not configured yet.';
-
-      const systemPrompt = `You are Sarah, a friendly and professional AI receptionist for ${settings?.clinicName || 'the clinic'}. Help patients by answering questions about services, hours, and booking appointments. Use clinic info: ${clinicInfo}. Be warm, concise, and professional.`;
-
-      // Prepare conversation messages for AI
-      const messages = [
-        { role: "system", content: systemPrompt },
-        ...conversationHistory.reverse().map(msg => ({
-          role: msg.sender === "user" ? "user" : "assistant",
-          content: msg.messageContent,
-        })),
-        { role: "user", content: messageText },
-      ];
-
-      // Call Lovable AI with tool calling
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.0-flash-exp",
-          messages,
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "check_availability",
-                description: "Check available appointment slots for a specific date or date range",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    date: {
-                      type: "string",
-                      description: "The date to check availability for (YYYY-MM-DD format)",
-                    },
-                    appointmentType: {
-                      type: "string",
-                      description: "Type of appointment (e.g., cleaning, consultation)",
-                    },
-                  },
-                  required: ["date"],
-                },
-              },
-            },
-            {
-              type: "function",
-              function: {
-                name: "view_appointments",
-                description: "View existing appointments for a patient by phone number",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    phoneNumber: {
-                      type: "string",
-                      description: "The patient's phone number",
-                    },
-                  },
-                  required: ["phoneNumber"],
-                },
-              },
-            },
-            {
-              type: "function",
-              function: {
-                name: "book_appointment",
-                description: "Book a new appointment for a patient",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    phoneNumber: {
-                      type: "string",
-                      description: "Patient's phone number",
-                    },
-                    patientName: {
-                      type: "string",
-                      description: "Patient's full name",
-                    },
-                    appointmentDate: {
-                      type: "string",
-                      description: "Date and time for the appointment (ISO format)",
-                    },
-                    appointmentType: {
-                      type: "string",
-                      description: "Type of appointment",
-                    },
-                    notes: {
-                      type: "string",
-                      description: "Additional notes or preferences",
-                    },
-                  },
-                  required: ["phoneNumber", "patientName", "appointmentDate", "appointmentType"],
-                },
-              },
-            },
-            {
-              type: "function",
-              function: {
-                name: "cancel_appointment",
-                description: "Cancel an existing appointment",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    appointmentId: {
-                      type: "string",
-                      description: "The ID of the appointment to cancel",
-                    },
-                  },
-                  required: ["appointmentId"],
-                },
-              },
-            },
-            {
-              type: "function",
-              function: {
-                name: "reschedule_appointment",
-                description: "Reschedule an existing appointment to a new date/time",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    appointmentId: {
-                      type: "string",
-                      description: "The ID of the appointment to reschedule",
-                    },
-                    newAppointmentDate: {
-                      type: "string",
-                      description: "New date and time for the appointment (ISO format)",
-                    },
-                  },
-                  required: ["appointmentId", "newAppointmentDate"],
-                },
-              },
-            },
-          ],
-        }),
-      });
-
-      const aiData = await aiResponse.json();
-      const choice = aiData.choices?.[0];
-      
-      if (!choice) {
-        throw new Error("No response from AI");
-      }
-
-      let finalResponse = choice.message.content || "I'm here to help! How can I assist you today?";
-
-      // Handle tool calls if present
-      if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
-        for (const toolCall of choice.message.tool_calls) {
-          const functionName = toolCall.function.name;
-          const args = JSON.parse(toolCall.function.arguments);
-
-          switch (functionName) {
-            case "check_availability":
-              // Simple availability check - in real implementation, check actual calendar
-              finalResponse = `We have several openings available on ${args.date}. Would you like to book a morning or afternoon slot?`;
-              break;
-
-            case "view_appointments":
-              const userAppointments = await storage.getAppointments();
-              const filtered = userAppointments.filter(apt => apt.phoneNumber === args.phoneNumber && apt.status !== 'cancelled');
-              if (filtered.length === 0) {
-                finalResponse = "I don't see any upcoming appointments for your number. Would you like to book one?";
-              } else {
-                const aptList = filtered.map(apt => 
-                  `${apt.appointmentType || 'Appointment'} on ${apt.appointmentDate ? new Date(apt.appointmentDate).toLocaleDateString() : 'TBD'}`
-                ).join(', ');
-                finalResponse = `You have the following appointments: ${aptList}`;
-              }
-              break;
-
-            case "book_appointment":
-              const newAppointment = await storage.createAppointment({
-                phoneNumber: args.phoneNumber,
-                patientName: args.patientName,
-                appointmentDate: new Date(args.appointmentDate),
-                appointmentType: args.appointmentType,
-                notes: args.notes || null,
-                status: "confirmed",
-              });
-              finalResponse = `Great! I've booked your ${args.appointmentType} appointment for ${new Date(args.appointmentDate).toLocaleString()}. You'll receive a confirmation shortly.`;
-              break;
-
-            case "cancel_appointment":
-              await storage.cancelAppointment(args.appointmentId);
-              finalResponse = "Your appointment has been cancelled. Let me know if you'd like to reschedule.";
-              break;
-
-            case "reschedule_appointment":
-              await storage.updateAppointment(args.appointmentId, {
-                appointmentDate: new Date(args.newAppointmentDate),
-              });
-              finalResponse = `Your appointment has been rescheduled to ${new Date(args.newAppointmentDate).toLocaleString()}.`;
-              break;
-          }
-        }
-      }
+      // Process message with AI assistant
+      const aiResponse = await processMessage(phoneNumber, messageText);
 
       // Store AI response
       await storage.createMessage({
         phoneNumber,
-        messageContent: finalResponse,
+        messageContent: aiResponse,
         sender: "assistant",
         messageType: "text",
-        aiResponse: JSON.stringify(aiData),
         processed: true,
       });
 
-      // Return TwiML XML format for WhatsApp
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      // Return response in appropriate format
+      if (webhookType === 'twilio') {
+        // Return TwiML XML format for Twilio
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Message>${finalResponse.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
+  <Message>${aiResponse.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
 </Response>`;
-
-      res.set('Content-Type', 'text/xml');
-      res.send(twiml);
+        res.set('Content-Type', 'text/xml');
+        res.send(twiml);
+      } else if (webhookType === 'facebook') {
+        // Facebook expects 200 OK, actual reply is sent via API
+        res.status(200).json({ success: true });
+      } else if (webhookType === 'messagebird') {
+        // MessageBird expects JSON response
+        res.status(200).json({
+          content: {
+            text: aiResponse
+          }
+        });
+      } else {
+        // Generic response
+        res.status(200).json({ message: aiResponse });
+      }
     } catch (error) {
       console.error("Webhook error:", error);
-      res.status(500).send(`<?xml version="1.0" encoding="UTF-8"?>
+      
+      // Return appropriate error format
+      if (req.body.From || req.body.from) {
+        res.status(500).send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>Sorry, I'm having trouble processing your request. Please try again later.</Message>
 </Response>`);
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
     }
   });
 

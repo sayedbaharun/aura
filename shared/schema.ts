@@ -27,10 +27,12 @@ export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 export const appointments = pgTable("appointments", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   phoneNumber: text("phone_number").notNull(),
-  patientName: text("patient_name"),
+  contactName: text("contact_name"),
   appointmentDate: timestamp("appointment_date"),
-  appointmentType: text("appointment_type"),
+  appointmentTitle: text("appointment_title"),
+  appointmentDuration: text("appointment_duration").default("60"),
   status: text("status").default("pending").notNull(),
+  googleEventId: text("google_event_id"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -45,26 +47,27 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointments.$inferSelect;
 
-// Clinic Settings Table
-export const clinicSettings = pgTable("clinic_settings", {
+// Assistant Settings Table
+export const assistantSettings = pgTable("assistant_settings", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  clinicName: text("clinic_name").default("Our Dental Clinic").notNull(),
-  clinicAddress: text("clinic_address"),
-  clinicPhone: text("clinic_phone"),
-  clinicEmail: text("clinic_email"),
-  workingHours: text("working_hours"),
-  services: text("services").array(),
-  aboutClinic: text("about_clinic"),
+  assistantName: text("assistant_name").default("Sarah").notNull(),
+  userName: text("user_name"),
+  userEmail: text("user_email"),
+  userPhone: text("user_phone"),
+  workingHours: text("working_hours").default("9:00 AM - 6:00 PM, Monday - Friday"),
+  defaultMeetingDuration: text("default_meeting_duration").default("60"),
+  timezone: text("timezone").default("Asia/Dubai"),
+  preferences: text("preferences"),
   whatsappWebhookUrl: text("whatsapp_webhook_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertClinicSettingsSchema = createInsertSchema(clinicSettings).omit({
+export const insertAssistantSettingsSchema = createInsertSchema(assistantSettings).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertClinicSettings = z.infer<typeof insertClinicSettingsSchema>;
-export type ClinicSettings = typeof clinicSettings.$inferSelect;
+export type InsertAssistantSettings = z.infer<typeof insertAssistantSettingsSchema>;
+export type AssistantSettings = typeof assistantSettings.$inferSelect;

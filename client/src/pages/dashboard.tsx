@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { WhatsappMessage, Appointment, ClinicSettings } from "@shared/schema";
+import type { WhatsappMessage, Appointment, AssistantSettings } from "@shared/schema";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -33,8 +33,8 @@ export default function Dashboard() {
     refetchInterval: 5000,
   });
 
-  // Fetch clinic settings
-  const { data: settings, isLoading: settingsLoading } = useQuery<ClinicSettings>({
+  // Fetch assistant settings
+  const { data: settings, isLoading: settingsLoading } = useQuery<AssistantSettings>({
     queryKey: ["/api/settings"],
   });
 
@@ -58,7 +58,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       toast({
         title: "Success",
-        description: "Clinic settings updated successfully",
+        description: "Assistant settings updated successfully",
       });
     },
     onError: () => {
@@ -73,18 +73,16 @@ export default function Dashboard() {
   const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
-    const services = formData.get("services") as string;
-    const servicesArray = services.split(",").map(s => s.trim()).filter(Boolean);
 
     updateSettingsMutation.mutate({
-      clinicName: formData.get("clinicName"),
-      clinicAddress: formData.get("clinicAddress"),
-      clinicPhone: formData.get("clinicPhone"),
-      clinicEmail: formData.get("clinicEmail"),
+      assistantName: formData.get("assistantName"),
+      userName: formData.get("userName"),
+      userEmail: formData.get("userEmail"),
+      userPhone: formData.get("userPhone"),
       workingHours: formData.get("workingHours"),
-      services: servicesArray,
-      aboutClinic: formData.get("aboutClinic"),
+      defaultMeetingDuration: formData.get("defaultMeetingDuration"),
+      timezone: formData.get("timezone"),
+      preferences: formData.get("preferences"),
     });
   };
 
@@ -117,8 +115,8 @@ export default function Dashboard() {
       <header className="h-16 border-b flex items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <Bot className="h-6 w-6 text-primary" />
-          <h1 className="text-lg font-semibold text-foreground" data-testid="text-clinic-name">
-            {settings?.clinicName || "AI Receptionist Dashboard"}
+          <h1 className="text-lg font-semibold text-foreground" data-testid="text-assistant-name">
+            {settings?.assistantName || "Sarah"} - Your AI Assistant
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -226,7 +224,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Appointments</CardTitle>
-                    <CardDescription>Manage and view all patient appointments</CardDescription>
+                    <CardDescription>Manage and view all your calendar appointments</CardDescription>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -290,7 +288,7 @@ export default function Dashboard() {
                                 <div className="flex items-start justify-between mb-2">
                                   <div className="flex items-center gap-2">
                                     <User className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">{apt.patientName || 'Unknown Patient'}</span>
+                                    <span className="font-medium">{apt.contactName || 'Contact'}</span>
                                   </div>
                                   <Badge className={getStatusColor(apt.status)}>
                                     {apt.status}
@@ -305,9 +303,9 @@ export default function Dashboard() {
                                     <Phone className="h-3 w-3" />
                                     {apt.phoneNumber}
                                   </div>
-                                  {apt.appointmentType && (
-                                    <div className="text-sm">
-                                      Type: {apt.appointmentType}
+                                  {apt.appointmentTitle && (
+                                    <div className="text-sm font-medium">
+                                      {apt.appointmentTitle}
                                     </div>
                                   )}
                                   {apt.notes && (
@@ -339,8 +337,8 @@ export default function Dashboard() {
                           <Card key={apt.id} className="p-6" data-testid={`appointment-card-${apt.id}`}>
                             <div className="flex items-start justify-between mb-4">
                               <div>
-                                <h3 className="font-semibold text-lg">{apt.patientName || 'Unknown Patient'}</h3>
-                                <p className="text-sm text-muted-foreground">{apt.phoneNumber}</p>
+                                <h3 className="font-semibold text-lg">{apt.appointmentTitle || 'Meeting'}</h3>
+                                <p className="text-sm text-muted-foreground">{apt.contactName || 'No contact'} • {apt.phoneNumber}</p>
                               </div>
                               <Badge className={getStatusColor(apt.status)}>
                                 {apt.status}
@@ -353,10 +351,10 @@ export default function Dashboard() {
                                   {apt.appointmentDate ? format(new Date(apt.appointmentDate), 'PPP p') : 'Not set'}
                                 </div>
                               </div>
-                              {apt.appointmentType && (
+                              {apt.appointmentDuration && (
                                 <div>
-                                  <div className="text-sm text-muted-foreground mb-1">Type</div>
-                                  <div className="font-medium">{apt.appointmentType}</div>
+                                  <div className="text-sm text-muted-foreground mb-1">Duration</div>
+                                  <div className="font-medium">{apt.appointmentDuration} minutes</div>
                                 </div>
                               )}
                             </div>
@@ -407,25 +405,27 @@ export default function Dashboard() {
                   </div>
 
                   <div className="bg-muted rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold text-sm">Twilio Setup Instructions:</h4>
+                    <h4 className="font-semibold text-sm">MessageBird/Bird Setup Instructions:</h4>
                     <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                      <li>Log in to your Twilio Console</li>
-                      <li>Navigate to Messaging → WhatsApp → Senders</li>
-                      <li>Select your WhatsApp sender</li>
+                      <li>Log in to your MessageBird/Bird Dashboard</li>
+                      <li>Navigate to Channels → WhatsApp → Settings</li>
                       <li>In the Webhook section, paste the URL above</li>
                       <li>Set HTTP Method to POST</li>
                       <li>Save your changes</li>
                     </ol>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Note: Also supports Twilio and Facebook/Meta webhooks
+                    </p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Clinic Settings Form */}
+              {/* Assistant Settings Form */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Clinic Information</CardTitle>
+                  <CardTitle>Assistant Configuration</CardTitle>
                   <CardDescription>
-                    Customize your clinic details for AI receptionist responses
+                    Customize Sarah's behavior and your personal preferences
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -439,83 +439,95 @@ export default function Dashboard() {
                     <form onSubmit={handleSaveSettings} className="space-y-6">
                       <div className="grid md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="clinicName">Clinic Name</Label>
+                          <Label htmlFor="assistantName">Assistant Name</Label>
                           <Input
-                            id="clinicName"
-                            name="clinicName"
-                            defaultValue={settings?.clinicName}
-                            placeholder="Our Dental Clinic"
-                            data-testid="input-clinic-name"
+                            id="assistantName"
+                            name="assistantName"
+                            defaultValue={settings?.assistantName}
+                            placeholder="Sarah"
+                            data-testid="input-assistant-name"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="clinicPhone">Phone Number</Label>
+                          <Label htmlFor="userName">Your Name</Label>
                           <Input
-                            id="clinicPhone"
-                            name="clinicPhone"
-                            defaultValue={settings?.clinicPhone || ''}
-                            placeholder="+1 234 567 8900"
-                            data-testid="input-clinic-phone"
+                            id="userName"
+                            name="userName"
+                            defaultValue={settings?.userName || ''}
+                            placeholder="John Doe"
+                            data-testid="input-user-name"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="userEmail">Your Email</Label>
+                          <Input
+                            id="userEmail"
+                            name="userEmail"
+                            type="email"
+                            defaultValue={settings?.userEmail || ''}
+                            placeholder="you@example.com"
+                            data-testid="input-user-email"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="userPhone">Your Phone</Label>
+                          <Input
+                            id="userPhone"
+                            name="userPhone"
+                            defaultValue={settings?.userPhone || ''}
+                            placeholder="+971 50 123 4567"
+                            data-testid="input-user-phone"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="workingHours">Working Hours</Label>
+                          <Input
+                            id="workingHours"
+                            name="workingHours"
+                            defaultValue={settings?.workingHours || ''}
+                            placeholder="9:00 AM - 6:00 PM, Monday - Friday"
+                            data-testid="input-working-hours"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="timezone">Timezone</Label>
+                          <Input
+                            id="timezone"
+                            name="timezone"
+                            defaultValue={settings?.timezone || ''}
+                            placeholder="Asia/Dubai"
+                            data-testid="input-timezone"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="clinicAddress">Address</Label>
+                        <Label htmlFor="defaultMeetingDuration">Default Meeting Duration (minutes)</Label>
                         <Input
-                          id="clinicAddress"
-                          name="clinicAddress"
-                          defaultValue={settings?.clinicAddress || ''}
-                          placeholder="123 Main Street, City, State"
-                          data-testid="input-clinic-address"
+                          id="defaultMeetingDuration"
+                          name="defaultMeetingDuration"
+                          type="number"
+                          defaultValue={settings?.defaultMeetingDuration || ''}
+                          placeholder="60"
+                          data-testid="input-default-duration"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="clinicEmail">Email</Label>
-                        <Input
-                          id="clinicEmail"
-                          name="clinicEmail"
-                          type="email"
-                          defaultValue={settings?.clinicEmail || ''}
-                          placeholder="contact@clinic.com"
-                          data-testid="input-clinic-email"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="workingHours">Working Hours</Label>
+                        <Label htmlFor="preferences">Additional Preferences</Label>
                         <Textarea
-                          id="workingHours"
-                          name="workingHours"
-                          defaultValue={settings?.workingHours || ''}
-                          placeholder="Monday-Friday: 9:00 AM - 5:00 PM&#10;Saturday: 10:00 AM - 2:00 PM&#10;Sunday: Closed"
-                          rows={3}
-                          data-testid="textarea-working-hours"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="services">Services (comma-separated)</Label>
-                        <Textarea
-                          id="services"
-                          name="services"
-                          defaultValue={settings?.services?.join(', ') || ''}
-                          placeholder="Dental cleaning, Root canal, Whitening, Orthodontics"
-                          rows={3}
-                          data-testid="textarea-services"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="aboutClinic">About Clinic</Label>
-                        <Textarea
-                          id="aboutClinic"
-                          name="aboutClinic"
-                          defaultValue={settings?.aboutClinic || ''}
-                          placeholder="Describe your clinic, specialties, and what makes you unique..."
+                          id="preferences"
+                          name="preferences"
+                          defaultValue={settings?.preferences || ''}
+                          placeholder="e.g., Never book meetings before 9am, Always leave 15 min buffer between meetings, Prefer afternoon meetings, etc."
                           rows={4}
-                          data-testid="textarea-about-clinic"
+                          data-testid="textarea-preferences"
                         />
                       </div>
 

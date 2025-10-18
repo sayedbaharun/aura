@@ -16,10 +16,10 @@ export default function Landing() {
             <div className="space-y-8">
               <div className="space-y-4">
                 <h1 className="text-5xl font-semibold tracking-tight text-foreground" data-testid="text-hero-headline">
-                  24/7 AI Receptionist for Your Clinic
+                  Meet Sarah - Your AI Personal Assistant
                 </h1>
                 <p className="text-xl text-muted-foreground">
-                  Never miss an appointment. Your intelligent WhatsApp assistant handles bookings while you focus on patients.
+                  Manage your calendar effortlessly through WhatsApp. Sarah checks availability, books meetings, and keeps you organized.
                 </p>
               </div>
               
@@ -58,22 +58,22 @@ export default function Landing() {
                 <div className="space-y-4">
                   <div className="bg-secondary/50 rounded-2xl rounded-tl-sm p-4 max-w-[85%]">
                     <p className="text-sm text-secondary-foreground">
-                      Hi! I'd like to book a dental cleaning appointment.
+                      Am I free tomorrow at 3pm?
                     </p>
                   </div>
                   <div className="bg-primary rounded-2xl rounded-tr-sm p-4 max-w-[85%] ml-auto">
                     <p className="text-sm text-primary-foreground">
-                      I'd be happy to help! We have openings this week. Would you prefer morning or afternoon?
+                      Yes, you're free at that time! Would you like me to book something?
                     </p>
                   </div>
                   <div className="bg-secondary/50 rounded-2xl rounded-tl-sm p-4 max-w-[85%]">
                     <p className="text-sm text-secondary-foreground">
-                      Afternoon works best for me.
+                      Book a meeting with John for 1 hour
                     </p>
                   </div>
                   <div className="bg-primary rounded-2xl rounded-tr-sm p-4 max-w-[85%] ml-auto">
                     <p className="text-sm text-primary-foreground">
-                      Perfect! I've booked you for Thursday at 2:30 PM. You'll receive a confirmation shortly.
+                      I'll book "Meeting with John" for tomorrow at 3:00 PM. Confirm?
                     </p>
                   </div>
                 </div>
@@ -88,10 +88,10 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-semibold text-foreground mb-4">
-              Intelligent Appointment Management
+              Intelligent Calendar Management
             </h2>
             <p className="text-lg text-muted-foreground">
-              Powered by AI to provide seamless patient experience
+              Powered by AI and integrated with Google Calendar for effortless scheduling
             </p>
           </div>
 
@@ -103,7 +103,7 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-3">24/7 Availability</h3>
               <p className="text-muted-foreground">
-                Always online to serve your patients, even outside office hours. Never miss a booking opportunity.
+                Sarah is always ready to help manage your calendar, check availability, and suggest meeting times - anytime, anywhere.
               </p>
             </Card>
 
@@ -112,9 +112,9 @@ export default function Landing() {
               <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mb-6">
                 <Calendar className="h-7 w-7 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Smart Booking</h3>
+              <h3 className="text-xl font-semibold text-foreground mb-3">Smart Scheduling</h3>
               <p className="text-muted-foreground">
-                AI handles scheduling conflicts automatically, ensuring optimal appointment management for your practice.
+                AI detects conflicts automatically and suggests optimal times based on your preferences and working hours.
               </p>
             </Card>
 
