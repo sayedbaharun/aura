@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a WhatsApp-integrated AI personal assistant application named "Sarah" that manages calendars and appointments through conversational interactions. The system uses OpenAI for natural language processing and Google Calendar for appointment management. Users interact with Sarah via WhatsApp, and administrators can monitor conversations and appointments through a web dashboard.
+This is a WhatsApp-integrated AI personal assistant application named "Aura" that manages calendars and appointments through conversational interactions. The system uses OpenAI for natural language processing and Google Calendar for appointment management. Users interact with Aura via WhatsApp, and administrators can monitor conversations and appointments through a web dashboard.
 
 The application is built as a full-stack TypeScript application with a React frontend, Express backend, and PostgreSQL database.
 

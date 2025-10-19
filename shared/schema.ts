@@ -50,7 +50,7 @@ export type Appointment = typeof appointments.$inferSelect;
 // Assistant Settings Table
 export const assistantSettings = pgTable("assistant_settings", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  assistantName: text("assistant_name").default("Sarah").notNull(),
+  assistantName: text("assistant_name").default("Aura").notNull(),
   userName: text("user_name"),
   userEmail: text("user_email"),
   userPhone: text("user_phone"),

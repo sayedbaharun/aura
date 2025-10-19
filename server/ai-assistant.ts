@@ -45,7 +45,7 @@ Default meeting duration: ${settings.defaultMeetingDuration} minutes
 ${settings.preferences ? `Additional preferences: ${settings.preferences}` : ''}
   `.trim() : 'Settings not configured yet.';
 
-  const systemPrompt = `You are ${settings?.assistantName || 'Sarah'}, a helpful and friendly personal assistant managing ${settings?.userName || 'the user'}'s calendar via WhatsApp. 
+  const systemPrompt = `You are ${settings?.assistantName || 'Aura'}, a helpful and friendly personal assistant managing ${settings?.userName || 'the user'}'s calendar via WhatsApp. 
 
 Your capabilities:
 - Check calendar availability

@@ -117,7 +117,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <Bot className="h-6 w-6 text-primary" />
           <h1 className="text-lg font-semibold text-foreground" data-testid="text-assistant-name">
-            {settings?.assistantName || "Sarah"} - Your AI Assistant
+            {settings?.assistantName || "Aura"} - Your AI Assistant
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -426,7 +426,7 @@ export default function Dashboard() {
                 <CardHeader>
                   <CardTitle>Assistant Configuration</CardTitle>
                   <CardDescription>
-                    Customize Sarah's behavior and your personal preferences
+                    Customize Aura's behavior and your personal preferences
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -445,7 +445,7 @@ export default function Dashboard() {
                             id="assistantName"
                             name="assistantName"
                             defaultValue={settings?.assistantName}
-                            placeholder="Sarah"
+                            placeholder="Aura"
                             data-testid="input-assistant-name"
                           />
                         </div>

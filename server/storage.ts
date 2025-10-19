@@ -120,7 +120,7 @@ export class DBStorage implements IStorage {
       const [newSettings] = await this.db
         .insert(assistantSettings)
         .values({
-          assistantName: "Sarah",
+          assistantName: "Aura",
           workingHours: "9:00 AM - 6:00 PM, Monday - Friday",
           defaultMeetingDuration: "60",
           timezone: "Asia/Dubai",
@@ -139,7 +139,7 @@ export class DBStorage implements IStorage {
       const [newSettings] = await this.db
         .insert(assistantSettings)
         .values({
-          assistantName: "Sarah",
+          assistantName: "Aura",
           workingHours: "9:00 AM - 6:00 PM, Monday - Friday",
           defaultMeetingDuration: "60",
           timezone: "Asia/Dubai",

@@ -16,10 +16,10 @@ export default function Landing() {
             <div className="space-y-8">
               <div className="space-y-4">
                 <h1 className="text-5xl font-semibold tracking-tight text-foreground" data-testid="text-hero-headline">
-                  Meet Sarah - Your AI Personal Assistant
+                  Meet Aura - Your AI Personal Assistant
                 </h1>
                 <p className="text-xl text-muted-foreground">
-                  Manage your calendar effortlessly through WhatsApp. Sarah checks availability, books meetings, and keeps you organized.
+                  Manage your calendar effortlessly through WhatsApp. Aura checks availability, books meetings, and keeps you organized.
                 </p>
               </div>
               
@@ -51,7 +51,7 @@ export default function Landing() {
                     <Bot className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-foreground mb-1">Sarah (AI Assistant)</div>
+                    <div className="text-sm font-medium text-foreground mb-1">Aura (AI Assistant)</div>
                     <div className="text-xs text-muted-foreground">Active now</div>
                   </div>
                 </div>
@@ -103,7 +103,7 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-3">24/7 Availability</h3>
               <p className="text-muted-foreground">
-                Sarah is always ready to help manage your calendar, check availability, and suggest meeting times - anytime, anywhere.
+                Aura is always ready to help manage your calendar, check availability, and suggest meeting times - anytime, anywhere.
               </p>
             </Card>
 
@@ -125,7 +125,7 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-3">Instant Responses</h3>
               <p className="text-muted-foreground">
-                Answer common questions in seconds. Provide clinic information and service details instantly.
+                Get instant answers to your questions. Natural conversation powered by advanced AI.
               </p>
             </Card>
           </div>
@@ -161,7 +161,7 @@ export default function Landing() {
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">Configure Settings</h3>
               <p className="text-muted-foreground text-sm">
-                Customize clinic details, hours, and services for personalized responses
+                Customize your preferences, working hours, and timezone for personalized assistance
               </p>
             </div>
 
@@ -171,7 +171,7 @@ export default function Landing() {
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">Let AI Handle It</h3>
               <p className="text-muted-foreground text-sm">
-                Your AI receptionist manages bookings automatically
+                Aura manages your calendar and appointments automatically
               </p>
             </div>
           </div>
@@ -201,7 +201,7 @@ export default function Landing() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-foreground">AI Receptionist</span>
+              <span className="font-semibold text-foreground">Aura AI Assistant</span>
             </div>
             <div className="text-sm text-muted-foreground">
               Powered by AI
