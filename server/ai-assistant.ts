@@ -48,6 +48,7 @@ ${settings.preferences ? `Additional preferences: ${settings.preferences}` : ''}
   const systemPrompt = `You are ${settings?.assistantName || 'Aura'}, a helpful and friendly personal assistant managing ${settings?.userName || 'the user'}'s calendar via WhatsApp. 
 
 Your capabilities:
+- View full schedule/calendar for any day
 - Check calendar availability
 - Find free time slots
 - Book appointments/meetings
@@ -77,6 +78,27 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
 
   // Define tools for calendar operations
   const tools: OpenAI.Chat.ChatCompletionTool[] = [
+    {
+      type: "function",
+      function: {
+        name: "get_schedule",
+        description: "Get a list of all scheduled appointments/events for a specific day or date range. Use this when the user asks 'what's my schedule', 'show me my calendar', 'what do I have today/tomorrow', etc.",
+        parameters: {
+          type: "object",
+          properties: {
+            startDate: {
+              type: "string",
+              description: "Start date/time in ISO format (e.g., 2025-10-20T00:00:00)",
+            },
+            endDate: {
+              type: "string",
+              description: "End date/time in ISO format (e.g., 2025-10-20T23:59:59)",
+            },
+          },
+          required: ["startDate", "endDate"],
+        },
+      },
+    },
     {
       type: "function",
       function: {
@@ -179,6 +201,40 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
 
       try {
         switch (functionName) {
+          case "get_schedule":
+            const events = await calendar.listEvents(
+              new Date(args.startDate),
+              new Date(args.endDate),
+              50 // Get up to 50 events
+            );
+            
+            if (events.length === 0) {
+              finalResponse = `Your calendar is clear for that time! No scheduled appointments.`;
+            } else {
+              const eventList = events.map((event: any) => {
+                const start = event.start?.dateTime || event.start?.date;
+                const startTime = new Date(start).toLocaleString('en-US', { 
+                  timeZone: settings?.timezone || 'Asia/Dubai',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: event.start?.dateTime ? 'numeric' : undefined,
+                  minute: event.start?.dateTime ? '2-digit' : undefined,
+                  hour12: true
+                });
+                return `• ${startTime} - ${event.summary || 'Untitled'}`;
+              }).join('\n');
+              
+              const dateStr = new Date(args.startDate).toLocaleDateString('en-US', { 
+                timeZone: settings?.timezone || 'Asia/Dubai',
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+              });
+              
+              finalResponse = `Here's your schedule for ${dateStr}:\n\n${eventList}`;
+            }
+            break;
+
           case "check_availability":
             const isAvailable = await calendar.checkAvailability(
               new Date(args.startTime),
