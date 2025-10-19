@@ -151,7 +151,7 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle>Recent Messages</CardTitle>
                 <CardDescription>
-                  Conversation history between patients and your AI receptionist
+                  Conversation history between users and your AI assistant
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -172,7 +172,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {messages.map((message) => (
+                      {messages.slice().reverse().map((message) => (
                         <div
                           key={message.id}
                           className={`flex gap-3 ${message.sender === 'assistant' ? 'flex-row' : 'flex-row-reverse'}`}
@@ -226,7 +226,9 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Appointments</CardTitle>
-                    <CardDescription>Manage and view all your calendar appointments</CardDescription>
+                    <CardDescription>
+                      View all appointments booked through WhatsApp. Track status (confirmed, pending, cancelled) and appointment details synced with your Google Calendar.
+                    </CardDescription>
                   </div>
                   <div className="flex gap-2">
                     <Button
