@@ -28,13 +28,14 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
-// WhatsApp Messages Table
+// Messages Table (supports both Telegram and WhatsApp)
 export const whatsappMessages = pgTable("whatsapp_messages", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  phoneNumber: text("phone_number").notNull(),
+  phoneNumber: text("phone_number").notNull(), // For WhatsApp: phone number, For Telegram: chat_id
   messageContent: text("message_content").notNull(),
   sender: text("sender").notNull(), // 'user' or 'assistant'
   messageType: text("message_type").notNull(),
+  platform: text("platform").default("whatsapp").notNull(), // 'whatsapp' or 'telegram'
   aiResponse: text("ai_response"),
   processed: boolean("processed").default(false).notNull(),
   receivedAt: timestamp("received_at").defaultNow().notNull(),
@@ -51,7 +52,8 @@ export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
 // Appointments Table
 export const appointments = pgTable("appointments", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  phoneNumber: text("phone_number").notNull(),
+  phoneNumber: text("phone_number").notNull(), // For WhatsApp: phone number, For Telegram: chat_id
+  platform: text("platform").default("whatsapp").notNull(), // 'whatsapp' or 'telegram'
   contactName: text("contact_name"),
   appointmentDate: timestamp("appointment_date"),
   appointmentTitle: text("appointment_title"),
@@ -85,6 +87,8 @@ export const assistantSettings = pgTable("assistant_settings", {
   preferences: text("preferences"),
   whatsappNumber: text("whatsapp_number"),
   whatsappWebhookUrl: text("whatsapp_webhook_url"),
+  telegramBotUsername: text("telegram_bot_username"),
+  telegramWebhookUrl: text("telegram_webhook_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

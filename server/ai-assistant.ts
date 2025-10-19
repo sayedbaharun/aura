@@ -16,16 +16,16 @@ export interface PendingConfirmation {
 
 export const pendingConfirmations: Map<string, PendingConfirmation> = new Map();
 
-export async function processMessage(phoneNumber: string, messageText: string) {
+export async function processMessage(messageText: string, identifier: string, platform: 'whatsapp' | 'telegram' = 'whatsapp') {
   // Check if user is responding to a confirmation request
-  const pendingConfirmation = pendingConfirmations.get(phoneNumber);
+  const pendingConfirmation = pendingConfirmations.get(identifier);
   if (pendingConfirmation && (messageText.toLowerCase().includes('yes') || messageText.toLowerCase().includes('confirm'))) {
     // Execute the pending action
-    const result = await executePendingAction(phoneNumber, pendingConfirmation);
-    pendingConfirmations.delete(phoneNumber);
+    const result = await executePendingAction(identifier, pendingConfirmation, platform);
+    pendingConfirmations.delete(identifier);
     return result;
   } else if (pendingConfirmation && (messageText.toLowerCase().includes('no') || messageText.toLowerCase().includes('cancel'))) {
-    pendingConfirmations.delete(phoneNumber);
+    pendingConfirmations.delete(identifier);
     return "No problem! Let me know if you need anything else.";
   }
 
@@ -33,7 +33,7 @@ export async function processMessage(phoneNumber: string, messageText: string) {
   const settings = await storage.getSettings();
   
   // Get conversation history
-  const conversationHistory = await storage.getMessagesByPhone(phoneNumber, 10);
+  const conversationHistory = await storage.getMessagesByPhone(identifier, 10);
 
   // Build AI system prompt
   const assistantInfo = settings ? `
@@ -45,7 +45,8 @@ Default meeting duration: ${settings.defaultMeetingDuration} minutes
 ${settings.preferences ? `Additional preferences: ${settings.preferences}` : ''}
   `.trim() : 'Settings not configured yet.';
 
-  const systemPrompt = `You are ${settings?.assistantName || 'Aura'}, a helpful and friendly personal assistant managing ${settings?.userName || 'the user'}'s calendar via WhatsApp. 
+  const platformName = platform === 'telegram' ? 'Telegram' : 'WhatsApp';
+  const systemPrompt = `You are ${settings?.assistantName || 'Aura'}, a helpful and friendly personal assistant managing ${settings?.userName || 'the user'}'s calendar via ${platformName}. 
 
 Your capabilities:
 - View full schedule/calendar for any day
@@ -60,7 +61,7 @@ Important rules:
 2. Be conversational and friendly, but professional
 3. When suggesting time slots, provide 2-3 options
 4. Consider the user's working hours when suggesting times
-5. Be concise - WhatsApp messages should be short and clear
+5. Be concise - messages should be short and clear
 
 ${assistantInfo}
 
@@ -276,7 +277,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               timeStyle: 'short'
             })}. Confirm?`;
             
-            pendingConfirmations.set(phoneNumber, {
+            pendingConfirmations.set(identifier, {
               action: 'book',
               data: args,
               messageText: confirmationMessage
@@ -295,7 +296,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
   return finalResponse;
 }
 
-async function executePendingAction(phoneNumber: string, confirmation: PendingConfirmation) {
+async function executePendingAction(identifier: string, confirmation: PendingConfirmation, platform: 'whatsapp' | 'telegram' = 'whatsapp') {
   const { action, data } = confirmation;
 
   try {
@@ -310,7 +311,8 @@ async function executePendingAction(phoneNumber: string, confirmation: PendingCo
         
         // Store in database
         await storage.createAppointment({
-          phoneNumber,
+          phoneNumber: identifier,
+          platform,
           contactName: data.contactName || null,
           appointmentTitle: data.title,
           appointmentDate: new Date(data.startTime),

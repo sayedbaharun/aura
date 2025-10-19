@@ -39,6 +39,25 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
+  // Initialize Telegram bot webhook
+  try {
+    const { setupTelegramWebhook, removeTelegramWebhook, bot } = await import('./telegram-bot');
+    if (bot) {
+      // Only set webhook in production (when REPLIT_DEPLOYMENT is set or REPL_SLUG exists)
+      if (process.env.REPL_SLUG) {
+        const webhookUrl = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/telegram-webhook`;
+        await setupTelegramWebhook(webhookUrl);
+        log(`Telegram webhook configured: ${webhookUrl}`);
+      } else {
+        // In development, remove webhook and bot will use long polling automatically
+        await removeTelegramWebhook();
+        log('Telegram bot running in development mode (no webhook)');
+      }
+    }
+  } catch (error) {
+    log('Telegram bot webhook setup skipped:', String(error));
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

@@ -188,11 +188,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messageContent: messageText,
         sender: "user",
         messageType: "text",
+        platform: "whatsapp",
         processed: false,
       });
 
       // Process message with AI assistant
-      const aiResponse = await processMessage(phoneNumber, messageText);
+      const aiResponse = await processMessage(messageText, phoneNumber, 'whatsapp');
 
       // Store AI response
       await storage.createMessage({
@@ -200,6 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messageContent: aiResponse,
         sender: "assistant",
         messageType: "text",
+        platform: "whatsapp",
         processed: true,
       });
 
@@ -238,6 +240,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ error: "Internal server error" });
       }
+    }
+  });
+
+  // Telegram Webhook
+  app.post("/api/telegram-webhook", async (req, res) => {
+    try {
+      const { bot } = await import('./telegram-bot');
+      
+      if (!bot) {
+        return res.status(503).json({ error: "Telegram bot not configured" });
+      }
+
+      // Process update with Telegraf
+      await bot.handleUpdate(req.body);
+      res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("Telegram webhook error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
