@@ -38,7 +38,8 @@ export default function Dashboard() {
     queryKey: ["/api/settings"],
   });
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'}/functions/v1/whatsapp-webhook`;
+  // Get actual Twilio webhook URL (works in dev and production)
+  const webhookUrl = `${window.location.origin}/api/whatsapp-webhook`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(webhookUrl);

@@ -5,9 +5,12 @@ import {
   type InsertAppointment,
   type AssistantSettings,
   type InsertAssistantSettings,
+  type User,
+  type UpsertUser,
   whatsappMessages,
   appointments,
-  assistantSettings
+  assistantSettings,
+  users
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-serverless";
@@ -18,6 +21,10 @@ import ws from "ws";
 neonConfig.webSocketConstructor = ws;
 
 export interface IStorage {
+  // User operations - Required for Replit Auth
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+
   // WhatsApp Messages
   getMessages(limit?: number): Promise<WhatsappMessage[]>;
   createMessage(message: InsertWhatsappMessage): Promise<WhatsappMessage>;
@@ -42,6 +49,27 @@ export class DBStorage implements IStorage {
   constructor() {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     this.db = drizzle(pool);
+  }
+
+  // User operations - Required for Replit Auth
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await this.db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
   }
 
   // WhatsApp Messages

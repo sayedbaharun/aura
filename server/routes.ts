@@ -10,10 +10,26 @@ import {
   extractFacebookMessage, 
   extractMessageBirdMessage 
 } from "./twilio-whatsapp";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Get all messages
-  app.get("/api/messages", async (req, res) => {
+  // Setup authentication
+  await setupAuth(app);
+
+  // Auth route - get current user
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Get all messages (protected)
+  app.get("/api/messages", isAuthenticated, async (req, res) => {
     try {
       const messages = await storage.getMessages();
       res.json(messages);
@@ -22,8 +38,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a message
-  app.post("/api/messages", async (req, res) => {
+  // Create a message (protected)
+  app.post("/api/messages", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertWhatsappMessageSchema.parse(req.body);
       const message = await storage.createMessage(validatedData);
@@ -37,8 +53,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get messages by phone number
-  app.get("/api/messages/:phoneNumber", async (req, res) => {
+  // Get messages by phone number (protected)
+  app.get("/api/messages/:phoneNumber", isAuthenticated, async (req, res) => {
     try {
       const messages = await storage.getMessagesByPhone(req.params.phoneNumber);
       res.json(messages);
@@ -47,8 +63,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all appointments
-  app.get("/api/appointments", async (req, res) => {
+  // Get all appointments (protected)
+  app.get("/api/appointments", isAuthenticated, async (req, res) => {
     try {
       const appointments = await storage.getAppointments();
       res.json(appointments);
@@ -57,8 +73,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create an appointment
-  app.post("/api/appointments", async (req, res) => {
+  // Create an appointment (protected)
+  app.post("/api/appointments", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertAppointmentSchema.parse(req.body);
       const appointment = await storage.createAppointment(validatedData);
@@ -72,8 +88,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get a specific appointment
-  app.get("/api/appointments/:id", async (req, res) => {
+  // Get a specific appointment (protected)
+  app.get("/api/appointments/:id", isAuthenticated, async (req, res) => {
     try {
       const appointment = await storage.getAppointment(req.params.id);
       if (!appointment) {
@@ -85,8 +101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update an appointment
-  app.put("/api/appointments/:id", async (req, res) => {
+  // Update an appointment (protected)
+  app.put("/api/appointments/:id", isAuthenticated, async (req, res) => {
     try {
       const updates = insertAppointmentSchema.partial().parse(req.body);
       const appointment = await storage.updateAppointment(req.params.id, updates);
@@ -103,8 +119,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Cancel an appointment
-  app.delete("/api/appointments/:id", async (req, res) => {
+  // Cancel an appointment (protected)
+  app.delete("/api/appointments/:id", isAuthenticated, async (req, res) => {
     try {
       const appointment = await storage.cancelAppointment(req.params.id);
       if (!appointment) {
@@ -116,8 +132,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get assistant settings
-  app.get("/api/settings", async (req, res) => {
+  // Get assistant settings (protected)
+  app.get("/api/settings", isAuthenticated, async (req, res) => {
     try {
       const settings = await storage.getSettings();
       res.json(settings);
@@ -126,8 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update assistant settings
-  app.put("/api/settings", async (req, res) => {
+  // Update assistant settings (protected)
+  app.put("/api/settings", isAuthenticated, async (req, res) => {
     try {
       const updates = insertAssistantSettingsSchema.partial().parse(req.body);
       const settings = await storage.updateSettings(updates);
