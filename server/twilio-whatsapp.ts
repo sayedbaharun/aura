@@ -63,13 +63,13 @@ export async function sendWhatsAppMessage({ to, message, fromNumber }: SendMessa
  * Detect webhook type from request
  */
 export function detectWebhookType(req: Request): 'twilio' | 'facebook' | 'messagebird' | 'unknown' {
-  // Twilio sends TwiML parameters in body
-  if (req.body.MessageSid || req.body.SmsSid) {
+  // Twilio sends TwiML parameters in body (From/Body are core fields, MessageSid is optional in tests)
+  if (req.body.From && req.body.Body) {
     return 'twilio';
   }
   
   // Facebook/Meta sends structured JSON
-  if (req.body.object === 'whatsapp_business_account') {
+  if (req.body.object === 'whatsapp_business_account' || req.body.entry) {
     return 'facebook';
   }
   
