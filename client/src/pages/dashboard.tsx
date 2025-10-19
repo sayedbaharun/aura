@@ -80,6 +80,7 @@ export default function Dashboard() {
       userName: formData.get("userName"),
       userEmail: formData.get("userEmail"),
       userPhone: formData.get("userPhone"),
+      telegramBotUsername: formData.get("telegramBotUsername"),
       whatsappNumber: formData.get("whatsappNumber"),
       workingHours: formData.get("workingHours"),
       defaultMeetingDuration: formData.get("defaultMeetingDuration"),
@@ -167,7 +168,7 @@ export default function Dashboard() {
                       <Bot className="h-16 w-16 text-muted-foreground/20 mb-4" />
                       <p className="text-muted-foreground">No messages yet</p>
                       <p className="text-sm text-muted-foreground">
-                        Messages will appear here when patients contact your WhatsApp number
+                        Messages will appear here when users contact your assistant via Telegram
                       </p>
                     </div>
                   ) : (
@@ -188,10 +189,17 @@ export default function Dashboard() {
                             )}
                           </div>
                           <div className={`flex-1 max-w-[80%] ${message.sender === 'user' ? 'text-right' : ''}`}>
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               {message.sender === 'assistant' && (
                                 <Badge variant="outline" className="text-xs">AI</Badge>
                               )}
+                              <Badge 
+                                variant="secondary" 
+                                className="text-xs"
+                                data-testid={`badge-platform-${message.platform || 'whatsapp'}`}
+                              >
+                                {message.platform === 'telegram' ? '📱 Telegram' : '💬 WhatsApp'}
+                              </Badge>
                               <span className="text-xs text-muted-foreground">
                                 {message.phoneNumber}
                               </span>
@@ -381,12 +389,44 @@ export default function Dashboard() {
           {/* Settings Tab */}
           <TabsContent value="settings">
             <div className="grid gap-6">
-              {/* Webhook URL Card */}
+              {/* Telegram Bot Info Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle>WhatsApp Webhook</CardTitle>
+                  <CardTitle>Telegram Bot Configuration</CardTitle>
                   <CardDescription>
-                    Use this URL to connect your WhatsApp Business account
+                    Your Telegram bot is ready to receive messages
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-muted rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-sm">Bot Username</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Your Telegram bot username (configure in Settings below)
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">Active</Badge>
+                    </div>
+                    <div className="pt-3 border-t space-y-2">
+                      <h4 className="font-semibold text-sm">How to use:</h4>
+                      <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                        <li>Open Telegram and search for your bot username</li>
+                        <li>Start a conversation with /start</li>
+                        <li>Ask Aura to check your calendar, book appointments, or reschedule</li>
+                        <li>All interactions appear in the Messages tab above</li>
+                      </ol>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* WhatsApp Webhook Card (Optional) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>WhatsApp Webhook (Optional)</CardTitle>
+                  <CardDescription>
+                    Use this URL to also connect WhatsApp Business
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -488,18 +528,33 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="whatsappNumber">WhatsApp Business Number</Label>
-                        <Input
-                          id="whatsappNumber"
-                          name="whatsappNumber"
-                          defaultValue={settings?.whatsappNumber || ''}
-                          placeholder="+15558416669"
-                          data-testid="input-whatsapp-number"
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Your Twilio WhatsApp number (format: +1234567890)
-                        </p>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="telegramBotUsername">Telegram Bot Username</Label>
+                          <Input
+                            id="telegramBotUsername"
+                            name="telegramBotUsername"
+                            defaultValue={settings?.telegramBotUsername || ''}
+                            placeholder="@your_bot_name"
+                            data-testid="input-telegram-bot"
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            Your Telegram bot username (e.g., @aura_assistant_bot)
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="whatsappNumber">WhatsApp Number (Optional)</Label>
+                          <Input
+                            id="whatsappNumber"
+                            name="whatsappNumber"
+                            defaultValue={settings?.whatsappNumber || ''}
+                            placeholder="+15558416669"
+                            data-testid="input-whatsapp-number"
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            Your Twilio WhatsApp number (format: +1234567890)
+                          </p>
+                        </div>
                       </div>
 
                       <div className="grid md:grid-cols-2 gap-4">
