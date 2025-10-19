@@ -79,6 +79,7 @@ export default function Dashboard() {
       userName: formData.get("userName"),
       userEmail: formData.get("userEmail"),
       userPhone: formData.get("userPhone"),
+      whatsappNumber: formData.get("whatsappNumber"),
       workingHours: formData.get("workingHours"),
       defaultMeetingDuration: formData.get("defaultMeetingDuration"),
       timezone: formData.get("timezone"),
@@ -482,6 +483,20 @@ export default function Dashboard() {
                             data-testid="input-user-phone"
                           />
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="whatsappNumber">WhatsApp Business Number</Label>
+                        <Input
+                          id="whatsappNumber"
+                          name="whatsappNumber"
+                          defaultValue={settings?.whatsappNumber || ''}
+                          placeholder="+15558416669"
+                          data-testid="input-whatsapp-number"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Your Twilio WhatsApp number (format: +1234567890)
+                        </p>
                       </div>
 
                       <div className="grid md:grid-cols-2 gap-4">

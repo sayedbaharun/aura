@@ -4,6 +4,12 @@ import { storage } from "./storage";
 import { insertWhatsappMessageSchema, insertAppointmentSchema, insertAssistantSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { processMessage } from "./ai-assistant";
+import { 
+  detectWebhookType, 
+  extractTwilioMessage, 
+  extractFacebookMessage, 
+  extractMessageBirdMessage 
+} from "./twilio-whatsapp";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all messages
@@ -138,37 +144,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WhatsApp Webhook - Supports Twilio, Facebook/Meta, and MessageBird/Bird
   app.post("/api/whatsapp-webhook", async (req, res) => {
     try {
-      let phoneNumber: string | undefined;
-      let messageText: string | undefined;
-      let webhookType: 'twilio' | 'facebook' | 'messagebird' | 'unknown' = 'unknown';
-
-      // Parse different webhook formats
-      if (req.body.From || req.body.from) {
-        // Twilio format
-        webhookType = 'twilio';
-        phoneNumber = req.body.From || req.body.from;
-        messageText = req.body.Body || req.body.body;
-      } else if (req.body.entry && Array.isArray(req.body.entry) && req.body.entry[0]?.changes) {
-        // Facebook/Meta format
-        webhookType = 'facebook';
-        const changes = req.body.entry[0].changes;
-        if (changes && Array.isArray(changes) && changes[0]?.value?.messages) {
-          const message = changes[0].value.messages[0];
-          phoneNumber = message.from;
-          messageText = message.text?.body;
-        }
-      } else if (req.body.contact && req.body.message) {
-        // MessageBird/Bird format
-        webhookType = 'messagebird';
-        phoneNumber = req.body.contact.msisdn || req.body.contact.id;
-        messageText = req.body.message.content?.text;
+      // Detect webhook type
+      const webhookType = detectWebhookType(req);
+      
+      // Extract message data based on type
+      let messageData: { from: string; message: string } | null = null;
+      
+      if (webhookType === 'twilio') {
+        messageData = extractTwilioMessage(req);
+      } else if (webhookType === 'facebook') {
+        messageData = extractFacebookMessage(req);
+      } else if (webhookType === 'messagebird') {
+        messageData = extractMessageBirdMessage(req);
       }
 
-      if (!phoneNumber || !messageText) {
-        console.log("Invalid webhook data:", req.body);
+      if (!messageData) {
+        console.log(`Invalid ${webhookType} webhook data:`, req.body);
         return res.status(400).json({ error: "Invalid webhook data" });
       }
 
+      const { from: phoneNumber, message: messageText } = messageData;
       console.log(`Received ${webhookType} message from ${phoneNumber}: ${messageText}`);
 
       // Store the incoming user message

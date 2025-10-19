@@ -109,10 +109,17 @@ Three main tables:
    - Availability checking and conflict detection
    - Automatic token refresh mechanism
 
-3. **WhatsApp Integration**
-   - Webhook-based message receiving (not fully implemented in current codebase)
-   - Supports both Twilio and Facebook WhatsApp Business API formats
-   - Message sending capability (implementation referenced but not shown)
+3. **WhatsApp Integration via Twilio**
+   - **Twilio WhatsApp API** for sending and receiving messages
+   - Manual credential setup (user declined Replit connector)
+   - Webhook-based message receiving at `/api/whatsapp-webhook`
+   - Supports multiple webhook formats:
+     - **Twilio**: TwiML XML response format (primary)
+     - **Facebook/Meta**: JSON webhook with async sending
+     - **MessageBird**: JSON webhook format (alternative)
+   - Auto-detection of webhook provider
+   - Message extraction and response generation
+   - WhatsApp Business number stored in assistant settings
 
 4. **Neon Database**
    - Serverless PostgreSQL hosting
@@ -145,3 +152,11 @@ Three main tables:
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` - OpenAI endpoint
 - `REPLIT_CONNECTORS_HOSTNAME` - Replit services endpoint
 - `REPL_IDENTITY` or `WEB_REPL_RENEWAL` - Authentication tokens
+- `TWILIO_ACCOUNT_SID` - Twilio account identifier (manual setup)
+- `TWILIO_AUTH_TOKEN` - Twilio authentication token (manual setup)
+
+**Note on Twilio Integration**
+- User opted for manual Twilio credential setup instead of Replit connector
+- Credentials stored as secrets and accessed via environment variables
+- WhatsApp Business number configured in assistant settings
+- Supports both Sandbox (testing) and Production WhatsApp Business API

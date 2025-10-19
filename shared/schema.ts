@@ -58,6 +58,7 @@ export const assistantSettings = pgTable("assistant_settings", {
   defaultMeetingDuration: text("default_meeting_duration").default("60"),
   timezone: text("timezone").default("Asia/Dubai"),
   preferences: text("preferences"),
+  whatsappNumber: text("whatsapp_number"),
   whatsappWebhookUrl: text("whatsapp_webhook_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
