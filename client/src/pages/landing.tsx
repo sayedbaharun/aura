@@ -1,13 +1,57 @@
 import { Link } from "wouter";
-import { Calendar, Clock, MessageSquare, Bot, CheckCircle2 } from "lucide-react";
+import { Calendar, Clock, MessageSquare, Bot, CheckCircle2, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Landing() {
+  const { isAuthenticated, isLoading, user } = useAuth();
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-2">
+              <Bot className="h-6 w-6 text-primary" />
+              <span className="font-semibold text-lg">Aura</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {isLoading ? (
+                <div className="h-9 w-20 bg-secondary animate-pulse rounded"></div>
+              ) : isAuthenticated ? (
+                <>
+                  <Link href="/dashboard">
+                    <Button variant="ghost" data-testid="button-dashboard">
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.location.href = "/api/logout"}
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={() => window.location.href = "/api/login"}
+                  data-testid="button-login"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Login
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
         <div className="absolute inset-0 bg-gradient-to-br from-background via-secondary/30 to-background"></div>
         
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -24,11 +68,22 @@ export default function Landing() {
               </div>
               
               <div className="flex flex-wrap gap-4">
-                <Link href="/dashboard">
-                  <Button size="lg" className="h-11 px-8" data-testid="button-view-dashboard">
-                    View Dashboard
+                {isAuthenticated ? (
+                  <Link href="/dashboard">
+                    <Button size="lg" className="h-11 px-8" data-testid="button-view-dashboard">
+                      View Dashboard
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    size="lg"
+                    className="h-11 px-8"
+                    onClick={() => window.location.href = "/api/login"}
+                    data-testid="button-get-started"
+                  >
+                    Get Started
                   </Button>
-                </Link>
+                )}
               </div>
 
               <div className="flex items-center gap-6 pt-4">
