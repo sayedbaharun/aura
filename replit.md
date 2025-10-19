@@ -1,8 +1,8 @@
-# WhatsApp AI Personal Assistant - Replit Project Guide
+# Aura - AI Personal Assistant - Replit Project Guide
 
 ## Overview
 
-This is a WhatsApp-integrated AI personal assistant application named "Aura" that manages calendars and appointments through conversational interactions. The system uses OpenAI for natural language processing and Google Calendar for appointment management. Users interact with Aura via WhatsApp, and administrators can monitor conversations and appointments through a web dashboard.
+This is a Telegram and WhatsApp-integrated AI personal assistant application named "Aura" that manages calendars and appointments through conversational interactions. The system uses OpenAI for natural language processing and Google Calendar for appointment management. Users interact with Aura primarily via Telegram (with optional WhatsApp support), and administrators can monitor conversations and appointments through a secure web dashboard.
 
 The application is built as a full-stack TypeScript application with a React frontend, Express backend, and PostgreSQL database.
 
@@ -41,10 +41,12 @@ Preferred communication style: Simple, everyday language.
 
 **API Structure**
 - RESTful endpoints under `/api` prefix:
-  - `/api/messages` - WhatsApp message CRUD operations
+  - `/api/messages` - Message CRUD operations (supports both Telegram and WhatsApp)
   - `/api/appointments` - Appointment management
   - `/api/settings` - Assistant configuration
-- Query parameters for filtering (e.g., by phone number)
+  - `/api/telegram-webhook` - Telegram bot webhook endpoint
+  - `/api/whatsapp-webhook` - WhatsApp webhook endpoint (optional)
+- Query parameters for filtering (e.g., by phone number/chat ID)
 - Standardized error handling middleware
 
 **AI Integration**
@@ -74,19 +76,23 @@ Three main tables:
    - Stores user and assistant messages
    - Includes AI response metadata
    - Processing status flag
-   - Phone number for conversation threading
+   - Phone number for conversation threading (or chat_id for Telegram)
+   - Platform field to distinguish between Telegram and WhatsApp
 
 2. **appointments** - Calendar event records
-   - Links to phone numbers for user association
+   - Links to phone numbers for user association (or chat_id for Telegram)
    - Stores appointment metadata (title, date, duration)
    - Status tracking (pending, confirmed, cancelled)
    - Google Calendar event ID for synchronization
+   - Platform field to distinguish between Telegram and WhatsApp
    - Automatic timestamp updates via triggers
 
 3. **assistant_settings** - AI configuration
    - Personalization (assistant name, user name)
    - Timezone and working hours
    - Default meeting duration
+   - Telegram bot username
+   - WhatsApp Business number (optional)
    - Custom preferences text
 
 **Data Access Pattern**
@@ -109,7 +115,16 @@ Three main tables:
    - Availability checking and conflict detection
    - Automatic token refresh mechanism
 
-3. **WhatsApp Integration via Twilio**
+3. **Telegram Integration**
+   - **Telegram Bot API** via Telegraf library
+   - Webhook support for production deployments
+   - Long polling mode for development
+   - Message handling with AI assistant integration
+   - Bot token stored securely in Replit Secrets
+   - Webhook endpoint: `/api/telegram-webhook`
+   - Graceful shutdown handling
+
+4. **WhatsApp Integration via Twilio (Optional)**
    - **Twilio WhatsApp API** for sending and receiving messages
    - Manual credential setup (user declined Replit connector)
    - Webhook-based message receiving at `/api/whatsapp-webhook`
@@ -121,7 +136,7 @@ Three main tables:
    - Message extraction and response generation
    - WhatsApp Business number stored in assistant settings
 
-4. **Neon Database**
+5. **Neon Database**
    - Serverless PostgreSQL hosting
    - WebSocket-based connection pooling
    - Accessed via `DATABASE_URL` environment variable

@@ -243,23 +243,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Telegram Webhook
-  app.post("/api/telegram-webhook", async (req, res) => {
+  // Telegram Webhook - Use Telegraf's webhookCallback for proper handling
+  const setupTelegramWebhookRoute = async () => {
     try {
       const { bot } = await import('./telegram-bot');
-      
-      if (!bot) {
-        return res.status(503).json({ error: "Telegram bot not configured" });
+      if (bot) {
+        app.use(bot.webhookCallback('/api/telegram-webhook'));
       }
-
-      // Process update with Telegraf
-      await bot.handleUpdate(req.body);
-      res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("Telegram webhook error:", error);
-      res.status(500).json({ error: "Internal server error" });
+      console.error('Failed to setup Telegram webhook route:', error);
     }
-  });
+  };
+  await setupTelegramWebhookRoute();
 
   const httpServer = createServer(app);
   return httpServer;

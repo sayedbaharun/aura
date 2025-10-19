@@ -39,25 +39,6 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  // Initialize Telegram bot webhook
-  try {
-    const { setupTelegramWebhook, removeTelegramWebhook, bot } = await import('./telegram-bot');
-    if (bot) {
-      // Only set webhook in production (when REPLIT_DEPLOYMENT is set or REPL_SLUG exists)
-      if (process.env.REPL_SLUG) {
-        const webhookUrl = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/telegram-webhook`;
-        await setupTelegramWebhook(webhookUrl);
-        log(`Telegram webhook configured: ${webhookUrl}`);
-      } else {
-        // In development, remove webhook and bot will use long polling automatically
-        await removeTelegramWebhook();
-        log('Telegram bot running in development mode (no webhook)');
-      }
-    }
-  } catch (error) {
-    log('Telegram bot webhook setup skipped:', String(error));
-  }
-
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -84,7 +65,49 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    
+    // Initialize Telegram bot webhook or polling AFTER server starts
+    let telegramBot: any = null;
+    try {
+      const { setupTelegramWebhook, removeTelegramWebhook, bot } = await import('./telegram-bot');
+      telegramBot = bot;
+      
+      if (bot) {
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT;
+        
+        if (isProduction && process.env.REPL_SLUG) {
+          // Production: use webhook
+          const webhookUrl = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/telegram-webhook`;
+          await setupTelegramWebhook(webhookUrl);
+          log(`Telegram webhook configured: ${webhookUrl}`);
+        } else {
+          // Development: use polling
+          await removeTelegramWebhook();
+          await bot.launch();
+          log('Telegram bot running in polling mode (development)');
+        }
+      }
+    } catch (error) {
+      log('Telegram bot setup skipped:', String(error));
+    }
+    
+    // Graceful shutdown
+    const gracefulShutdown = async () => {
+      log('Shutting down gracefully...');
+      if (telegramBot) {
+        try {
+          await telegramBot.stop();
+          log('Telegram bot stopped');
+        } catch (error) {
+          log('Error stopping Telegram bot:', String(error));
+        }
+      }
+      process.exit(0);
+    };
+    
+    process.once('SIGINT', gracefulShutdown);
+    process.once('SIGTERM', gracefulShutdown);
   });
 })();
