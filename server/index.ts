@@ -77,9 +77,14 @@ app.use((req, res, next) => {
       if (bot) {
         const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT;
         
-        if (isProduction && process.env.REPL_SLUG) {
-          // Production: use webhook
-          const webhookUrl = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/telegram-webhook`;
+        if (isProduction) {
+          // Production: use webhook with published domain
+          // REPLIT_DOMAINS is available in published deployments (e.g., "aurasb.replit.app")
+          const domain = process.env.REPLIT_DOMAINS 
+            ? process.env.REPLIT_DOMAINS.split(',')[0] 
+            : `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+          
+          const webhookUrl = `https://${domain}/api/telegram-webhook`;
           await setupTelegramWebhook(webhookUrl);
           log(`Telegram webhook configured: ${webhookUrl}`);
         } else {
