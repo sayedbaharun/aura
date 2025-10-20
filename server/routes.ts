@@ -34,6 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const messages = await storage.getMessages();
       res.json(messages);
     } catch (error) {
+      console.error("Error fetching messages:", error);
       res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
@@ -69,6 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const appointments = await storage.getAppointments();
       res.json(appointments);
     } catch (error) {
+      console.error("Error fetching appointments:", error);
       res.status(500).json({ error: "Failed to fetch appointments" });
     }
   });
@@ -138,6 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getSettings();
       res.json(settings);
     } catch (error) {
+      console.error("Error fetching settings:", error);
       res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
@@ -149,6 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.updateSettings(updates);
       res.json(settings);
     } catch (error) {
+      console.error("Error updating settings:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid settings data", details: error.errors });
       } else {
