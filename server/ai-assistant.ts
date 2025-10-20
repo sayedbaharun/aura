@@ -63,6 +63,7 @@ Important rules:
 4. Consider the user's working hours when suggesting times
 5. Be concise - messages should be short and clear
 6. TIME EXTRACTION: When user says "cancel X and book Y at the same time" or similar, ALWAYS use search_events first to find event X, extract its exact start/end times, then use those EXACT times for booking event Y. Never use default times when replacing events.
+7. BOOK vs RESCHEDULE: "Cancel X and book Y" = TWO separate actions (cancel X, then request_book_appointment for Y). "Reschedule X to [new time]" = ONE action (request_reschedule_appointment). NEVER reschedule when user wants to cancel one event and create a different event.
 
 ${assistantInfo}
 
@@ -235,7 +236,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
       type: "function",
       function: {
         name: "request_reschedule_appointment",
-        description: "Request to reschedule an existing appointment (requires user confirmation)",
+        description: "Request to reschedule an existing appointment (requires user confirmation). Can also add attendees when rescheduling.",
         parameters: {
           type: "object",
           properties: {
@@ -254,6 +255,11 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             newEndTime: {
               type: "string",
               description: "New end time in ISO format",
+            },
+            attendeeEmails: {
+              type: "array",
+              items: { type: "string" },
+              description: "Email addresses of attendees to invite (optional)",
             },
           },
           required: ["eventId", "eventTitle", "newStartTime", "newEndTime"],
@@ -398,11 +404,16 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             break;
 
           case "request_reschedule_appointment":
-            const rescheduleMessage = `I'll reschedule "${args.eventTitle}" to ${new Date(args.newStartTime).toLocaleString('en-US', { 
+            let rescheduleMessage = `I'll reschedule "${args.eventTitle}" to ${new Date(args.newStartTime).toLocaleString('en-US', { 
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
               timeStyle: 'short'
-            })}. Confirm?`;
+            })}`;
+            
+            if (args.attendeeEmails && args.attendeeEmails.length > 0) {
+              rescheduleMessage += ` and send invites to ${args.attendeeEmails.join(', ')}`;
+            }
+            rescheduleMessage += '. Confirm?';
             
             pendingConfirmations.set(identifier, {
               action: 'reschedule',
@@ -487,15 +498,23 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           await calendar.updateEvent(data.eventId, {
             startTime: new Date(data.newStartTime),
             endTime: new Date(data.newEndTime),
+            attendeeEmails: data.attendeeEmails,
           });
         }
-        return `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', { 
+        const settings = await storage.getSettings();
+        let rescheduleSuccessMsg = `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', { 
+          timeZone: settings?.timezone || 'Asia/Dubai',
           month: 'short',
           day: 'numeric',
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
-        })}.`;
+        })}`;
+        if (data.attendeeEmails && data.attendeeEmails.length > 0) {
+          rescheduleSuccessMsg += ` and invites sent to the attendees`;
+        }
+        rescheduleSuccessMsg += '.';
+        return rescheduleSuccessMsg;
 
       default:
         return "I'm not sure what to do with that. Can you try again?";

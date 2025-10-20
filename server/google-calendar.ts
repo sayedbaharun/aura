@@ -157,6 +157,7 @@ export async function updateEvent(eventId: string, updates: {
   startTime?: Date;
   endTime?: Date;
   description?: string;
+  attendeeEmails?: string[];
 }) {
   const calendar = await getUncachableGoogleCalendarClient();
   
@@ -176,10 +177,16 @@ export async function updateEvent(eventId: string, updates: {
     };
   }
 
+  // Add attendees if provided
+  if (updates.attendeeEmails && updates.attendeeEmails.length > 0) {
+    event.attendees = updates.attendeeEmails.map(email => ({ email }));
+  }
+
   const response = await calendar.events.patch({
     calendarId: 'primary',
     eventId,
     requestBody: event,
+    sendUpdates: updates.attendeeEmails && updates.attendeeEmails.length > 0 ? 'all' : 'none',
   });
 
   return response.data;
