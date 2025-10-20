@@ -149,8 +149,33 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
     {
       type: "function",
       function: {
+        name: "search_events",
+        description: "Search for events on the calendar by title, description, or keywords. Use this to find specific events like 'gym', 'meeting with Warren', etc.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Search query (e.g., 'gym', 'meeting', 'lunch')",
+            },
+            startDate: {
+              type: "string",
+              description: "Optional: limit search to events after this date (ISO format)",
+            },
+            endDate: {
+              type: "string",
+              description: "Optional: limit search to events before this date (ISO format)",
+            },
+          },
+          required: ["query"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
         name: "request_book_appointment",
-        description: "Request to book a new appointment (requires user confirmation)",
+        description: "Request to book a new appointment (requires user confirmation). Can include attendee emails to send calendar invites.",
         parameters: {
           type: "object",
           properties: {
@@ -170,8 +195,67 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               type: "string",
               description: "Additional details or notes",
             },
+            attendeeEmails: {
+              type: "array",
+              items: { type: "string" },
+              description: "Email addresses of attendees to invite (optional)",
+            },
           },
           required: ["title", "startTime", "endTime"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "request_cancel_appointment",
+        description: "Request to cancel an existing appointment (requires user confirmation). Provide the event ID from search_events.",
+        parameters: {
+          type: "object",
+          properties: {
+            eventId: {
+              type: "string",
+              description: "Google Calendar event ID",
+            },
+            eventTitle: {
+              type: "string",
+              description: "Title of the event to cancel (for confirmation message)",
+            },
+            eventTime: {
+              type: "string",
+              description: "Start time of the event (for confirmation message)",
+            },
+          },
+          required: ["eventId", "eventTitle", "eventTime"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "request_reschedule_appointment",
+        description: "Request to reschedule an existing appointment (requires user confirmation)",
+        parameters: {
+          type: "object",
+          properties: {
+            eventId: {
+              type: "string",
+              description: "Google Calendar event ID",
+            },
+            eventTitle: {
+              type: "string",
+              description: "Current title of the event",
+            },
+            newStartTime: {
+              type: "string",
+              description: "New start time in ISO format",
+            },
+            newEndTime: {
+              type: "string",
+              description: "New end time in ISO format",
+            },
+          },
+          required: ["eventId", "eventTitle", "newStartTime", "newEndTime"],
         },
       },
     },
@@ -269,21 +353,84 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             }
             break;
 
+          case "search_events":
+            const searchResults = await calendar.searchEvents(
+              args.query,
+              args.startDate ? new Date(args.startDate) : undefined,
+              args.endDate ? new Date(args.endDate) : undefined
+            );
+            
+            if (searchResults.length === 0) {
+              finalResponse = `I couldn't find any events matching "${args.query}".`;
+            } else {
+              const resultList = searchResults.map((event: any) => {
+                const start = event.start?.dateTime || event.start?.date;
+                const startTime = new Date(start).toLocaleString('en-US', { 
+                  timeZone: settings?.timezone || 'Asia/Dubai',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: event.start?.dateTime ? 'numeric' : undefined,
+                  minute: event.start?.dateTime ? '2-digit' : undefined,
+                  hour12: true
+                });
+                return `• ${startTime} - ${event.summary || 'Untitled'} (ID: ${event.id})`;
+              }).join('\n');
+              finalResponse = `Found ${searchResults.length} event(s):\n\n${resultList}`;
+            }
+            break;
+
           case "request_book_appointment":
-            // Store pending confirmation
-            const confirmationMessage = `I'll book "${args.title}" for ${new Date(args.startTime).toLocaleString('en-US', { 
+            // Store pending confirmation with attendees
+            let bookMessage = `I'll book "${args.title}" for ${new Date(args.startTime).toLocaleString('en-US', { 
+              timeZone: settings?.timezone || 'Asia/Dubai',
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            })}`;
+            
+            if (args.attendeeEmails && args.attendeeEmails.length > 0) {
+              bookMessage += ` and send invites to ${args.attendeeEmails.join(', ')}`;
+            }
+            bookMessage += '. Confirm?';
+            
+            pendingConfirmations.set(identifier, {
+              action: 'book',
+              data: args,
+              messageText: bookMessage
+            });
+            
+            finalResponse = bookMessage;
+            break;
+
+          case "request_cancel_appointment":
+            const cancelMessage = `I'll cancel "${args.eventTitle}" scheduled for ${new Date(args.eventTime).toLocaleString('en-US', { 
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
               timeStyle: 'short'
             })}. Confirm?`;
             
             pendingConfirmations.set(identifier, {
-              action: 'book',
+              action: 'cancel',
               data: args,
-              messageText: confirmationMessage
+              messageText: cancelMessage
             });
             
-            finalResponse = confirmationMessage;
+            finalResponse = cancelMessage;
+            break;
+
+          case "request_reschedule_appointment":
+            const rescheduleMessage = `I'll reschedule "${args.eventTitle}" to ${new Date(args.newStartTime).toLocaleString('en-US', { 
+              timeZone: settings?.timezone || 'Asia/Dubai',
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            })}. Confirm?`;
+            
+            pendingConfirmations.set(identifier, {
+              action: 'reschedule',
+              data: args,
+              messageText: rescheduleMessage
+            });
+            
+            finalResponse = rescheduleMessage;
             break;
         }
       } catch (error) {
@@ -306,7 +453,8 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           data.title,
           new Date(data.startTime),
           new Date(data.endTime),
-          data.description
+          data.description,
+          data.attendeeEmails // Pass attendee emails
         );
         
         // Store in database
@@ -322,26 +470,33 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           notes: data.description || null,
         });
         
-        return `✓ Booked! I've added "${data.title}" to your calendar.`;
+        let bookSuccessMsg = `✓ Booked! I've added "${data.title}" to your calendar`;
+        if (data.attendeeEmails && data.attendeeEmails.length > 0) {
+          bookSuccessMsg += ` and sent invites to the attendees`;
+        }
+        bookSuccessMsg += '.';
+        return bookSuccessMsg;
 
       case 'cancel':
-        if (data.googleEventId) {
-          await calendar.deleteEvent(data.googleEventId);
+        if (data.eventId) {
+          await calendar.deleteEvent(data.eventId);
         }
-        await storage.cancelAppointment(data.appointmentId);
-        return `✓ Cancelled. The appointment has been removed from your calendar.`;
+        return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
 
       case 'reschedule':
-        if (data.googleEventId) {
-          await calendar.updateEvent(data.googleEventId, {
+        if (data.eventId) {
+          await calendar.updateEvent(data.eventId, {
             startTime: new Date(data.newStartTime),
             endTime: new Date(data.newEndTime),
           });
         }
-        await storage.updateAppointment(data.appointmentId, {
-          appointmentDate: new Date(data.newStartTime),
-        });
-        return `✓ Rescheduled! Your appointment has been updated.`;
+        return `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', { 
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        })}.`;
 
       default:
         return "I'm not sure what to do with that. Can you try again?";

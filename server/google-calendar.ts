@@ -115,10 +115,16 @@ export async function findFreeSlots(startDate: Date, endDate: Date, durationMinu
   return freeSlots;
 }
 
-export async function createEvent(summary: string, startTime: Date, endTime: Date, description?: string) {
+export async function createEvent(
+  summary: string, 
+  startTime: Date, 
+  endTime: Date, 
+  description?: string,
+  attendeeEmails?: string[]
+) {
   const calendar = await getUncachableGoogleCalendarClient();
   
-  const event = {
+  const event: any = {
     summary,
     description,
     start: {
@@ -131,9 +137,16 @@ export async function createEvent(summary: string, startTime: Date, endTime: Dat
     },
   };
 
+  // Add attendees if provided
+  if (attendeeEmails && attendeeEmails.length > 0) {
+    event.attendees = attendeeEmails.map(email => ({ email }));
+    event.sendUpdates = 'all'; // Send email invitations
+  }
+
   const response = await calendar.events.insert({
     calendarId: 'primary',
     requestBody: event,
+    sendUpdates: attendeeEmails && attendeeEmails.length > 0 ? 'all' : 'none',
   });
 
   return response.data;
@@ -181,4 +194,19 @@ export async function deleteEvent(eventId: string) {
   });
 
   return true;
+}
+
+export async function searchEvents(query: string, timeMin?: Date, timeMax?: Date) {
+  const calendar = await getUncachableGoogleCalendarClient();
+  
+  const response = await calendar.events.list({
+    calendarId: 'primary',
+    q: query,
+    timeMin: timeMin?.toISOString(),
+    timeMax: timeMax?.toISOString(),
+    singleEvents: true,
+    orderBy: 'startTime',
+  });
+
+  return response.data.items || [];
 }
