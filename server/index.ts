@@ -84,9 +84,25 @@ app.use((req, res, next) => {
           log(`Telegram webhook configured: ${webhookUrl}`);
         } else {
           // Development: use polling
+          log('Starting Telegram bot in development mode...');
           await removeTelegramWebhook();
-          await bot.launch();
-          log('Telegram bot running in polling mode (development)');
+          log('Webhook removed, launching bot...');
+          try {
+            // Launch bot with timeout to prevent hanging
+            const launchPromise = bot.launch({
+              dropPendingUpdates: true, // Skip old updates
+            });
+            
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Bot launch timeout')), 10000)
+            );
+            
+            await Promise.race([launchPromise, timeoutPromise]);
+            log('✓ Telegram bot running in polling mode (development)');
+          } catch (launchError) {
+            log('⚠ Telegram bot launch issue:', String(launchError));
+            log('Bot may still receive messages via webhook when deployed');
+          }
         }
       }
     } catch (error) {
