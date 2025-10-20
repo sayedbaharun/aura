@@ -50,10 +50,12 @@ Preferred communication style: Simple, everyday language.
 - Standardized error handling middleware
 
 **AI Integration**
-- **OpenAI API** via Replit AI Integrations for natural language understanding
+- **OpenAI API** via Replit AI Integrations for natural language understanding (GPT-4o)
 - Conversation context management with message history (10 messages)
+- Multi-turn tool calling loop - AI can search events, extract times, and use them for follow-up actions
 - Pending confirmation system for user actions requiring approval
-- Function calling pattern for calendar operations
+- Function calling pattern for calendar operations with structured tool results
+- Support for search_events, cancel_appointment, reschedule_appointment, and booking with attendees
 
 **Calendar Integration**
 - **Google Calendar API** via googleapis library

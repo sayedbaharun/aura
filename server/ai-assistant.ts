@@ -62,6 +62,7 @@ Important rules:
 3. When suggesting time slots, provide 2-3 options
 4. Consider the user's working hours when suggesting times
 5. Be concise - messages should be short and clear
+6. TIME EXTRACTION: When user says "cancel X and book Y at the same time" or similar, ALWAYS use search_events first to find event X, extract its exact start/end times, then use those EXACT times for booking event Y. Never use default times when replacing events.
 
 ${assistantInfo}
 
@@ -261,28 +262,43 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
     },
   ];
 
-  // Call OpenAI (Replit AI)
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages,
-    tools,
-    temperature: 0.7,
-  });
-
-  const choice = completion.choices[0];
+  // Multi-turn tool calling loop - allows AI to use search results for follow-up actions
+  let conversationMessages = [...messages];
+  let finalResponse = "";
+  const maxTurns = 5; // Prevent infinite loops
   
-  if (!choice || !choice.message) {
-    throw new Error("No response from AI");
-  }
+  for (let turn = 0; turn < maxTurns; turn++) {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: conversationMessages,
+      tools,
+      temperature: 0.7,
+    });
 
-  let finalResponse = choice.message.content || "I'm here to help! How can I assist you today?";
+    const choice = completion.choices[0];
+    
+    if (!choice || !choice.message) {
+      throw new Error("No response from AI");
+    }
 
-  // Handle tool calls if present
-  if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
+    // If no tool calls, we have our final response
+    if (!choice.message.tool_calls || choice.message.tool_calls.length === 0) {
+      finalResponse = choice.message.content || "I'm here to help! How can I assist you today?";
+      break;
+    }
+
+    // Add assistant message with tool calls to conversation
+    conversationMessages.push(choice.message);
+
+    // Process each tool call and collect results for next turn
+    const toolResults: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
+    
     for (const toolCall of choice.message.tool_calls) {
       if (toolCall.type !== 'function') continue;
       const functionName = toolCall.function.name;
       const args = JSON.parse(toolCall.function.arguments);
+
+      let toolResult = "";
 
       try {
         switch (functionName) {
@@ -290,33 +306,18 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             const events = await calendar.listEvents(
               new Date(args.startDate),
               new Date(args.endDate),
-              50 // Get up to 50 events
+              50
             );
             
             if (events.length === 0) {
-              finalResponse = `Your calendar is clear for that time! No scheduled appointments.`;
+              toolResult = `Calendar is clear - no scheduled appointments.`;
             } else {
-              const eventList = events.map((event: any) => {
-                const start = event.start?.dateTime || event.start?.date;
-                const startTime = new Date(start).toLocaleString('en-US', { 
-                  timeZone: settings?.timezone || 'Asia/Dubai',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: event.start?.dateTime ? 'numeric' : undefined,
-                  minute: event.start?.dateTime ? '2-digit' : undefined,
-                  hour12: true
-                });
-                return `• ${startTime} - ${event.summary || 'Untitled'}`;
-              }).join('\n');
-              
-              const dateStr = new Date(args.startDate).toLocaleDateString('en-US', { 
-                timeZone: settings?.timezone || 'Asia/Dubai',
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric'
-              });
-              
-              finalResponse = `Here's your schedule for ${dateStr}:\n\n${eventList}`;
+              toolResult = JSON.stringify(events.map((e: any) => ({
+                title: e.summary,
+                start: e.start?.dateTime || e.start?.date,
+                end: e.end?.dateTime || e.end?.date,
+                id: e.id
+              })));
             }
             break;
 
@@ -325,9 +326,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               new Date(args.startTime),
               new Date(args.endTime)
             );
-            finalResponse = isAvailable 
-              ? `Yes, you're free at that time! Would you like me to book something?`
-              : `Sorry, you have a conflict at that time. Would you like me to suggest other times?`;
+            toolResult = isAvailable ? "Time slot is available" : "Time slot is NOT available - conflict exists";
             break;
 
           case "find_free_slots":
@@ -336,21 +335,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               new Date(args.endDate),
               args.durationMinutes || 60
             );
-            
-            if (freeSlots.length === 0) {
-              finalResponse = `I couldn't find any free slots in that time range. Try a different date?`;
-            } else {
-              const slotList = freeSlots.slice(0, 3).map(slot => 
-                `${new Date(slot.start).toLocaleString('en-US', { 
-                  timeZone: settings?.timezone || 'Asia/Dubai',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit'
-                })}`
-              ).join(', ');
-              finalResponse = `Here are some free slots: ${slotList}. Which one works for you?`;
-            }
+            toolResult = freeSlots.length === 0 ? "No free slots found" : JSON.stringify(freeSlots.slice(0, 5));
             break;
 
           case "search_events":
@@ -361,26 +346,19 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             );
             
             if (searchResults.length === 0) {
-              finalResponse = `I couldn't find any events matching "${args.query}".`;
+              toolResult = `No events found matching "${args.query}"`;
             } else {
-              const resultList = searchResults.map((event: any) => {
-                const start = event.start?.dateTime || event.start?.date;
-                const startTime = new Date(start).toLocaleString('en-US', { 
-                  timeZone: settings?.timezone || 'Asia/Dubai',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: event.start?.dateTime ? 'numeric' : undefined,
-                  minute: event.start?.dateTime ? '2-digit' : undefined,
-                  hour12: true
-                });
-                return `• ${startTime} - ${event.summary || 'Untitled'} (ID: ${event.id})`;
-              }).join('\n');
-              finalResponse = `Found ${searchResults.length} event(s):\n\n${resultList}`;
+              toolResult = JSON.stringify(searchResults.map((e: any) => ({
+                title: e.summary,
+                start: e.start?.dateTime || e.start?.date,
+                end: e.end?.dateTime || e.end?.date,
+                id: e.id,
+                description: e.description
+              })));
             }
             break;
 
           case "request_book_appointment":
-            // Store pending confirmation with attendees
             let bookMessage = `I'll book "${args.title}" for ${new Date(args.startTime).toLocaleString('en-US', { 
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
@@ -398,6 +376,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               messageText: bookMessage
             });
             
+            toolResult = "PENDING_CONFIRMATION";
             finalResponse = bookMessage;
             break;
 
@@ -414,6 +393,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               messageText: cancelMessage
             });
             
+            toolResult = "PENDING_CONFIRMATION";
             finalResponse = cancelMessage;
             break;
 
@@ -430,14 +410,33 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               messageText: rescheduleMessage
             });
             
+            toolResult = "PENDING_CONFIRMATION";
             finalResponse = rescheduleMessage;
             break;
+
+          default:
+            toolResult = `Unknown function: ${functionName}`;
         }
       } catch (error) {
         console.error(`Error executing tool ${functionName}:`, error);
-        finalResponse = `I had trouble processing that request. Could you try rephrasing?`;
+        toolResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
+
+      // Add tool result to list
+      toolResults.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: toolResult,
+      });
     }
+
+    // If we got a confirmation request, stop the loop and return immediately
+    if (finalResponse) {
+      break;
+    }
+
+    // Add tool results to conversation for next turn
+    conversationMessages.push(...toolResults);
   }
 
   return finalResponse;
