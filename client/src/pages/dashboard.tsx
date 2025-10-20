@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Calendar, MessageSquare, Settings, Bot, Phone, Clock, User, Copy, CheckCircle2, LayoutList } from "lucide-react";
@@ -523,48 +523,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              {/* WhatsApp Webhook Card (Optional) */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>WhatsApp Webhook (Optional)</CardTitle>
-                  <CardDescription>
-                    Use this URL to also connect WhatsApp Business
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      value={webhookUrl}
-                      readOnly
-                      className="font-mono text-sm"
-                      data-testid="input-webhook-url"
-                    />
-                    <Button
-                      onClick={copyToClipboard}
-                      variant="outline"
-                      className="gap-2"
-                      data-testid="button-copy-webhook"
-                    >
-                      {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      {copied ? 'Copied' : 'Copy'}
-                    </Button>
-                  </div>
-
-                  <div className="bg-muted rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold text-sm">MessageBird/Bird Setup Instructions:</h4>
-                    <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                      <li>Log in to your MessageBird/Bird Dashboard</li>
-                      <li>Navigate to Channels → WhatsApp → Settings</li>
-                      <li>In the Webhook section, paste the URL above</li>
-                      <li>Set HTTP Method to POST</li>
-                      <li>Save your changes</li>
-                    </ol>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Note: Also supports Twilio and Facebook/Meta webhooks
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* WhatsApp Webhook Card (Hidden - Optional feature) */}
 
               {/* Assistant Settings Form */}
               <Card>
