@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [copied, setCopied] = useState(false);
+  const [platformFilter, setPlatformFilter] = useState<"all" | "telegram" | "whatsapp">("all");
 
   // Fetch messages with 5s refresh
   const { data: messages = [], isLoading: messagesLoading } = useQuery<WhatsappMessage[]>({
@@ -102,15 +103,30 @@ export default function Dashboard() {
     }
   };
 
-  const selectedDateAppointments = appointments.filter(apt => {
+  // Filter messages and appointments by platform
+  const filteredMessages = platformFilter === "all" 
+    ? messages 
+    : messages.filter(msg => msg.platform === platformFilter);
+
+  const filteredAppointments = platformFilter === "all" 
+    ? appointments 
+    : appointments.filter(apt => apt.platform === platformFilter);
+
+  const selectedDateAppointments = filteredAppointments.filter(apt => {
     if (!apt.appointmentDate || !selectedDate) return false;
     const aptDate = new Date(apt.appointmentDate);
     return aptDate.toDateString() === selectedDate.toDateString();
   });
 
-  const appointmentDates = appointments
+  const appointmentDates = filteredAppointments
     .filter(apt => apt.appointmentDate)
     .map(apt => new Date(apt.appointmentDate!).toDateString());
+
+  // Count by platform
+  const telegramCount = messages.filter(m => m.platform === 'telegram').length;
+  const whatsappCount = messages.filter(m => m.platform === 'whatsapp' || !m.platform).length;
+  const telegramAppointmentsCount = appointments.filter(a => a.platform === 'telegram').length;
+  const whatsappAppointmentsCount = appointments.filter(a => a.platform === 'whatsapp' || !a.platform).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,10 +166,40 @@ export default function Dashboard() {
           <TabsContent value="messages">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Messages</CardTitle>
-                <CardDescription>
-                  Conversation history between users and your AI assistant
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Recent Messages</CardTitle>
+                    <CardDescription>
+                      Conversation history between users and your AI assistant
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={platformFilter === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPlatformFilter("all")}
+                      data-testid="button-filter-all"
+                    >
+                      All ({messages.length})
+                    </Button>
+                    <Button
+                      variant={platformFilter === "telegram" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPlatformFilter("telegram")}
+                      data-testid="button-filter-telegram"
+                    >
+                      📱 Telegram ({telegramCount})
+                    </Button>
+                    <Button
+                      variant={platformFilter === "whatsapp" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPlatformFilter("whatsapp")}
+                      data-testid="button-filter-whatsapp"
+                    >
+                      💬 WhatsApp ({whatsappCount})
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[600px] pr-4">
@@ -163,17 +209,23 @@ export default function Dashboard() {
                         <div key={i} className="h-24 bg-muted animate-pulse rounded-lg"></div>
                       ))}
                     </div>
-                  ) : messages.length === 0 ? (
+                  ) : filteredMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-[400px] text-center">
                       <Bot className="h-16 w-16 text-muted-foreground/20 mb-4" />
-                      <p className="text-muted-foreground">No messages yet</p>
+                      <p className="text-muted-foreground">
+                        {platformFilter === "all" 
+                          ? "No messages yet" 
+                          : `No ${platformFilter === "telegram" ? "Telegram" : "WhatsApp"} messages yet`}
+                      </p>
                       <p className="text-sm text-muted-foreground">
-                        Messages will appear here when users contact your assistant via Telegram
+                        {platformFilter === "all"
+                          ? "Messages will appear here when users contact your assistant"
+                          : `Try switching to another platform to see messages`}
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {messages.slice().reverse().map((message) => (
+                      {filteredMessages.slice().reverse().map((message) => (
                         <div
                           key={message.id}
                           className={`flex gap-3 ${message.sender === 'assistant' ? 'flex-row' : 'flex-row-reverse'}`}
@@ -231,32 +283,60 @@ export default function Dashboard() {
           <TabsContent value="appointments">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
                     <CardTitle>Appointments</CardTitle>
                     <CardDescription>
-                      View all appointments booked through WhatsApp. Track status (confirmed, pending, cancelled) and appointment details synced with your Google Calendar.
+                      View all appointments booked through Telegram or WhatsApp. Track status and details synced with your Google Calendar.
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant={viewMode === "calendar" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("calendar")}
-                      data-testid="button-calendar-view"
-                    >
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Calendar
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      data-testid="button-list-view"
-                    >
-                      <LayoutList className="h-4 w-4 mr-2" />
-                      List
-                    </Button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <Button
+                        variant={viewMode === "calendar" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setViewMode("calendar")}
+                        data-testid="button-calendar-view"
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Calendar
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        data-testid="button-list-view"
+                      >
+                        <LayoutList className="h-4 w-4 mr-2" />
+                        List
+                      </Button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      <Button
+                        variant={platformFilter === "all" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPlatformFilter("all")}
+                        data-testid="button-filter-appointments-all"
+                      >
+                        All ({appointments.length})
+                      </Button>
+                      <Button
+                        variant={platformFilter === "telegram" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPlatformFilter("telegram")}
+                        data-testid="button-filter-appointments-telegram"
+                      >
+                        📱 Telegram ({telegramAppointmentsCount})
+                      </Button>
+                      <Button
+                        variant={platformFilter === "whatsapp" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPlatformFilter("whatsapp")}
+                        data-testid="button-filter-appointments-whatsapp"
+                      >
+                        💬 WhatsApp ({whatsappAppointmentsCount})
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -298,9 +378,16 @@ export default function Dashboard() {
                             {selectedDateAppointments.map((apt) => (
                               <Card key={apt.id} className="p-4" data-testid={`appointment-${apt.id}`}>
                                 <div className="flex items-start justify-between mb-2">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <User className="h-4 w-4 text-muted-foreground" />
                                     <span className="font-medium">{apt.contactName || 'Contact'}</span>
+                                    <Badge 
+                                      variant="secondary" 
+                                      className="text-xs"
+                                      data-testid={`badge-cal-platform-${apt.platform || 'whatsapp'}`}
+                                    >
+                                      {apt.platform === 'telegram' ? '📱' : '💬'}
+                                    </Badge>
                                   </div>
                                   <Badge className={getStatusColor(apt.status)}>
                                     {apt.status}
@@ -335,21 +422,36 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <ScrollArea className="h-[500px]">
-                    {appointments.length === 0 ? (
+                    {filteredAppointments.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-[400px] text-center">
                         <Calendar className="h-16 w-16 text-muted-foreground/20 mb-4" />
-                        <p className="text-muted-foreground">No appointments yet</p>
+                        <p className="text-muted-foreground">
+                          {platformFilter === "all" 
+                            ? "No appointments yet" 
+                            : `No ${platformFilter === "telegram" ? "Telegram" : "WhatsApp"} appointments yet`}
+                        </p>
                         <p className="text-sm text-muted-foreground">
-                          Appointments will appear here when booked through WhatsApp
+                          {platformFilter === "all"
+                            ? "Appointments will appear here when booked through Telegram or WhatsApp"
+                            : `Try switching to another platform to see appointments`}
                         </p>
                       </div>
                     ) : (
                       <div className="grid gap-4">
-                        {appointments.map((apt) => (
+                        {filteredAppointments.map((apt) => (
                           <Card key={apt.id} className="p-6" data-testid={`appointment-card-${apt.id}`}>
                             <div className="flex items-start justify-between mb-4">
-                              <div>
-                                <h3 className="font-semibold text-lg">{apt.appointmentTitle || 'Meeting'}</h3>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className="font-semibold text-lg">{apt.appointmentTitle || 'Meeting'}</h3>
+                                  <Badge 
+                                    variant="secondary" 
+                                    className="text-xs"
+                                    data-testid={`badge-apt-platform-${apt.platform || 'whatsapp'}`}
+                                  >
+                                    {apt.platform === 'telegram' ? '📱 Telegram' : '💬 WhatsApp'}
+                                  </Badge>
+                                </div>
                                 <p className="text-sm text-muted-foreground">{apt.contactName || 'No contact'} • {apt.phoneNumber}</p>
                               </div>
                               <Badge className={getStatusColor(apt.status)}>
