@@ -1,5 +1,5 @@
-import { 
-  type WhatsappMessage, 
+import {
+  type WhatsappMessage,
   type InsertWhatsappMessage,
   type Appointment,
   type InsertAppointment,
@@ -7,15 +7,18 @@ import {
   type InsertAssistantSettings,
   type User,
   type UpsertUser,
+  type PendingConfirmation,
+  type InsertPendingConfirmation,
   whatsappMessages,
   appointments,
   assistantSettings,
-  users
+  users,
+  pendingConfirmations
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool, neonConfig } from "@neondatabase/serverless";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, lt } from "drizzle-orm";
 import ws from "ws";
 
 neonConfig.webSocketConstructor = ws;
@@ -40,6 +43,12 @@ export interface IStorage {
   // Assistant Settings
   getSettings(): Promise<AssistantSettings | undefined>;
   updateSettings(settings: Partial<InsertAssistantSettings>): Promise<AssistantSettings>;
+
+  // Pending Confirmations
+  getPendingConfirmation(chatId: string): Promise<PendingConfirmation | undefined>;
+  createPendingConfirmation(confirmation: InsertPendingConfirmation): Promise<PendingConfirmation>;
+  deletePendingConfirmation(chatId: string): Promise<void>;
+  cleanupExpiredConfirmations(): Promise<number>;
 }
 
 // PostgreSQL Storage Implementation
@@ -184,6 +193,48 @@ export class DBStorage implements IStorage {
       .returning();
     
     return updated;
+  }
+
+  // Pending Confirmations
+  async getPendingConfirmation(chatId: string): Promise<PendingConfirmation | undefined> {
+    const [confirmation] = await this.db
+      .select()
+      .from(pendingConfirmations)
+      .where(eq(pendingConfirmations.chatId, chatId))
+      .limit(1);
+
+    // Check if expired
+    if (confirmation && new Date(confirmation.expiresAt) < new Date()) {
+      await this.deletePendingConfirmation(chatId);
+      return undefined;
+    }
+
+    return confirmation;
+  }
+
+  async createPendingConfirmation(insertConfirmation: InsertPendingConfirmation): Promise<PendingConfirmation> {
+    // Delete any existing confirmation for this chatId first
+    await this.deletePendingConfirmation(insertConfirmation.chatId);
+
+    const [confirmation] = await this.db
+      .insert(pendingConfirmations)
+      .values(insertConfirmation)
+      .returning();
+    return confirmation;
+  }
+
+  async deletePendingConfirmation(chatId: string): Promise<void> {
+    await this.db
+      .delete(pendingConfirmations)
+      .where(eq(pendingConfirmations.chatId, chatId));
+  }
+
+  async cleanupExpiredConfirmations(): Promise<number> {
+    const result = await this.db
+      .delete(pendingConfirmations)
+      .where(lt(pendingConfirmations.expiresAt, new Date()))
+      .returning();
+    return result.length;
   }
 }
 

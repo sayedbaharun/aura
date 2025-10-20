@@ -1,4 +1,6 @@
 import { google } from 'googleapis';
+import { retryGoogleAPI } from './retry-utils';
+import { logger } from './logger';
 
 let connectionSettings: any;
 
@@ -49,107 +51,120 @@ export async function getUncachableGoogleCalendarClient() {
 
 // Calendar Service Functions
 export async function listEvents(timeMin: Date, timeMax: Date, maxResults: number = 10) {
-  const calendar = await getUncachableGoogleCalendarClient();
-  
-  const response = await calendar.events.list({
-    calendarId: 'primary',
-    timeMin: timeMin.toISOString(),
-    timeMax: timeMax.toISOString(),
-    maxResults,
-    singleEvents: true,
-    orderBy: 'startTime',
-  });
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
 
-  return response.data.items || [];
+    const response = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+      maxResults,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    logger.debug({ timeMin, timeMax, count: response.data.items?.length || 0 }, 'Listed calendar events');
+    return response.data.items || [];
+  });
 }
 
 export async function checkAvailability(startTime: Date, endTime: Date) {
-  const calendar = await getUncachableGoogleCalendarClient();
-  
-  const response = await calendar.freebusy.query({
-    requestBody: {
-      timeMin: startTime.toISOString(),
-      timeMax: endTime.toISOString(),
-      items: [{ id: 'primary' }],
-    },
-  });
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
 
-  const busy = response.data.calendars?.['primary']?.busy || [];
-  return busy.length === 0; // true if free, false if busy
+    const response = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: startTime.toISOString(),
+        timeMax: endTime.toISOString(),
+        items: [{ id: 'primary' }],
+      },
+    });
+
+    const busy = response.data.calendars?.['primary']?.busy || [];
+    const isAvailable = busy.length === 0;
+    logger.debug({ startTime, endTime, isAvailable }, 'Checked calendar availability');
+    return isAvailable; // true if free, false if busy
+  });
 }
 
 export async function findFreeSlots(startDate: Date, endDate: Date, durationMinutes: number = 60) {
-  const calendar = await getUncachableGoogleCalendarClient();
-  
-  const response = await calendar.freebusy.query({
-    requestBody: {
-      timeMin: startDate.toISOString(),
-      timeMax: endDate.toISOString(),
-      items: [{ id: 'primary' }],
-    },
-  });
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
 
-  const busy = response.data.calendars?.['primary']?.busy || [];
-  
-  // Simple algorithm to find free slots
-  const freeSlots: { start: Date; end: Date }[] = [];
-  let currentTime = new Date(startDate);
-
-  while (currentTime < endDate) {
-    const slotEnd = new Date(currentTime.getTime() + durationMinutes * 60000);
-    
-    // Check if this slot overlaps with any busy period
-    const isBusy = busy.some((busyPeriod: any) => {
-      const busyStart = new Date(busyPeriod.start);
-      const busyEnd = new Date(busyPeriod.end);
-      return currentTime < busyEnd && slotEnd > busyStart;
+    const response = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: startDate.toISOString(),
+        timeMax: endDate.toISOString(),
+        items: [{ id: 'primary' }],
+      },
     });
 
-    if (!isBusy && slotEnd <= endDate) {
-      freeSlots.push({ start: new Date(currentTime), end: slotEnd });
+    const busy = response.data.calendars?.['primary']?.busy || [];
+
+    // Simple algorithm to find free slots
+    const freeSlots: { start: Date; end: Date }[] = [];
+    let currentTime = new Date(startDate);
+
+    while (currentTime < endDate) {
+      const slotEnd = new Date(currentTime.getTime() + durationMinutes * 60000);
+
+      // Check if this slot overlaps with any busy period
+      const isBusy = busy.some((busyPeriod: any) => {
+        const busyStart = new Date(busyPeriod.start);
+        const busyEnd = new Date(busyPeriod.end);
+        return currentTime < busyEnd && slotEnd > busyStart;
+      });
+
+      if (!isBusy && slotEnd <= endDate) {
+        freeSlots.push({ start: new Date(currentTime), end: slotEnd });
+      }
+
+      currentTime = new Date(currentTime.getTime() + 30 * 60000); // Check every 30 minutes
     }
 
-    currentTime = new Date(currentTime.getTime() + 30 * 60000); // Check every 30 minutes
-  }
-
-  return freeSlots;
+    logger.debug({ startDate, endDate, durationMinutes, freeSlots: freeSlots.length }, 'Found free slots');
+    return freeSlots;
+  });
 }
 
 export async function createEvent(
-  summary: string, 
-  startTime: Date, 
-  endTime: Date, 
+  summary: string,
+  startTime: Date,
+  endTime: Date,
   description?: string,
   attendeeEmails?: string[]
 ) {
-  const calendar = await getUncachableGoogleCalendarClient();
-  
-  const event: any = {
-    summary,
-    description,
-    start: {
-      dateTime: startTime.toISOString(),
-      timeZone: 'Asia/Dubai',
-    },
-    end: {
-      dateTime: endTime.toISOString(),
-      timeZone: 'Asia/Dubai',
-    },
-  };
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
 
-  // Add attendees if provided
-  if (attendeeEmails && attendeeEmails.length > 0) {
-    event.attendees = attendeeEmails.map(email => ({ email }));
-    event.sendUpdates = 'all'; // Send email invitations
-  }
+    const event: any = {
+      summary,
+      description,
+      start: {
+        dateTime: startTime.toISOString(),
+        timeZone: 'Asia/Dubai',
+      },
+      end: {
+        dateTime: endTime.toISOString(),
+        timeZone: 'Asia/Dubai',
+      },
+    };
 
-  const response = await calendar.events.insert({
-    calendarId: 'primary',
-    requestBody: event,
-    sendUpdates: attendeeEmails && attendeeEmails.length > 0 ? 'all' : 'none',
+    // Add attendees if provided
+    if (attendeeEmails && attendeeEmails.length > 0) {
+      event.attendees = attendeeEmails.map(email => ({ email }));
+      event.sendUpdates = 'all'; // Send email invitations
+    }
+
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: event,
+      sendUpdates: attendeeEmails && attendeeEmails.length > 0 ? 'all' : 'none',
+    });
+
+    logger.info({ summary, startTime, endTime, attendees: attendeeEmails?.length || 0, eventId: response.data.id }, 'Created calendar event');
+    return response.data;
   });
-
-  return response.data;
 }
 
 export async function updateEvent(eventId: string, updates: {
@@ -159,61 +174,70 @@ export async function updateEvent(eventId: string, updates: {
   description?: string;
   attendeeEmails?: string[];
 }) {
-  const calendar = await getUncachableGoogleCalendarClient();
-  
-  const event: any = {};
-  if (updates.summary) event.summary = updates.summary;
-  if (updates.description) event.description = updates.description;
-  if (updates.startTime) {
-    event.start = {
-      dateTime: updates.startTime.toISOString(),
-      timeZone: 'Asia/Dubai',
-    };
-  }
-  if (updates.endTime) {
-    event.end = {
-      dateTime: updates.endTime.toISOString(),
-      timeZone: 'Asia/Dubai',
-    };
-  }
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
 
-  // Add attendees if provided
-  if (updates.attendeeEmails && updates.attendeeEmails.length > 0) {
-    event.attendees = updates.attendeeEmails.map(email => ({ email }));
-  }
+    const event: any = {};
+    if (updates.summary) event.summary = updates.summary;
+    if (updates.description) event.description = updates.description;
+    if (updates.startTime) {
+      event.start = {
+        dateTime: updates.startTime.toISOString(),
+        timeZone: 'Asia/Dubai',
+      };
+    }
+    if (updates.endTime) {
+      event.end = {
+        dateTime: updates.endTime.toISOString(),
+        timeZone: 'Asia/Dubai',
+      };
+    }
 
-  const response = await calendar.events.patch({
-    calendarId: 'primary',
-    eventId,
-    requestBody: event,
-    sendUpdates: updates.attendeeEmails && updates.attendeeEmails.length > 0 ? 'all' : 'none',
+    // Add attendees if provided
+    if (updates.attendeeEmails && updates.attendeeEmails.length > 0) {
+      event.attendees = updates.attendeeEmails.map(email => ({ email }));
+    }
+
+    const response = await calendar.events.patch({
+      calendarId: 'primary',
+      eventId,
+      requestBody: event,
+      sendUpdates: updates.attendeeEmails && updates.attendeeEmails.length > 0 ? 'all' : 'none',
+    });
+
+    logger.info({ eventId, updates: Object.keys(updates) }, 'Updated calendar event');
+    return response.data;
   });
-
-  return response.data;
 }
 
 export async function deleteEvent(eventId: string) {
-  const calendar = await getUncachableGoogleCalendarClient();
-  
-  await calendar.events.delete({
-    calendarId: 'primary',
-    eventId,
-  });
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
 
-  return true;
+    await calendar.events.delete({
+      calendarId: 'primary',
+      eventId,
+    });
+
+    logger.info({ eventId }, 'Deleted calendar event');
+    return true;
+  });
 }
 
 export async function searchEvents(query: string, timeMin?: Date, timeMax?: Date) {
-  const calendar = await getUncachableGoogleCalendarClient();
-  
-  const response = await calendar.events.list({
-    calendarId: 'primary',
-    q: query,
-    timeMin: timeMin?.toISOString(),
-    timeMax: timeMax?.toISOString(),
-    singleEvents: true,
-    orderBy: 'startTime',
-  });
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
 
-  return response.data.items || [];
+    const response = await calendar.events.list({
+      calendarId: 'primary',
+      q: query,
+      timeMin: timeMin?.toISOString(),
+      timeMax: timeMax?.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    logger.debug({ query, count: response.data.items?.length || 0 }, 'Searched calendar events');
+    return response.data.items || [];
+  });
 }

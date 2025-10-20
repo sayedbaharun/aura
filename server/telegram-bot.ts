@@ -8,10 +8,81 @@ if (!BOT_TOKEN) {
   console.warn('TELEGRAM_BOT_TOKEN not set - Telegram bot will not start');
 }
 
+// Load authorized chat IDs from environment variable
+const AUTHORIZED_CHAT_IDS = (process.env.AUTHORIZED_TELEGRAM_CHAT_IDS || '')
+  .split(',')
+  .map(id => id.trim())
+  .filter(Boolean);
+
+// Rate limiting: Map<chatId, { count: number; resetAt: number }>
+const chatRateLimits = new Map<string, { count: number; resetAt: number }>();
+
+// Cleanup expired rate limits every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  const expiredChatIds: string[] = [];
+  chatRateLimits.forEach((limit, chatId) => {
+    if (now > limit.resetAt) {
+      expiredChatIds.push(chatId);
+    }
+  });
+  expiredChatIds.forEach(chatId => chatRateLimits.delete(chatId));
+}, 5 * 60 * 1000);
+
+function checkRateLimit(chatId: string, maxRequests = 10, windowMs = 60000): boolean {
+  const now = Date.now();
+  const limit = chatRateLimits.get(chatId);
+
+  if (!limit || now > limit.resetAt) {
+    chatRateLimits.set(chatId, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+
+  if (limit.count >= maxRequests) {
+    return false;
+  }
+
+  limit.count++;
+  return true;
+}
+
 export const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
 // Initialize bot if token exists
 if (bot) {
+  // Middleware: Access Control
+  bot.use((ctx, next) => {
+    const chatId = ctx.chat?.id.toString();
+
+    // Skip authorization check if no authorized IDs are configured (development mode)
+    if (AUTHORIZED_CHAT_IDS.length === 0) {
+      console.warn('⚠️  No AUTHORIZED_TELEGRAM_CHAT_IDS configured - running in open mode');
+      return next();
+    }
+
+    if (!chatId || !AUTHORIZED_CHAT_IDS.includes(chatId)) {
+      console.warn(`⛔ Unauthorized access attempt from chat ID: ${chatId}`);
+      return ctx.reply("⛔ Unauthorized. This is a private assistant.");
+    }
+
+    return next();
+  });
+
+  // Middleware: Rate Limiting
+  bot.use((ctx, next) => {
+    const chatId = ctx.chat?.id.toString();
+    if (!chatId) {
+      return ctx.reply("Error: Unable to identify chat.");
+    }
+
+    if (!checkRateLimit(chatId)) {
+      console.warn(`⏱️  Rate limit exceeded for chat ID: ${chatId}`);
+      return ctx.reply("⏱️  You're sending messages too quickly. Please wait a moment and try again.");
+    }
+
+    return next();
+  });
+
   // Handle /start command
   bot.command('start', async (ctx) => {
     await ctx.reply(

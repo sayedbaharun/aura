@@ -4,17 +4,65 @@ import { storage } from "./storage";
 import { insertWhatsappMessageSchema, insertAppointmentSchema, insertAssistantSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { processMessage } from "./ai-assistant";
-import { 
-  detectWebhookType, 
-  extractTwilioMessage, 
-  extractFacebookMessage, 
-  extractMessageBirdMessage 
+import {
+  detectWebhookType,
+  extractTwilioMessage,
+  extractFacebookMessage,
+  extractMessageBirdMessage
 } from "./twilio-whatsapp";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { logger } from "./logger";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   await setupAuth(app);
+
+  // Health check endpoint (unauthenticated)
+  app.get('/health', async (req, res) => {
+    const health = {
+      status: 'healthy' as 'healthy' | 'degraded',
+      timestamp: new Date().toISOString(),
+      checks: {
+        database: false,
+        openai: false,
+        calendar: false,
+      }
+    };
+
+    // Check database connectivity
+    try {
+      await storage.getSettings();
+      health.checks.database = true;
+    } catch (error) {
+      logger.error({ error }, 'Health check: Database connectivity failed');
+      health.status = 'degraded';
+    }
+
+    // Check OpenAI connectivity (light check - just verify config)
+    try {
+      if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
+        health.checks.openai = true;
+      } else {
+        health.status = 'degraded';
+      }
+    } catch (error) {
+      logger.error({ error }, 'Health check: OpenAI configuration check failed');
+      health.status = 'degraded';
+    }
+
+    // Check Google Calendar connectivity
+    try {
+      const { getUncachableGoogleCalendarClient } = await import('./google-calendar');
+      await getUncachableGoogleCalendarClient();
+      health.checks.calendar = true;
+    } catch (error) {
+      logger.error({ error }, 'Health check: Google Calendar connectivity failed');
+      health.status = 'degraded';
+    }
+
+    const statusCode = health.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(health);
+  });
 
   // Auth route - get current user
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -23,7 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
-      console.error("Error fetching user:", error);
+      logger.error({ error }, "Error fetching user");
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
@@ -34,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const messages = await storage.getMessages();
       res.json(messages);
     } catch (error) {
-      console.error("Error fetching messages:", error);
+      logger.error({ error }, "Error fetching messages");
       res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
@@ -70,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const appointments = await storage.getAppointments();
       res.json(appointments);
     } catch (error) {
-      console.error("Error fetching appointments:", error);
+      logger.error({ error }, "Error fetching appointments");
       res.status(500).json({ error: "Failed to fetch appointments" });
     }
   });
@@ -140,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getSettings();
       res.json(settings);
     } catch (error) {
-      console.error("Error fetching settings:", error);
+      logger.error({ error }, "Error fetching settings");
       res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
@@ -152,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.updateSettings(updates);
       res.json(settings);
     } catch (error) {
-      console.error("Error updating settings:", error);
+      logger.error({ error }, "Error updating settings");
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid settings data", details: error.errors });
       } else {
@@ -179,12 +227,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!messageData) {
-        console.log(`Invalid ${webhookType} webhook data:`, req.body);
+        logger.warn({ webhookType, body: req.body }, `Invalid ${webhookType} webhook data`);
         return res.status(400).json({ error: "Invalid webhook data" });
       }
 
       const { from: phoneNumber, message: messageText } = messageData;
-      console.log(`Received ${webhookType} message from ${phoneNumber}: ${messageText}`);
+      logger.info({ webhookType, phoneNumber, messageText }, `Received ${webhookType} message`);
 
       // Store the incoming user message
       await storage.createMessage({
@@ -233,8 +281,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(200).json({ message: aiResponse });
       }
     } catch (error) {
-      console.error("Webhook error:", error);
-      
+      logger.error({ error }, "Webhook error");
+
       // Return appropriate error format
       if (req.body.From || req.body.from) {
         res.status(500).send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -255,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         app.use(bot.webhookCallback('/api/telegram-webhook'));
       }
     } catch (error) {
-      console.error('Failed to setup Telegram webhook route:', error);
+      logger.error({ error }, 'Failed to setup Telegram webhook route');
     }
   };
   await setupTelegramWebhookRoute();

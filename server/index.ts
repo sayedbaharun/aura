@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -67,7 +68,19 @@ app.use((req, res, next) => {
     reusePort: true,
   }, async () => {
     log(`serving on port ${port}`);
-    
+
+    // Start cleanup job for expired confirmations (runs every 5 minutes)
+    const cleanupInterval = setInterval(async () => {
+      try {
+        const deleted = await storage.cleanupExpiredConfirmations();
+        if (deleted > 0) {
+          log(`Cleaned up ${deleted} expired confirmation(s)`);
+        }
+      } catch (error) {
+        log('Error cleaning up expired confirmations:', String(error));
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
     // Initialize Telegram bot webhook or polling AFTER server starts
     let telegramBot: any = null;
     try {
@@ -117,6 +130,7 @@ app.use((req, res, next) => {
     // Graceful shutdown
     const gracefulShutdown = async () => {
       log('Shutting down gracefully...');
+      clearInterval(cleanupInterval);
       if (telegramBot) {
         try {
           await telegramBot.stop();

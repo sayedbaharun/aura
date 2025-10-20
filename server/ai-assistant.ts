@@ -1,6 +1,9 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
 import * as calendar from "./google-calendar";
+import { logBooking, logCancellation, logReschedule, logViewSchedule } from "./audit-logger";
+import { logger } from "./logger";
+import { retryOpenAI } from "./retry-utils";
 
 // Initialize OpenAI with Replit AI Integrations credentials
 const openai = new OpenAI({
@@ -8,24 +11,27 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-export interface PendingConfirmation {
+export interface PendingConfirmationData {
   action: string;
   data: any;
   messageText: string;
 }
 
-export const pendingConfirmations: Map<string, PendingConfirmation> = new Map();
-
 export async function processMessage(messageText: string, identifier: string, platform: 'whatsapp' | 'telegram' = 'whatsapp') {
   // Check if user is responding to a confirmation request
-  const pendingConfirmation = pendingConfirmations.get(identifier);
+  const pendingConfirmation = await storage.getPendingConfirmation(identifier);
   if (pendingConfirmation && (messageText.toLowerCase().includes('yes') || messageText.toLowerCase().includes('confirm'))) {
     // Execute the pending action
-    const result = await executePendingAction(identifier, pendingConfirmation, platform);
-    pendingConfirmations.delete(identifier);
+    const confirmData: PendingConfirmationData = {
+      action: pendingConfirmation.action,
+      data: pendingConfirmation.data,
+      messageText: pendingConfirmation.messageText
+    };
+    const result = await executePendingAction(identifier, confirmData, platform);
+    await storage.deletePendingConfirmation(identifier);
     return result;
   } else if (pendingConfirmation && (messageText.toLowerCase().includes('no') || messageText.toLowerCase().includes('cancel'))) {
-    pendingConfirmations.delete(identifier);
+    await storage.deletePendingConfirmation(identifier);
     return "No problem! Let me know if you need anything else.";
   }
 
@@ -274,12 +280,14 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
   const maxTurns = 5; // Prevent infinite loops
   
   for (let turn = 0; turn < maxTurns; turn++) {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: conversationMessages,
-      tools,
-      temperature: 0.7,
-    });
+    const completion = await retryOpenAI(() =>
+      openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: conversationMessages,
+        tools,
+        temperature: 0.7,
+      })
+    );
 
     const choice = completion.choices[0];
     
@@ -314,7 +322,10 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               new Date(args.endDate),
               50
             );
-            
+
+            // Log view schedule action
+            await logViewSchedule(identifier);
+
             if (events.length === 0) {
               toolResult = `Calendar is clear - no scheduled appointments.`;
             } else {
@@ -365,62 +376,71 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             break;
 
           case "request_book_appointment":
-            let bookMessage = `I'll book "${args.title}" for ${new Date(args.startTime).toLocaleString('en-US', { 
+            let bookMessage = `I'll book "${args.title}" for ${new Date(args.startTime).toLocaleString('en-US', {
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
               timeStyle: 'short'
             })}`;
-            
+
             if (args.attendeeEmails && args.attendeeEmails.length > 0) {
               bookMessage += ` and send invites to ${args.attendeeEmails.join(', ')}`;
             }
             bookMessage += '. Confirm?';
-            
-            pendingConfirmations.set(identifier, {
+
+            // Store in database with 5-minute TTL
+            await storage.createPendingConfirmation({
+              chatId: identifier,
               action: 'book',
               data: args,
-              messageText: bookMessage
+              messageText: bookMessage,
+              expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
             });
-            
+
             toolResult = "PENDING_CONFIRMATION";
             finalResponse = bookMessage;
             break;
 
           case "request_cancel_appointment":
-            const cancelMessage = `I'll cancel "${args.eventTitle}" scheduled for ${new Date(args.eventTime).toLocaleString('en-US', { 
+            const cancelMessage = `I'll cancel "${args.eventTitle}" scheduled for ${new Date(args.eventTime).toLocaleString('en-US', {
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
               timeStyle: 'short'
             })}. Confirm?`;
-            
-            pendingConfirmations.set(identifier, {
+
+            // Store in database with 5-minute TTL
+            await storage.createPendingConfirmation({
+              chatId: identifier,
               action: 'cancel',
               data: args,
-              messageText: cancelMessage
+              messageText: cancelMessage,
+              expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
             });
-            
+
             toolResult = "PENDING_CONFIRMATION";
             finalResponse = cancelMessage;
             break;
 
           case "request_reschedule_appointment":
-            let rescheduleMessage = `I'll reschedule "${args.eventTitle}" to ${new Date(args.newStartTime).toLocaleString('en-US', { 
+            let rescheduleMessage = `I'll reschedule "${args.eventTitle}" to ${new Date(args.newStartTime).toLocaleString('en-US', {
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
               timeStyle: 'short'
             })}`;
-            
+
             if (args.attendeeEmails && args.attendeeEmails.length > 0) {
               rescheduleMessage += ` and send invites to ${args.attendeeEmails.join(', ')}`;
             }
             rescheduleMessage += '. Confirm?';
-            
-            pendingConfirmations.set(identifier, {
+
+            // Store in database with 5-minute TTL
+            await storage.createPendingConfirmation({
+              chatId: identifier,
               action: 'reschedule',
               data: args,
-              messageText: rescheduleMessage
+              messageText: rescheduleMessage,
+              expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
             });
-            
+
             toolResult = "PENDING_CONFIRMATION";
             finalResponse = rescheduleMessage;
             break;
@@ -429,7 +449,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             toolResult = `Unknown function: ${functionName}`;
         }
       } catch (error) {
-        console.error(`Error executing tool ${functionName}:`, error);
+        logger.error({ functionName, error, chatId: identifier }, `Error executing tool ${functionName}`);
         toolResult = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
 
@@ -453,7 +473,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
   return finalResponse;
 }
 
-async function executePendingAction(identifier: string, confirmation: PendingConfirmation, platform: 'whatsapp' | 'telegram' = 'whatsapp') {
+async function executePendingAction(identifier: string, confirmation: PendingConfirmationData, platform: 'whatsapp' | 'telegram' = 'whatsapp') {
   const { action, data } = confirmation;
 
   try {
@@ -479,7 +499,10 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           googleEventId: event.id || null,
           notes: data.description || null,
         });
-        
+
+        // Log successful booking
+        await logBooking(identifier, true, event.id || undefined, data.title);
+
         let bookSuccessMsg = `✓ Booked! I've added "${data.title}" to your calendar`;
         if (data.attendeeEmails && data.attendeeEmails.length > 0) {
           bookSuccessMsg += ` and sent invites to the attendees`;
@@ -490,6 +513,9 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
       case 'cancel':
         if (data.eventId) {
           await calendar.deleteEvent(data.eventId);
+
+          // Log successful cancellation
+          await logCancellation(identifier, true, data.eventId, data.eventTitle);
         }
         return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
 
@@ -500,9 +526,12 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
             endTime: new Date(data.newEndTime),
             attendeeEmails: data.attendeeEmails,
           });
+
+          // Log successful reschedule
+          await logReschedule(identifier, true, data.eventId, data.eventTitle);
         }
         const settings = await storage.getSettings();
-        let rescheduleSuccessMsg = `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', { 
+        let rescheduleSuccessMsg = `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', {
           timeZone: settings?.timezone || 'Asia/Dubai',
           month: 'short',
           day: 'numeric',
@@ -520,7 +549,18 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
         return "I'm not sure what to do with that. Can you try again?";
     }
   } catch (error) {
-    console.error("Error executing action:", error);
+    logger.error({ action: confirmation.action, chatId: identifier, error }, "Error executing pending action");
+
+    // Log failed action
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (action === 'book') {
+      await logBooking(identifier, false, undefined, data.title, errorMessage);
+    } else if (action === 'cancel') {
+      await logCancellation(identifier, false, data.eventId, data.eventTitle, errorMessage);
+    } else if (action === 'reschedule') {
+      await logReschedule(identifier, false, data.eventId, data.eventTitle, errorMessage);
+    }
+
     return "Sorry, something went wrong. Please try again.";
   }
 }

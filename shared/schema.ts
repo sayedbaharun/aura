@@ -101,3 +101,42 @@ export const insertAssistantSettingsSchema = createInsertSchema(assistantSetting
 
 export type InsertAssistantSettings = z.infer<typeof insertAssistantSettingsSchema>;
 export type AssistantSettings = typeof assistantSettings.$inferSelect;
+
+// Pending Confirmations Table - For persistent confirmation state
+export const pendingConfirmations = pgTable("pending_confirmations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: text("chat_id").notNull(),
+  action: text("action").notNull(),
+  data: jsonb("data").notNull(),
+  messageText: text("message_text").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPendingConfirmationSchema = createInsertSchema(pendingConfirmations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPendingConfirmation = z.infer<typeof insertPendingConfirmationSchema>;
+export type PendingConfirmation = typeof pendingConfirmations.$inferSelect;
+
+// Audit Logs Table
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: text("chat_id").notNull(),
+  action: text("action").notNull(), // 'view_schedule', 'book', 'cancel', 'reschedule'
+  eventId: text("event_id"),
+  eventTitle: text("event_title"),
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
