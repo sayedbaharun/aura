@@ -202,3 +202,34 @@ export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit
 
 export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
 export type EventAttendee = typeof eventAttendees.$inferSelect;
+
+// Email Summaries Table - Cache AI-generated email summaries
+export const emailSummaries = pgTable(
+  "email_summaries",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    chatId: text("chat_id").notNull(),
+    gmailMessageId: text("gmail_message_id").notNull().unique(),
+    from: text("from").notNull(),
+    subject: text("subject").notNull(),
+    summary: text("summary").notNull(),
+    category: text("category").notNull(), // 'urgent', 'action', 'fyi', 'noise'
+    hasMeetingRequest: boolean("has_meeting_request").default(false).notNull(),
+    extractedMeetingDetails: jsonb("extracted_meeting_details"), // { proposedTimes: string[], attendees: string[], subject: string }
+    receivedDate: timestamp("received_date").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_email_summaries_chat_id").on(table.chatId),
+    index("idx_email_summaries_category").on(table.category),
+    index("idx_email_summaries_received_date").on(table.receivedDate),
+  ],
+);
+
+export const insertEmailSummarySchema = createInsertSchema(emailSummaries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertEmailSummary = z.infer<typeof insertEmailSummarySchema>;
+export type EmailSummary = typeof emailSummaries.$inferSelect;
