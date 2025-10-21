@@ -44,23 +44,23 @@ export function validateEnvironment(): ValidationResult {
 
   // Replit Connectors (for Google Calendar OAuth)
   if (!process.env.REPLIT_CONNECTORS_HOSTNAME) {
-    errors.push('REPLIT_CONNECTORS_HOSTNAME is required for Replit Connectors');
+    warnings.push('REPLIT_CONNECTORS_HOSTNAME not configured - Google Calendar integration may not work');
   }
 
   // Replit Identity Token (at least one required)
   if (!process.env.REPL_IDENTITY && !process.env.WEB_REPL_RENEWAL) {
-    errors.push('Either REPL_IDENTITY or WEB_REPL_RENEWAL is required for authentication');
+    warnings.push('Neither REPL_IDENTITY nor WEB_REPL_RENEWAL found - Google Calendar integration may not work');
   }
 
   // Telegram Bot
   if (!process.env.TELEGRAM_BOT_TOKEN) {
-    errors.push('TELEGRAM_BOT_TOKEN is required for Telegram bot integration');
+    warnings.push('TELEGRAM_BOT_TOKEN not configured - Telegram bot integration disabled');
   } else if (!process.env.TELEGRAM_BOT_TOKEN.match(/^\d+:[A-Za-z0-9_-]+$/)) {
-    errors.push('TELEGRAM_BOT_TOKEN format is invalid (expected format: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)');
+    warnings.push('TELEGRAM_BOT_TOKEN format is invalid (expected format: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)');
   }
 
   if (!process.env.AUTHORIZED_TELEGRAM_CHAT_IDS) {
-    errors.push('AUTHORIZED_TELEGRAM_CHAT_IDS is required for Telegram access control (comma-separated list of chat IDs)');
+    warnings.push('AUTHORIZED_TELEGRAM_CHAT_IDS not configured - all Telegram chats will be allowed (security risk)');
   }
 
   // Session Secret
