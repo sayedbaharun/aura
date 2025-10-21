@@ -382,6 +382,35 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
     {
       type: "function",
       function: {
+        name: "create_focus_time",
+        description: "Block time for focused deep work. This creates a 'busy' calendar block that prevents scheduling conflicts and shows you're unavailable. Perfect for protecting time for important tasks.",
+        parameters: {
+          type: "object",
+          properties: {
+            title: {
+              type: "string",
+              description: "Title for the focus block (e.g., 'Deep Work', 'Focus Time', 'Writing Session')",
+            },
+            startTime: {
+              type: "string",
+              description: "Start time in ISO format",
+            },
+            endTime: {
+              type: "string",
+              description: "End time in ISO format",
+            },
+            description: {
+              type: "string",
+              description: "Optional description of what you'll be working on",
+            },
+          },
+          required: ["title", "startTime", "endTime"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
         name: "request_cancel_appointment",
         description: "Request to cancel an existing appointment (requires user confirmation). Provide the event ID from search_events.",
         parameters: {
@@ -543,6 +572,18 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
                 recurring: !!e.recurrence
               })));
             }
+            break;
+
+          case "create_focus_time":
+            const focusEvent = await calendar.createFocusTimeBlock(
+              args.title,
+              new Date(args.startTime),
+              new Date(args.endTime),
+              args.description
+            );
+            
+            toolResult = `Focus time block created: "${args.title}" from ${new Date(args.startTime).toLocaleTimeString()} to ${new Date(args.endTime).toLocaleTimeString()}`;
+            finalResponse = `Focus time blocked! I've set aside "${args.title}" on your calendar.\n\nThis time is marked as busy and will automatically decline any meeting invitations during this period. Perfect for deep work!`;
             break;
 
           case "request_book_appointment":

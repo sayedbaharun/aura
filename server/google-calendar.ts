@@ -354,3 +354,55 @@ export async function searchEvents(query: string, timeMin?: Date, timeMax?: Date
     return response.data.items || [];
   });
 }
+
+export async function createFocusTimeBlock(
+  title: string,
+  startTime: Date,
+  endTime: Date,
+  description?: string
+) {
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
+
+    const event: any = {
+      summary: title || 'Focus Time',
+      description: description || 'Deep work session - Do Not Disturb',
+      start: {
+        dateTime: startTime.toISOString(),
+        timeZone: 'Asia/Dubai',
+      },
+      end: {
+        dateTime: endTime.toISOString(),
+        timeZone: 'Asia/Dubai',
+      },
+      eventType: 'focusTime', // Special event type that enables auto-decline
+      focusTime: {
+        autoDeclineMode: 'declineAllConflictingInvitations',
+        declineMessage: 'I am in focus time and cannot attend. Please reschedule.'
+      },
+      transparency: 'opaque', // Marks time as busy
+      colorId: '9', // Blue color in Google Calendar
+      visibility: 'public', // Visible to others as "Busy"
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 10 } // Reminder 10 min before
+        ]
+      }
+    };
+
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: event,
+    });
+
+    logger.info({ 
+      title, 
+      startTime, 
+      endTime, 
+      eventId: response.data.id,
+      autoDecline: true
+    }, 'Created focus time block with auto-decline');
+    return response.data;
+  });
+}
