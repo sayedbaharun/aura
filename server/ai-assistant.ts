@@ -70,6 +70,7 @@ Important rules:
 5. Be concise - messages should be short and clear
 6. TIME EXTRACTION: When user says "cancel X and book Y at the same time" or similar, ALWAYS use search_events first to find event X, extract its exact start/end times, then use those EXACT times for booking event Y. Never use default times when replacing events.
 7. BOOK vs RESCHEDULE: "Cancel X and book Y" = TWO separate actions (cancel X, then request_book_appointment for Y). "Reschedule X to [new time]" = ONE action (request_reschedule_appointment). NEVER reschedule when user wants to cancel one event and create a different event.
+8. CRITICAL - EVENT ID REQUIREMENT: Before calling request_cancel_appointment or request_reschedule_appointment, you MUST first call search_events to find the event and get its ID. NEVER use placeholder values like "event_id_placeholder". You MUST use the actual "id" field from the search_events result. If search returns no events, tell the user the event wasn't found.
 
 ${assistantInfo}
 
@@ -401,6 +402,12 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             break;
 
           case "request_cancel_appointment":
+            // Validate event ID
+            if (!args.eventId || args.eventId.includes('placeholder') || args.eventId.length < 10) {
+              toolResult = "ERROR: Invalid or missing event ID. You must use search_events first to get the actual event ID.";
+              break;
+            }
+
             const cancelMessage = `I'll cancel "${args.eventTitle}" scheduled for ${new Date(args.eventTime).toLocaleString('en-US', {
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
@@ -421,6 +428,12 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             break;
 
           case "request_reschedule_appointment":
+            // Validate event ID
+            if (!args.eventId || args.eventId.includes('placeholder') || args.eventId.length < 10) {
+              toolResult = "ERROR: Invalid or missing event ID. You must use search_events first to get the actual event ID.";
+              break;
+            }
+
             let rescheduleMessage = `I'll reschedule "${args.eventTitle}" to ${new Date(args.newStartTime).toLocaleString('en-US', {
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
