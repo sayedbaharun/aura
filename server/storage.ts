@@ -16,12 +16,8 @@ import {
   pendingConfirmations
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { Pool, neonConfig } from "@neondatabase/serverless";
 import { eq, desc, lt } from "drizzle-orm";
-import ws from "ws";
-
-neonConfig.webSocketConstructor = ws;
+import { db as database } from "../db";
 
 export interface IStorage {
   // User operations - Required for Replit Auth
@@ -53,11 +49,10 @@ export interface IStorage {
 
 // PostgreSQL Storage Implementation
 export class DBStorage implements IStorage {
-  private db: ReturnType<typeof drizzle>;
+  private db = database;
 
   constructor() {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    this.db = drizzle(pool);
+    // Using shared database connection from db/index.ts
   }
 
   // User operations - Required for Replit Auth
