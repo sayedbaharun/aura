@@ -105,7 +105,7 @@ export type AssistantSettings = typeof assistantSettings.$inferSelect;
 // Pending Confirmations Table - For persistent confirmation state
 export const pendingConfirmations = pgTable("pending_confirmations", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  chatId: text("chat_id").notNull(),
+  chatId: text("chat_id").notNull().unique(), // Unique constraint to prevent duplicate pending confirmations per chat
   action: text("action").notNull(),
   data: jsonb("data").notNull(),
   messageText: text("message_text").notNull(),

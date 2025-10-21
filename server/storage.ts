@@ -218,12 +218,19 @@ export class DBStorage implements IStorage {
   }
 
   async createPendingConfirmation(insertConfirmation: InsertPendingConfirmation): Promise<PendingConfirmation> {
-    // Delete any existing confirmation for this chatId first
-    await this.deletePendingConfirmation(insertConfirmation.chatId);
-
+    // Use upsert to atomically replace existing confirmation (prevents race conditions)
     const [confirmation] = await this.db
       .insert(pendingConfirmations)
       .values(insertConfirmation)
+      .onConflictDoUpdate({
+        target: pendingConfirmations.chatId,
+        set: {
+          action: insertConfirmation.action,
+          data: insertConfirmation.data,
+          messageText: insertConfirmation.messageText,
+          expiresAt: insertConfirmation.expiresAt,
+        }
+      })
       .returning();
     return confirmation;
   }
