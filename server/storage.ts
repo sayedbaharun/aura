@@ -9,14 +9,17 @@ import {
   type UpsertUser,
   type PendingConfirmation,
   type InsertPendingConfirmation,
+  type EventAttendee,
+  type InsertEventAttendee,
   whatsappMessages,
   appointments,
   assistantSettings,
   users,
-  pendingConfirmations
+  pendingConfirmations,
+  eventAttendees
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, lt } from "drizzle-orm";
+import { eq, desc, lt, and } from "drizzle-orm";
 import { db as database } from "../db";
 
 // Singleton ID for assistant settings - ensures only one settings row exists
@@ -49,6 +52,12 @@ export interface IStorage {
   createPendingConfirmation(confirmation: InsertPendingConfirmation): Promise<PendingConfirmation>;
   deletePendingConfirmation(chatId: string): Promise<void>;
   cleanupExpiredConfirmations(): Promise<number>;
+
+  // Event Attendees
+  getEventAttendee(googleEventId: string, attendeeEmail: string): Promise<EventAttendee | undefined>;
+  createEventAttendee(attendee: InsertEventAttendee): Promise<EventAttendee>;
+  updateEventAttendee(googleEventId: string, attendeeEmail: string, responseStatus: string): Promise<void>;
+  getEventAttendees(googleEventId: string): Promise<EventAttendee[]>;
 }
 
 // PostgreSQL Storage Implementation
@@ -263,6 +272,47 @@ export class DBStorage implements IStorage {
       .where(lt(pendingConfirmations.expiresAt, new Date()))
       .returning();
     return result.length;
+  }
+
+  // Event Attendees
+  async getEventAttendee(googleEventId: string, attendeeEmail: string): Promise<EventAttendee | undefined> {
+    const [attendee] = await this.db
+      .select()
+      .from(eventAttendees)
+      .where(and(
+        eq(eventAttendees.googleEventId, googleEventId),
+        eq(eventAttendees.attendeeEmail, attendeeEmail)
+      ))
+      .limit(1);
+    return attendee;
+  }
+
+  async createEventAttendee(insertAttendee: InsertEventAttendee): Promise<EventAttendee> {
+    const [attendee] = await this.db
+      .insert(eventAttendees)
+      .values(insertAttendee)
+      .returning();
+    return attendee;
+  }
+
+  async updateEventAttendee(googleEventId: string, attendeeEmail: string, responseStatus: string): Promise<void> {
+    await this.db
+      .update(eventAttendees)
+      .set({ 
+        responseStatus, 
+        lastChecked: new Date() 
+      })
+      .where(and(
+        eq(eventAttendees.googleEventId, googleEventId),
+        eq(eventAttendees.attendeeEmail, attendeeEmail)
+      ));
+  }
+
+  async getEventAttendees(googleEventId: string): Promise<EventAttendee[]> {
+    return await this.db
+      .select()
+      .from(eventAttendees)
+      .where(eq(eventAttendees.googleEventId, googleEventId));
   }
 }
 

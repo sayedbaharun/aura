@@ -189,7 +189,9 @@ export async function createEvent(
   startTime: Date,
   endTime: Date,
   description?: string,
-  attendeeEmails?: string[]
+  attendeeEmails?: string[],
+  recurrenceRule?: string,
+  reminders?: { useDefault?: boolean; overrides?: Array<{ method: 'email' | 'popup'; minutes: number }> }
 ) {
   return retryGoogleAPI(async () => {
     const calendar = await getUncachableGoogleCalendarClient();
@@ -213,13 +215,31 @@ export async function createEvent(
       event.sendUpdates = 'all'; // Send email invitations
     }
 
+    // Add recurrence rule if provided (RFC5545 format)
+    if (recurrenceRule) {
+      event.recurrence = [`RRULE:${recurrenceRule}`];
+    }
+
+    // Add custom reminders if provided
+    if (reminders) {
+      event.reminders = reminders;
+    }
+
     const response = await calendar.events.insert({
       calendarId: 'primary',
       requestBody: event,
       sendUpdates: attendeeEmails && attendeeEmails.length > 0 ? 'all' : 'none',
     });
 
-    logger.info({ summary, startTime, endTime, attendees: attendeeEmails?.length || 0, eventId: response.data.id }, 'Created calendar event');
+    logger.info({ 
+      summary, 
+      startTime, 
+      endTime, 
+      attendees: attendeeEmails?.length || 0, 
+      eventId: response.data.id,
+      recurring: !!recurrenceRule,
+      customReminders: !!reminders
+    }, 'Created calendar event');
     return response.data;
   });
 }
@@ -230,6 +250,8 @@ export async function updateEvent(eventId: string, updates: {
   endTime?: Date;
   description?: string;
   attendeeEmails?: string[];
+  recurrenceRule?: string;
+  reminders?: { useDefault?: boolean; overrides?: Array<{ method: 'email' | 'popup'; minutes: number }> };
 }) {
   return retryGoogleAPI(async () => {
     const calendar = await getUncachableGoogleCalendarClient();
@@ -253,6 +275,16 @@ export async function updateEvent(eventId: string, updates: {
     // Add attendees if provided
     if (updates.attendeeEmails && updates.attendeeEmails.length > 0) {
       event.attendees = updates.attendeeEmails.map(email => ({ email }));
+    }
+
+    // Add recurrence rule if provided
+    if (updates.recurrenceRule) {
+      event.recurrence = [`RRULE:${updates.recurrenceRule}`];
+    }
+
+    // Add custom reminders if provided
+    if (updates.reminders) {
+      event.reminders = updates.reminders;
     }
 
     const response = await calendar.events.patch({

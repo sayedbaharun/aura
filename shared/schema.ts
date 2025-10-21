@@ -71,6 +71,9 @@ export const appointments = pgTable(
     status: text("status").default("pending").notNull(),
     googleEventId: text("google_event_id"),
     notes: text("notes"),
+    attendeeEmails: text("attendee_emails").array(), // Array of attendee email addresses
+    recurrenceRule: text("recurrence_rule"), // RFC5545 RRULE format (e.g., "FREQ=DAILY;COUNT=10")
+    reminders: jsonb("reminders"), // { useDefault: boolean, overrides: [{ method: 'email'|'popup', minutes: number }] }
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -171,3 +174,31 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+// Event Attendees Table - Tracks attendee response status for notifications
+export const eventAttendees = pgTable(
+  "event_attendees",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    googleEventId: text("google_event_id").notNull(),
+    attendeeEmail: text("attendee_email").notNull(),
+    responseStatus: text("response_status").notNull(), // 'needsAction', 'accepted', 'declined', 'tentative'
+    chatId: text("chat_id").notNull(), // To send notifications to the right user
+    lastChecked: timestamp("last_checked").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_event_attendees_event_id").on(table.googleEventId),
+    index("idx_event_attendees_chat_id").on(table.chatId),
+    index("idx_event_attendees_event_email").on(table.googleEventId, table.attendeeEmail),
+  ],
+);
+
+export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({
+  id: true,
+  createdAt: true,
+  lastChecked: true,
+});
+
+export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
+export type EventAttendee = typeof eventAttendees.$inferSelect;

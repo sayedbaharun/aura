@@ -139,6 +139,15 @@ app.use((req, res, next) => {
       }
     }, 5 * 60 * 1000); // 5 minutes
 
+    // Initialize attendee tracking service (starts polling every 10 minutes)
+    try {
+      const { startAttendeeTracking } = await import('./attendee-tracker');
+      startAttendeeTracking();
+      log('✓ Attendee tracking service started');
+    } catch (error) {
+      log('Attendee tracking setup skipped:', String(error));
+    }
+
     // Initialize Telegram bot webhook or polling AFTER server starts
     let telegramBot: any = null;
     try {
@@ -189,6 +198,16 @@ app.use((req, res, next) => {
     const gracefulShutdown = async () => {
       log('Shutting down gracefully...');
       clearInterval(cleanupInterval);
+      
+      // Stop attendee tracking
+      try {
+        const { stopAttendeeTracking } = await import('./attendee-tracker');
+        stopAttendeeTracking();
+        log('Attendee tracking stopped');
+      } catch (error) {
+        log('Error stopping attendee tracking:', String(error));
+      }
+      
       if (telegramBot) {
         try {
           await telegramBot.stop();
