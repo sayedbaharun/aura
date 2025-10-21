@@ -17,10 +17,142 @@ export interface PendingConfirmationData {
   messageText: string;
 }
 
+/**
+ * Parse user intent for confirmation/rejection
+ * Handles natural language while preventing false positives
+ * Returns: 'confirm' | 'reject' | 'unknown'
+ */
+function parseConfirmationIntent(text: string): 'confirm' | 'reject' | 'unknown' {
+  // Normalize: lowercase, expand contractions, remove punctuation, collapse whitespace
+  let normalized = text.toLowerCase();
+  
+  // Expand common negative contractions before removing punctuation
+  // Include U+2019 (') curly apostrophe in addition to ASCII apostrophe
+  normalized = normalized
+    .replace(/\bdon['\u2019]?t\b/gi, 'do not')
+    .replace(/\bcan['\u2019]?t\b/gi, 'can not')
+    .replace(/\bcannot\b/gi, 'can not')
+    .replace(/\bwon['\u2019]?t\b/gi, 'will not')
+    .replace(/\bain['\u2019]?t\b/gi, 'is not')
+    .replace(/\bisn['\u2019]?t\b/gi, 'is not')
+    .replace(/\baren['\u2019]?t\b/gi, 'are not')
+    .replace(/\bwasn['\u2019]?t\b/gi, 'was not')
+    .replace(/\bweren['\u2019]?t\b/gi, 'were not')
+    .replace(/\bhasn['\u2019]?t\b/gi, 'has not')
+    .replace(/\bhaven['\u2019]?t\b/gi, 'have not')
+    .replace(/\bhadn['\u2019]?t\b/gi, 'had not')
+    .replace(/\bdidn['\u2019]?t\b/gi, 'did not')
+    .replace(/\bshouldn['\u2019]?t\b/gi, 'should not')
+    .replace(/\bwouldn['\u2019]?t\b/gi, 'would not')
+    .replace(/\bcouldn['\u2019]?t\b/gi, 'could not');
+  
+  // Remove punctuation (including curly quotes, parentheses, slashes, unicode quotes)
+  normalized = normalized
+    .replace(/[.,!?;:'""`\u201C\u201D\u2018\u2019—–\-…()/\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Special case: phrases that contain "no" but aren't rejections
+  if (normalized.startsWith('no worries') || normalized.startsWith('no problem')) {
+    // Check if there's a strong rejection later (use word boundaries)
+    if (!/\bcancel\b|\bnevermind\b/.test(normalized)) {
+      return 'unknown'; // Neutral phrase, not a rejection
+    }
+  }
+  
+  // Special case: "never mind" phrase (two words)
+  if (/\bnever\s+mind\b/.test(normalized)) {
+    return 'reject';
+  }
+  
+  // Tokenize
+  const tokens = normalized.split(' ');
+  const firstToken = tokens[0];
+  
+  // Define word sets
+  const confirmWords = ['yes', 'y', 'confirm', 'ok', 'okay', 'sure', 'yep', 'yeah', 'yup'];
+  const strongRejectWords = ['cancel', 'nevermind']; // Anywhere in message
+  const weakRejectWords = ['no', 'n', 'nope', 'nah']; // First token or after confirm word
+  const neutralHedgeWords = ['maybe', 'later', 'noted', 'unsure', 'idk', 'think']; // Uncertainty markers
+  
+  // Check for strong rejection words anywhere (e.g., "cancel", "nevermind")
+  const hasStrongRejection = tokens.some(token => strongRejectWords.includes(token));
+  if (hasStrongRejection) {
+    return 'reject';
+  }
+  
+  // Check for negation using word boundary (prevents "nothing", "noted", "knot")
+  const hasNegation = /\bnot\b/.test(normalized) || tokens.includes('can not');
+  if (hasNegation) {
+    return 'unknown';
+  }
+  
+  // Check for weak rejection words in first position (e.g., "no", "nope")
+  // But skip if it's a neutral phrase we already handled
+  if (weakRejectWords.includes(firstToken) && 
+      !normalized.startsWith('no worries') && 
+      !normalized.startsWith('no problem')) {
+    return 'reject';
+  }
+  
+  // Check if message starts with a confirmation word
+  if (confirmWords.includes(firstToken)) {
+    // Check for uncertainty/hedging or rejection in rest of message
+    const restTokens = tokens.slice(1);
+    
+    // Check for strong rejections
+    const hasStrongRejectInRest = restTokens.some(token => strongRejectWords.includes(token));
+    
+    // Check for weak rejections, but exclude neutral idioms like "no worries"
+    const restText = restTokens.join(' ');
+    const hasWeakRejectInRest = restTokens.some(token => weakRejectWords.includes(token)) &&
+                                 !restText.startsWith('no worries') &&
+                                 !restText.startsWith('no problem');
+    
+    const hasNeutralInRest = restTokens.some(token => neutralHedgeWords.includes(token));
+    
+    // Additional phrase checks for common patterns
+    const hasUncertainPhrase = normalized.includes('not now') || 
+                                normalized.includes('not yet') || 
+                                normalized.includes('think about it');
+    
+    const hasNeutralPhrase = restText.startsWith('no worries') || 
+                              restText.startsWith('no problem');
+    
+    if (hasStrongRejectInRest || hasWeakRejectInRest) {
+      return 'reject'; // "ok, cancel" or "yes, no" → reject
+    }
+    
+    if (hasNeutralInRest || hasUncertainPhrase || hasNeutralPhrase) {
+      return 'unknown'; // "ok, maybe later" or "ok no worries" → unknown
+    }
+    
+    return 'confirm'; // "ok thanks" → confirm
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Check if message is an explicit confirmation
+ * Examples: "yes", "yes please", "ok thanks", "sure, go ahead"
+ */
+function isConfirmation(text: string): boolean {
+  return parseConfirmationIntent(text) === 'confirm';
+}
+
+/**
+ * Check if message is an explicit rejection
+ * Examples: "no", "no thanks", "nah not now", "cancel please"
+ */
+function isRejection(text: string): boolean {
+  return parseConfirmationIntent(text) === 'reject';
+}
+
 export async function processMessage(messageText: string, identifier: string, platform: 'whatsapp' | 'telegram' = 'whatsapp') {
   // Check if user is responding to a confirmation request
   const pendingConfirmation = await storage.getPendingConfirmation(identifier);
-  if (pendingConfirmation && (messageText.toLowerCase().includes('yes') || messageText.toLowerCase().includes('confirm'))) {
+  if (pendingConfirmation && isConfirmation(messageText)) {
     // Execute the pending action
     const confirmData: PendingConfirmationData = {
       action: pendingConfirmation.action,
@@ -30,7 +162,7 @@ export async function processMessage(messageText: string, identifier: string, pl
     const result = await executePendingAction(identifier, confirmData, platform);
     await storage.deletePendingConfirmation(identifier);
     return result;
-  } else if (pendingConfirmation && (messageText.toLowerCase().includes('no') || messageText.toLowerCase().includes('cancel'))) {
+  } else if (pendingConfirmation && isRejection(messageText)) {
     await storage.deletePendingConfirmation(identifier);
     return "No problem! Let me know if you need anything else.";
   }
@@ -70,6 +202,7 @@ Important rules:
 5. Be concise - messages should be short and clear
 6. TIME EXTRACTION: When user says "cancel X and book Y at the same time" or similar, ALWAYS use search_events first to find event X, extract its exact start/end times, then use those EXACT times for booking event Y. Never use default times when replacing events.
 7. BOOK vs RESCHEDULE: "Cancel X and book Y" = TWO separate actions (cancel X, then request_book_appointment for Y). "Reschedule X to [new time]" = ONE action (request_reschedule_appointment). NEVER reschedule when user wants to cancel one event and create a different event.
+8. CRITICAL - EVENT ID REQUIREMENT: Before calling request_cancel_appointment or request_reschedule_appointment, you MUST first call search_events to find the event and get its ID. NEVER use placeholder values like "event_id_placeholder". You MUST use the actual "id" field from the search_events result. If search returns no events, tell the user the event wasn't found.
 
 ${assistantInfo}
 
@@ -401,6 +534,12 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             break;
 
           case "request_cancel_appointment":
+            // Validate event ID
+            if (!args.eventId || args.eventId.includes('placeholder') || args.eventId.length < 10) {
+              toolResult = "ERROR: Invalid or missing event ID. You must use search_events first to get the actual event ID.";
+              break;
+            }
+
             const cancelMessage = `I'll cancel "${args.eventTitle}" scheduled for ${new Date(args.eventTime).toLocaleString('en-US', {
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
@@ -421,6 +560,12 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             break;
 
           case "request_reschedule_appointment":
+            // Validate event ID
+            if (!args.eventId || args.eventId.includes('placeholder') || args.eventId.length < 10) {
+              toolResult = "ERROR: Invalid or missing event ID. You must use search_events first to get the actual event ID.";
+              break;
+            }
+
             let rescheduleMessage = `I'll reschedule "${args.eventTitle}" to ${new Date(args.newStartTime).toLocaleString('en-US', {
               timeZone: settings?.timezone || 'Asia/Dubai',
               dateStyle: 'medium',
@@ -479,71 +624,203 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
   try {
     switch (action) {
       case 'book':
-        const event = await calendar.createEvent(
-          data.title,
-          new Date(data.startTime),
-          new Date(data.endTime),
-          data.description,
-          data.attendeeEmails // Pass attendee emails
-        );
+        // Saga Pattern: Create Calendar → Save to DB → Rollback Calendar if DB fails
+        let createdEvent: any = null;
         
-        // Store in database
-        await storage.createAppointment({
-          phoneNumber: identifier,
-          platform,
-          contactName: data.contactName || null,
-          appointmentTitle: data.title,
-          appointmentDate: new Date(data.startTime),
-          appointmentDuration: String(Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000)),
-          status: "confirmed",
-          googleEventId: event.id || null,
-          notes: data.description || null,
-        });
+        try {
+          // Step 1: Create Google Calendar event
+          createdEvent = await calendar.createEvent(
+            data.title,
+            new Date(data.startTime),
+            new Date(data.endTime),
+            data.description,
+            data.attendeeEmails
+          );
+          
+          // Step 2: Store in database (may fail)
+          await storage.createAppointment({
+            phoneNumber: identifier,
+            platform,
+            contactName: data.contactName || null,
+            appointmentTitle: data.title,
+            appointmentDate: new Date(data.startTime),
+            appointmentDuration: String(Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000)),
+            status: "confirmed",
+            googleEventId: createdEvent.id || null,
+            notes: data.description || null,
+          });
 
-        // Log successful booking
-        await logBooking(identifier, true, event.id || undefined, data.title);
+          // Both operations succeeded
+          await logBooking(identifier, true, createdEvent.id || undefined, data.title);
 
-        let bookSuccessMsg = `✓ Booked! I've added "${data.title}" to your calendar`;
-        if (data.attendeeEmails && data.attendeeEmails.length > 0) {
-          bookSuccessMsg += ` and sent invites to the attendees`;
+          let bookSuccessMsg = `✓ Booked! I've added "${data.title}" to your calendar`;
+          if (data.attendeeEmails && data.attendeeEmails.length > 0) {
+            bookSuccessMsg += ` and sent invites to the attendees`;
+          }
+          bookSuccessMsg += '.';
+          return bookSuccessMsg;
+        } catch (dbError) {
+          // Step 3: Rollback - Delete calendar event if database save failed
+          if (createdEvent?.id) {
+            logger.warn({ eventId: createdEvent.id, error: dbError }, "Database save failed, rolling back calendar event");
+            try {
+              await calendar.deleteEvent(createdEvent.id);
+              logger.info({ eventId: createdEvent.id }, "Successfully rolled back calendar event");
+            } catch (rollbackError) {
+              logger.error({ eventId: createdEvent.id, error: rollbackError }, "Failed to rollback calendar event - orphaned event may exist");
+            }
+          }
+          throw dbError; // Re-throw to be caught by outer catch
         }
-        bookSuccessMsg += '.';
-        return bookSuccessMsg;
 
       case 'cancel':
-        if (data.eventId) {
-          await calendar.deleteEvent(data.eventId);
-
-          // Log successful cancellation
-          await logCancellation(identifier, true, data.eventId, data.eventTitle);
+        // Saga Pattern (DB-first): Update DB → Delete from Calendar → Rollback DB if Calendar fails
+        if (!data.eventId) {
+          return "Cannot cancel: No event ID provided.";
         }
-        return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
+
+        let cancelledAppointment: any = null;
+        
+        try {
+          // Step 1: Find appointment in database
+          const appointment = await storage.getAppointmentByGoogleEventId(data.eventId);
+          if (!appointment) {
+            logger.warn({ eventId: data.eventId }, "No appointment found in DB, deleting calendar-only event");
+            // Proceed with calendar deletion even if not in DB
+            try {
+              await calendar.deleteEvent(data.eventId);
+            } catch (deleteError: any) {
+              // Treat 404/410 as success (idempotent delete)
+              if (deleteError?.code === 404 || deleteError?.code === 410 || deleteError?.message?.includes('404') || deleteError?.message?.includes('410')) {
+                logger.info({ eventId: data.eventId }, "Calendar event already deleted (404/410)");
+              } else {
+                throw deleteError; // Re-throw non-idempotent errors
+              }
+            }
+            await logCancellation(identifier, true, data.eventId, data.eventTitle);
+            return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
+          }
+          
+          // Step 2: Mark as cancelled in database
+          cancelledAppointment = await storage.cancelAppointment(appointment.id);
+          
+          // Step 3: Delete from Google Calendar (may fail)
+          try {
+            await calendar.deleteEvent(data.eventId);
+          } catch (deleteError: any) {
+            // Treat 404/410 as success (already deleted, idempotent)
+            if (deleteError?.code === 404 || deleteError?.code === 410 || deleteError?.message?.includes('404') || deleteError?.message?.includes('410')) {
+              logger.info({ eventId: data.eventId }, "Calendar event already deleted (404/410), keeping DB cancelled");
+              // Don't rollback - event is gone, DB should remain cancelled
+              await logCancellation(identifier, true, data.eventId, data.eventTitle);
+              return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
+            }
+            // For other errors, proceed to rollback
+            throw deleteError;
+          }
+
+          // Both operations succeeded
+          await logCancellation(identifier, true, data.eventId, data.eventTitle);
+          return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
+        } catch (calendarError) {
+          // Step 4: Rollback - Restore DB status if calendar deletion failed with non-idempotent error
+          if (cancelledAppointment) {
+            logger.warn({ eventId: data.eventId, error: calendarError }, "Calendar deletion failed, rolling back database status");
+            try {
+              await storage.updateAppointment(cancelledAppointment.id, { status: 'confirmed' });
+              logger.info({ appointmentId: cancelledAppointment.id }, "Successfully rolled back appointment status");
+            } catch (rollbackError) {
+              logger.error({ appointmentId: cancelledAppointment.id, error: rollbackError }, "Failed to rollback appointment status - database inconsistent");
+            }
+          }
+          throw calendarError; // Re-throw to be caught by outer catch
+        }
 
       case 'reschedule':
-        if (data.eventId) {
+        // Saga Pattern (DB-first): Update DB → Update Calendar → Rollback DB if Calendar fails
+        if (!data.eventId) {
+          return "Cannot reschedule: No event ID provided.";
+        }
+
+        let oldAppointmentData: { date: Date; duration: string } | null = null;
+        let rescheduleAppointment: any = null;
+        
+        try {
+          // Step 1: Find appointment in database
+          const appointment = await storage.getAppointmentByGoogleEventId(data.eventId);
+          if (!appointment) {
+            logger.warn({ eventId: data.eventId }, "No appointment found in DB, updating calendar-only event");
+            // Proceed with calendar update even if not in DB
+            await calendar.updateEvent(data.eventId, {
+              startTime: new Date(data.newStartTime),
+              endTime: new Date(data.newEndTime),
+              attendeeEmails: data.attendeeEmails,
+            });
+            await logReschedule(identifier, true, data.eventId, data.eventTitle);
+            
+            const settings = await storage.getSettings();
+            return `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', {
+              timeZone: settings?.timezone || 'Asia/Dubai',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            })}.`;
+          }
+          
+          // Step 2: Save original appointment data for potential rollback
+          oldAppointmentData = {
+            date: appointment.appointmentDate!,
+            duration: appointment.appointmentDuration || '60'
+          };
+          
+          // Step 3: Update database
+          rescheduleAppointment = await storage.updateAppointment(appointment.id, {
+            appointmentDate: new Date(data.newStartTime),
+            appointmentDuration: String(Math.round((new Date(data.newEndTime).getTime() - new Date(data.newStartTime).getTime()) / 60000)),
+          });
+          
+          // Step 4: Update Google Calendar (may fail)
           await calendar.updateEvent(data.eventId, {
             startTime: new Date(data.newStartTime),
             endTime: new Date(data.newEndTime),
             attendeeEmails: data.attendeeEmails,
           });
 
-          // Log successful reschedule
+          // Both operations succeeded
           await logReschedule(identifier, true, data.eventId, data.eventTitle);
+
+          const settings = await storage.getSettings();
+          let rescheduleSuccessMsg = `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', {
+            timeZone: settings?.timezone || 'Asia/Dubai',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })}`;
+          if (data.attendeeEmails && data.attendeeEmails.length > 0) {
+            rescheduleSuccessMsg += ` and invites sent to the attendees`;
+          }
+          rescheduleSuccessMsg += '.';
+          return rescheduleSuccessMsg;
+        } catch (calendarError) {
+          // Step 5: Rollback - Revert database to original values if calendar update failed
+          if (rescheduleAppointment && oldAppointmentData) {
+            logger.warn({ eventId: data.eventId, error: calendarError }, "Calendar update failed, rolling back database reschedule");
+            try {
+              await storage.updateAppointment(rescheduleAppointment.id, {
+                appointmentDate: oldAppointmentData.date,
+                appointmentDuration: oldAppointmentData.duration,
+              });
+              logger.info({ appointmentId: rescheduleAppointment.id }, "Successfully rolled back appointment reschedule");
+            } catch (rollbackError) {
+              logger.error({ appointmentId: rescheduleAppointment.id, error: rollbackError }, "Failed to rollback appointment reschedule - database inconsistent");
+            }
+          }
+          throw calendarError; // Re-throw to be caught by outer catch
         }
-        const settings = await storage.getSettings();
-        let rescheduleSuccessMsg = `✓ Rescheduled! "${data.eventTitle}" has been moved to ${new Date(data.newStartTime).toLocaleString('en-US', {
-          timeZone: settings?.timezone || 'Asia/Dubai',
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        })}`;
-        if (data.attendeeEmails && data.attendeeEmails.length > 0) {
-          rescheduleSuccessMsg += ` and invites sent to the attendees`;
-        }
-        rescheduleSuccessMsg += '.';
-        return rescheduleSuccessMsg;
 
       default:
         return "I'm not sure what to do with that. Can you try again?";
