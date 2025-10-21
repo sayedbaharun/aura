@@ -2,6 +2,10 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
+import { validateEnvironmentOrExit } from "./env-validator";
+
+// Validate environment variables before starting the application
+validateEnvironmentOrExit();
 
 const app = express();
 app.use(express.json());
