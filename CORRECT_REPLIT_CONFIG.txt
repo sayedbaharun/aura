@@ -1,3 +1,5 @@
+# Copy this into your .replit file
+
 modules = ["nodejs-20", "web", "postgresql-16"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
@@ -8,6 +10,7 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "autoscale"
 build = "npm run db:emergency-fix && npm run build"
+run = ["npm", "run", "start"]
 
 [[ports]]
 localPort = 5000
