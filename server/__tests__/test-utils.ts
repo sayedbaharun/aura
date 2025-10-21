@@ -124,7 +124,7 @@ export const mockStorage = {
     userName: 'Test User',
     timezone: 'Asia/Dubai',
     workingHours: '9 AM - 5 PM',
-    defaultMeetingDuration: 60,
+    defaultMeetingDuration: "60",
     preferences: 'Test preferences',
   }),
   getMessagesByPhone: vi.fn().mockResolvedValue([]),
@@ -181,7 +181,7 @@ export function resetAllMocks() {
     userName: 'Test User',
     timezone: 'Asia/Dubai',
     workingHours: '9 AM - 5 PM',
-    defaultMeetingDuration: 60,
+    defaultMeetingDuration: "60",
     preferences: 'Test preferences',
   });
   mockStorage.getMessagesByPhone.mockResolvedValue([]);

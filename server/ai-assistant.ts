@@ -644,7 +644,7 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
             contactName: data.contactName || null,
             appointmentTitle: data.title,
             appointmentDate: new Date(data.startTime),
-            appointmentDuration: Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000),
+            appointmentDuration: String(Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000)),
             status: "confirmed",
             googleEventId: createdEvent.id || null,
             notes: data.description || null,
@@ -772,13 +772,13 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           // Step 2: Save original appointment data for potential rollback
           oldAppointmentData = {
             date: appointment.appointmentDate!,
-            duration: appointment.appointmentDuration || 60
+            duration: parseInt(appointment.appointmentDuration || "60", 10)
           };
           
           // Step 3: Update database
           rescheduleAppointment = await storage.updateAppointment(appointment.id, {
             appointmentDate: new Date(data.newStartTime),
-            appointmentDuration: Math.round((new Date(data.newEndTime).getTime() - new Date(data.newStartTime).getTime()) / 60000),
+            appointmentDuration: String(Math.round((new Date(data.newEndTime).getTime() - new Date(data.newStartTime).getTime()) / 60000)),
           });
           
           // Step 4: Update Google Calendar (may fail)
@@ -812,7 +812,7 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
             try {
               await storage.updateAppointment(rescheduleAppointment.id, {
                 appointmentDate: oldAppointmentData.date,
-                appointmentDuration: oldAppointmentData.duration,
+                appointmentDuration: String(oldAppointmentData.duration),
               });
               logger.info({ appointmentId: rescheduleAppointment.id }, "Successfully rolled back appointment reschedule");
             } catch (rollbackError) {
