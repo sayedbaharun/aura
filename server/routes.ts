@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertWhatsappMessageSchema, insertAppointmentSchema, insertAssistantSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { processMessage } from "./ai-assistant";
+import * as gmail from "./gmail";
 // WhatsApp webhook removed - not needed for Phase 1
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { logger } from "./logger";
@@ -201,6 +202,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ error: "Failed to update settings" });
       }
+    }
+  });
+
+  // Email API endpoints (protected)
+  
+  // Get recent emails
+  app.get("/api/emails", isAuthenticated, async (req, res) => {
+    try {
+      const maxResults = parseInt(req.query.maxResults as string) || 10;
+      const unreadOnly = req.query.unreadOnly === 'true';
+      const query = req.query.query as string;
+      
+      const emails = await gmail.listMessages({
+        maxResults: Math.min(maxResults, 50),
+        query: unreadOnly ? (query ? `${query} is:unread` : 'is:unread') : query,
+      });
+      
+      res.json(emails);
+    } catch (error) {
+      logger.error({ error }, "Error fetching emails");
+      res.status(500).json({ error: "Failed to fetch emails" });
+    }
+  });
+
+  // Send an email
+  app.post("/api/emails/send", isAuthenticated, async (req, res) => {
+    try {
+      const { to, subject, body } = req.body;
+      
+      if (!to || !subject || !body) {
+        return res.status(400).json({ error: "Missing required fields: to, subject, body" });
+      }
+      
+      const result = await gmail.sendEmail({ to, subject, body });
+      
+      if (result.success) {
+        res.json({ success: true, messageId: result.messageId });
+      } else {
+        res.status(500).json({ error: result.error || "Failed to send email" });
+      }
+    } catch (error) {
+      logger.error({ error }, "Error sending email");
+      res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
+  // Search emails
+  app.get("/api/emails/search", isAuthenticated, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const maxResults = parseInt(req.query.maxResults as string) || 10;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Missing search query parameter 'q'" });
+      }
+      
+      const emails = await gmail.searchEmails(query, Math.min(maxResults, 50));
+      res.json(emails);
+    } catch (error) {
+      logger.error({ error }, "Error searching emails");
+      res.status(500).json({ error: "Failed to search emails" });
+    }
+  });
+
+  // Get email summaries for a user
+  app.get("/api/email-summaries", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = req.query.chatId as string;
+      
+      if (!chatId) {
+        return res.status(400).json({ error: "Missing chatId parameter" });
+      }
+      
+      const summaries = await storage.getEmailSummary(chatId);
+      res.json(summaries);
+    } catch (error) {
+      logger.error({ error }, "Error fetching email summaries");
+      res.status(500).json({ error: "Failed to fetch email summaries" });
     }
   });
 
