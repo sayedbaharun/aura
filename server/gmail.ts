@@ -13,7 +13,16 @@ const GMAIL_SCOPES = [
 function createOAuth2Client() {
   const clientId = process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  const redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:5000/oauth/gmail/callback';
+  
+  let redirectUri = process.env.GMAIL_REDIRECT_URI;
+  if (!redirectUri) {
+    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+    if (replitDomain) {
+      redirectUri = `https://${replitDomain}/oauth/gmail/callback`;
+    } else {
+      redirectUri = 'http://localhost:5000/oauth/gmail/callback';
+    }
+  }
 
   if (!clientId || !clientSecret) {
     return null;

@@ -32,15 +32,17 @@ Open your downloaded JSON file and add these secrets:
 
 1. **GMAIL_CLIENT_ID**: Copy from `client_id` field
 2. **GMAIL_CLIENT_SECRET**: Copy from `client_secret` field
-3. **GMAIL_REDIRECT_URI**: `http://localhost:5000/oauth/gmail/callback`
+
+**Note**: The redirect URI is automatically detected from your Replit domain. You don't need to set it manually unless you're using a custom domain.
 
 ### 3. Authorize and Get Refresh Token (2 minutes)
 
 1. Make sure your app is running
-2. Visit: `http://localhost:5000/oauth/gmail/authorize`
-3. Sign in with Google and grant permissions
-4. Copy the refresh token from the success page
-5. Add to Replit Secrets:
+2. In Replit, click the web preview button (or open your Replit app URL)
+3. Navigate to: `/oauth/gmail/authorize` (add this to your Replit URL)
+4. Sign in with Google and grant permissions
+5. Copy the refresh token from the success page
+6. Add to Replit Secrets:
    - **GMAIL_REFRESH_TOKEN**: (paste the token)
 
 ### 4. Restart and Test

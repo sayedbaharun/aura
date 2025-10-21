@@ -65,14 +65,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const authUrl = gmail.getAuthUrl();
       if (!authUrl) {
+        const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+        const defaultRedirectUri = replitDomain 
+          ? `https://${replitDomain}/oauth/gmail/callback`
+          : 'http://localhost:5000/oauth/gmail/callback';
+        
         res.status(400).send(`
           <h1>Gmail OAuth Not Configured</h1>
           <p>Please set the following environment variables in Replit Secrets:</p>
           <ul>
             <li><code>GMAIL_CLIENT_ID</code></li>
             <li><code>GMAIL_CLIENT_SECRET</code></li>
-            <li><code>GMAIL_REDIRECT_URI</code> (optional, defaults to http://localhost:5000/oauth/gmail/callback)</li>
           </ul>
+          <p><strong>Your redirect URI for Google Cloud Console:</strong></p>
+          <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${defaultRedirectUri}</pre>
           <p>See <a href="/GMAIL_OAUTH_SETUP.md">Setup Guide</a> for instructions.</p>
         `);
         return;

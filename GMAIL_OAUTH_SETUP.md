@@ -50,17 +50,20 @@ Add these secrets in your Replit project (Secrets tab in the left sidebar):
 
 1. **GMAIL_CLIENT_ID**: The `client_id` from the downloaded JSON
 2. **GMAIL_CLIENT_SECRET**: The `client_secret` from the downloaded JSON
-3. **GMAIL_REDIRECT_URI**: Set to `http://localhost:5000/oauth/gmail/callback`
+
+**Important**: In Google Cloud Console, when creating the OAuth client, use **Desktop app** type. The redirect URI will be automatically detected from your Replit domain (something like `https://your-repl-id.replit.dev/oauth/gmail/callback`).
 
 ## 6. Generate Refresh Token
 
-After updating the code, you'll run a one-time authorization flow:
+After adding the secrets, run a one-time authorization flow:
 
-1. Visit: `http://localhost:5000/oauth/gmail/authorize` in your browser
-2. You'll be redirected to Google to authorize the app
-3. Sign in and grant all requested permissions
-4. You'll be redirected back and see your refresh token
-5. Copy the refresh token and add it to Replit Secrets as **GMAIL_REFRESH_TOKEN**
+1. Make sure your app is running in Replit
+2. Click the webview/preview button or open your Replit app URL
+3. Add `/oauth/gmail/authorize` to the URL (e.g., `https://your-repl.replit.dev/oauth/gmail/authorize`)
+4. You'll be redirected to Google to authorize the app
+5. Sign in and grant all requested permissions
+6. You'll be redirected back and see your refresh token displayed
+7. Copy the refresh token and add it to Replit Secrets as **GMAIL_REFRESH_TOKEN**
 
 ## 7. Restart the Application
 
@@ -69,5 +72,9 @@ Once all secrets are added, restart your app and the Gmail features will work!
 ## Troubleshooting
 
 - **"Access blocked"**: Make sure your email is added as a test user in the OAuth consent screen
-- **"Redirect URI mismatch"**: Ensure the redirect URI in your OAuth client matches exactly: `http://localhost:5000/oauth/gmail/callback`
+- **"Redirect URI mismatch"**: 
+  1. Visit `/oauth/gmail/authorize` (without credentials set) to see your actual redirect URI
+  2. Go to Google Cloud Console > Credentials > Edit your OAuth client
+  3. Add the redirect URI shown (should be `https://your-repl-domain.replit.dev/oauth/gmail/callback`)
 - **Token expired**: The refresh token should auto-refresh, but if issues persist, re-run the authorization flow
+- **Page not loading**: Make sure you're using the Replit preview URL, not `localhost`
