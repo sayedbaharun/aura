@@ -233,3 +233,33 @@ export const insertEmailSummarySchema = createInsertSchema(emailSummaries).omit(
 
 export type InsertEmailSummary = z.infer<typeof insertEmailSummarySchema>;
 export type EmailSummary = typeof emailSummaries.$inferSelect;
+
+// Notion Operations Table - Track Notion actions for audit and debugging
+export const notionOperations = pgTable(
+  "notion_operations",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    chatId: text("chat_id").notNull(),
+    operation: text("operation").notNull(), // 'create_page', 'query_database', 'search', 'update_page', 'create_entry'
+    notionObjectId: text("notion_object_id"), // Page ID or Database ID
+    notionObjectType: text("notion_object_type"), // 'page', 'database', 'entry'
+    title: text("title"),
+    success: boolean("success").notNull(),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata"), // Additional operation details
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_notion_operations_chat_id").on(table.chatId),
+    index("idx_notion_operations_timestamp").on(table.timestamp),
+    index("idx_notion_operations_chat_timestamp").on(table.chatId, table.timestamp),
+  ],
+);
+
+export const insertNotionOperationSchema = createInsertSchema(notionOperations).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertNotionOperation = z.infer<typeof insertNotionOperationSchema>;
+export type NotionOperation = typeof notionOperations.$inferSelect;

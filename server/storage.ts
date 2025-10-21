@@ -13,13 +13,16 @@ import {
   type InsertEventAttendee,
   type EmailSummary,
   type InsertEmailSummary,
+  type NotionOperation,
+  type InsertNotionOperation,
   whatsappMessages,
   appointments,
   assistantSettings,
   users,
   pendingConfirmations,
   eventAttendees,
-  emailSummaries
+  emailSummaries,
+  notionOperations
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, lt, and } from "drizzle-orm";
@@ -67,6 +70,10 @@ export interface IStorage {
   createEmailSummary(summary: InsertEmailSummary): Promise<EmailSummary>;
   getEmailSummariesByChat(chatId: string, limit?: number): Promise<EmailSummary[]>;
   getEmailSummariesByCategory(chatId: string, category: string): Promise<EmailSummary[]>;
+
+  // Notion Operations
+  createNotionOperation(operation: InsertNotionOperation): Promise<NotionOperation>;
+  getNotionOperationsByChat(chatId: string, limit?: number): Promise<NotionOperation[]>;
 }
 
 // PostgreSQL Storage Implementation
@@ -369,6 +376,24 @@ export class DBStorage implements IStorage {
         eq(emailSummaries.category, category)
       ))
       .orderBy(desc(emailSummaries.receivedDate));
+  }
+
+  // Notion Operations
+  async createNotionOperation(insertOperation: InsertNotionOperation): Promise<NotionOperation> {
+    const [operation] = await this.db
+      .insert(notionOperations)
+      .values(insertOperation)
+      .returning();
+    return operation;
+  }
+
+  async getNotionOperationsByChat(chatId: string, limit: number = 50): Promise<NotionOperation[]> {
+    return await this.db
+      .select()
+      .from(notionOperations)
+      .where(eq(notionOperations.chatId, chatId))
+      .orderBy(desc(notionOperations.timestamp))
+      .limit(limit);
   }
 }
 

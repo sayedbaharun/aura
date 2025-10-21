@@ -829,8 +829,132 @@ Aura: "Booked! I've added 'Q4 planning discussion' to your calendar.
 
 ---
 
+## 📝 STEP 3: Knowledge Management (Notion Integration)
+
+### Core Notion Features
+
+#### **Search Notion**
+Find pages, notes, and database entries across your entire Notion workspace.
+
+**How to use:**
+- "Search Notion for project planning"
+- "Find my meeting notes from last week"
+- "Show me notes about quarterly goals"
+
+**What you get:**
+- Page title and type
+- Direct URL to the page
+- Last edited timestamp
+- Up to 50 results per search
+
+**Features:**
+- Full-text search across all accessible pages
+- Sorted by most recently edited
+- Fast and accurate results
+
+---
+
+#### **Create Notion Notes**
+Create new pages and notes in your Notion workspace through chat.
+
+**How to use:**
+- "Create a note in Notion titled 'Project Ideas' with content..."
+- "Add a note about the client feedback to my Work Notes page"
+- "Make a new page called 'Meeting Action Items'"
+
+**What happens:**
+- Creates a new page under your specified parent page
+- Adds the title and content you provide
+- Returns the page ID for future reference
+
+**Requirements:**
+- You need the parent page ID (get from Notion URL)
+- Content is optional - can create empty pages
+
+---
+
+#### **Query Notion Databases**
+View and filter entries in your Notion databases (tasks, projects, etc.)
+
+**How to use:**
+- "Show me my pending tasks in Notion"
+- "List all entries in my Projects database"
+- "What's in my Content Calendar database?"
+
+**What you get:**
+- All database entries and their properties
+- Creation timestamps
+- Direct URLs to each entry
+- Up to 100 results per query
+
+**Use cases:**
+- Task management
+- Project tracking
+- Content planning
+- CRM databases
+
+---
+
+#### **Create Database Entries**
+Add new entries to your Notion databases via chat.
+
+**How to use:**
+- "Add a task 'Review Q4 report' to my Tasks database"
+- "Create a new project entry called 'Website Redesign'"
+- "Add 'Client Meeting Notes' to my Work Log database"
+
+**What happens:**
+- Creates a new entry in the specified database
+- Sets the title/name property
+- Can include additional properties (status, tags, dates, etc.)
+- Returns confirmation and entry ID
+
+**Benefits:**
+- Quick task capture
+- Update databases without opening Notion
+- Maintain databases while on the go
+
+---
+
+#### **Update Notion Pages**
+Modify existing pages or database entries.
+
+**How to use:**
+- "Archive that meeting notes page"
+- "Update the status of task XYZ to Done"
+- "Mark page ABC as complete"
+
+**What you can update:**
+- Page properties
+- Archive status
+- Database entry fields
+
+**Requirements:**
+- Need the page ID (from search or create operations)
+
+---
+
+### **Benefits of Notion Integration**
+
+**Unified Knowledge Base:**
+- Access all your notes and databases through Aura
+- No need to switch between apps
+- Quick information retrieval
+
+**Productivity Boost:**
+- Capture thoughts and tasks instantly
+- Update databases on the go
+- Search across all your knowledge
+
+**Workflow Integration:**
+- Connect calendar events to Notion pages
+- Document meeting outcomes
+- Track action items from conversations
+
+---
+
 **Last Updated:** October 21, 2025  
-**Version:** Phase 2 with Gmail Integration (21 features live)  
+**Version:** Phase 2.1 with Notion Integration (26 features live)  
 **Status:** Production-ready and deployed at aurasb.replit.app
 
 ---
@@ -852,6 +976,24 @@ Aura: "Booked! I've added 'Q4 planning discussion' to your calendar.
 4. Exchange code for refresh token
 5. Store refresh token in environment
 6. Automatic access token refresh on each request
+
+---
+
+### Notion Integration Stack
+- **Notion API**: Full workspace access via Replit Connector
+- **Authentication**: OAuth2 via Replit Connectors (automatic token refresh)
+- **Permissions**: user:read, user:write, content:read, content:write, workspace:read, workspace:write
+- **Storage**: Operation audit logging in PostgreSQL
+- **Features**: Search, create pages, query databases, create entries, update pages
+- **SDK**: @notionhq/client v5.3.0
+
+### Notion API Capabilities
+- Search across all accessible pages and databases
+- Create new pages and notes
+- Query databases with filters and sorting
+- Create database entries with properties
+- Update page properties and archive status
+- Automatic handling of 2000-character content limits
 
 ---
 

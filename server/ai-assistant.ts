@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import * as calendar from "./google-calendar";
 import * as gmail from "./gmail";
+import * as notion from "./notion";
 import { logBooking, logCancellation, logReschedule, logViewSchedule } from "./audit-logger";
 import { logger } from "./logger";
 import { retryOpenAI } from "./retry-utils";
@@ -538,6 +539,123 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "search_notion",
+        description: "Search across all Notion pages and databases for specific content. Use this to find notes, tasks, or any information stored in Notion.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Search query (e.g., 'project planning', 'meeting notes', 'quarterly goals')",
+            },
+            limit: {
+              type: "number",
+              description: "Maximum number of results to return (default 10, max 50)",
+            },
+          },
+          required: ["query"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "create_notion_note",
+        description: "Create a new note/page in Notion under a specific parent page",
+        parameters: {
+          type: "object",
+          properties: {
+            parentId: {
+              type: "string",
+              description: "Parent page ID where this note should be created",
+            },
+            title: {
+              type: "string",
+              description: "Title of the note",
+            },
+            content: {
+              type: "string",
+              description: "Content/body of the note",
+            },
+          },
+          required: ["parentId", "title"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "query_notion_database",
+        description: "Query a Notion database to get entries/tasks. Use this to show pending tasks, filter by status, etc.",
+        parameters: {
+          type: "object",
+          properties: {
+            databaseId: {
+              type: "string",
+              description: "Notion database ID",
+            },
+            limit: {
+              type: "number",
+              description: "Maximum number of results (default 10)",
+            },
+          },
+          required: ["databaseId"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "create_notion_database_entry",
+        description: "Create a new entry in a Notion database (e.g., add a task, create a project entry)",
+        parameters: {
+          type: "object",
+          properties: {
+            databaseId: {
+              type: "string",
+              description: "Notion database ID",
+            },
+            title: {
+              type: "string",
+              description: "Title/name for the entry",
+            },
+            properties: {
+              type: "object",
+              description: "Additional properties for the database entry (status, tags, dates, etc.)",
+            },
+          },
+          required: ["databaseId", "title"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "update_notion_page",
+        description: "Update an existing Notion page (change properties, archive it, etc.)",
+        parameters: {
+          type: "object",
+          properties: {
+            pageId: {
+              type: "string",
+              description: "Notion page ID to update",
+            },
+            properties: {
+              type: "object",
+              description: "Properties to update",
+            },
+            archived: {
+              type: "boolean",
+              description: "Whether to archive the page",
+            },
+          },
+          required: ["pageId"],
+        },
+      },
+    },
   ];
 
   // Multi-turn tool calling loop - allows AI to use search results for follow-up actions
@@ -844,6 +962,125 @@ Return as JSON with keys: hasMeetingRequest (boolean), proposedTimes (array of s
             });
             
             toolResult = JSON.stringify(analysis);
+            break;
+
+          case "search_notion":
+            const notionSearchResults = await notion.searchNotion(args.query, args.limit || 10);
+            
+            if (notionSearchResults.length === 0) {
+              toolResult = "No Notion pages found matching your search";
+            } else {
+              toolResult = JSON.stringify(notionSearchResults.map((result: any) => ({
+                id: result.id,
+                title: result.properties?.title?.title?.[0]?.plain_text || 'Untitled',
+                type: result.object,
+                url: result.url,
+                lastEdited: result.last_edited_time,
+              })));
+            }
+            
+            await storage.createNotionOperation({
+              chatId: identifier,
+              operation: 'search',
+              success: true,
+              metadata: { query: args.query, resultsCount: notionSearchResults.length },
+            });
+            break;
+
+          case "create_notion_note":
+            const createdPage = await notion.createNotionPage({
+              parentId: args.parentId,
+              title: args.title,
+              content: args.content,
+            });
+            
+            await storage.createNotionOperation({
+              chatId: identifier,
+              operation: 'create_page',
+              notionObjectId: createdPage.id,
+              notionObjectType: 'page',
+              title: args.title,
+              success: true,
+            });
+            
+            toolResult = `Successfully created note "${args.title}" in Notion. Page ID: ${createdPage.id}`;
+            break;
+
+          case "query_notion_database":
+            const dbEntries = await notion.queryDatabase({
+              databaseId: args.databaseId,
+              limit: args.limit || 10,
+            });
+            
+            if (dbEntries.length === 0) {
+              toolResult = "No entries found in this database";
+            } else {
+              toolResult = JSON.stringify(dbEntries.map((entry: any) => ({
+                id: entry.id,
+                properties: entry.properties,
+                url: entry.url,
+                createdTime: entry.created_time,
+              })));
+            }
+            
+            await storage.createNotionOperation({
+              chatId: identifier,
+              operation: 'query_database',
+              notionObjectId: args.databaseId,
+              notionObjectType: 'database',
+              success: true,
+              metadata: { resultsCount: dbEntries.length },
+            });
+            break;
+
+          case "create_notion_database_entry":
+            const entryProperties: any = {
+              title: {
+                title: [
+                  {
+                    text: {
+                      content: args.title
+                    }
+                  }
+                ]
+              },
+              ...args.properties,
+            };
+            
+            const createdEntry = await notion.createDatabaseEntry({
+              databaseId: args.databaseId,
+              properties: entryProperties,
+            });
+            
+            await storage.createNotionOperation({
+              chatId: identifier,
+              operation: 'create_entry',
+              notionObjectId: createdEntry.id,
+              notionObjectType: 'entry',
+              title: args.title,
+              success: true,
+            });
+            
+            toolResult = `Successfully created entry "${args.title}" in database`;
+            break;
+
+          case "update_notion_page":
+            const updatedPage = await notion.updateNotionPage({
+              pageId: args.pageId,
+              properties: args.properties,
+              archived: args.archived,
+            });
+            
+            await storage.createNotionOperation({
+              chatId: identifier,
+              operation: 'update_page',
+              notionObjectId: args.pageId,
+              notionObjectType: 'page',
+              success: true,
+              metadata: { archived: args.archived },
+            });
+            
+            toolResult = `Successfully updated page ${args.pageId}`;
             break;
 
           default:

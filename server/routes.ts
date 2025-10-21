@@ -357,6 +357,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notion operation history for a user
+  app.get("/api/notion/operations", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = req.query.chatId as string;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      if (!chatId) {
+        return res.status(400).json({ error: "Missing chatId parameter" });
+      }
+      
+      const operations = await storage.getNotionOperationsByChat(chatId, limit);
+      res.json(operations);
+    } catch (error) {
+      logger.error({ error }, "Error fetching Notion operations");
+      res.status(500).json({ error: "Failed to fetch Notion operations" });
+    }
+  });
+
   // Telegram Webhook - Use Telegraf's webhookCallback for proper handling
   // with secret token validation for security
   const setupTelegramWebhookRoute = async () => {
