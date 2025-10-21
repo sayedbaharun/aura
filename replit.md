@@ -212,6 +212,40 @@ Three main tables:
 - PostCSS with Tailwind for CSS processing
 - ESBuild for production server bundling
 
+**Deployment & Production Build**
+
+The application supports two serving modes:
+
+1. **Development Mode** (default with `npm run dev`)
+   - Uses Vite dev server for hot module replacement
+   - Serves source files directly from `client/src`
+   - Ideal for active development
+
+2. **Production Mode** (`npm run start`)
+   - Serves pre-built static files from `dist/public`
+   - Created by running `npm run build`
+   - Used automatically when deployed/published on Replit
+
+**Testing Production Build Locally**
+
+If you need to test the production build in development:
+
+1. Build the production assets:
+   ```bash
+   npm run build
+   ```
+
+2. Add `FORCE_STATIC=1` to the `[env]` section in `.replit`:
+   ```toml
+   [env]
+   PORT = "5000"
+   FORCE_STATIC = "1"
+   ```
+
+3. Restart the workflow - the server will now serve the built files from `dist/public` even in development mode
+
+**Note**: When you publish the app on Replit, it automatically uses the `[deployment]` configuration which runs `npm run build` and `npm run start`, serving the production build correctly.
+
 **Environment Configuration**
 - `DATABASE_URL` - PostgreSQL connection string
 - `AI_INTEGRATIONS_OPENAI_API_KEY` - OpenAI API access

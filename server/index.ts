@@ -89,7 +89,10 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  // FORCE_STATIC=1 can be used to serve production build in development mode
+  const forceStatic = process.env.FORCE_STATIC === '1' || process.env.FORCE_STATIC === 'true';
+  
+  if (app.get("env") === "development" && !forceStatic) {
     await setupVite(app, server);
   } else {
     serveStatic(app);
