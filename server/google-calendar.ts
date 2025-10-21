@@ -207,6 +207,14 @@ export async function createEvent(
         dateTime: endTime.toISOString(),
         timeZone: 'Asia/Dubai',
       },
+      conferenceData: {
+        createRequest: {
+          requestId: `meet-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          conferenceSolutionKey: {
+            type: 'hangoutsMeet'
+          }
+        }
+      },
     };
 
     // Add attendees if provided
@@ -228,6 +236,7 @@ export async function createEvent(
     const response = await calendar.events.insert({
       calendarId: 'primary',
       requestBody: event,
+      conferenceDataVersion: 1,
       sendUpdates: attendeeEmails && attendeeEmails.length > 0 ? 'all' : 'none',
     });
 
@@ -237,9 +246,10 @@ export async function createEvent(
       endTime, 
       attendees: attendeeEmails?.length || 0, 
       eventId: response.data.id,
+      meetLink: response.data.hangoutLink,
       recurring: !!recurrenceRule,
       customReminders: !!reminders
-    }, 'Created calendar event');
+    }, 'Created calendar event with Google Meet link');
     return response.data;
   });
 }

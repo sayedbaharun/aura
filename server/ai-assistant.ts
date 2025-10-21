@@ -705,11 +705,17 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           // Both operations succeeded
           await logBooking(identifier, true, createdEvent.id || undefined, data.title);
 
-          let bookSuccessMsg = `✓ Booked! I've added "${data.title}" to your calendar`;
-          if (data.attendeeEmails && data.attendeeEmails.length > 0) {
-            bookSuccessMsg += ` and sent invites to the attendees`;
+          let bookSuccessMsg = `Booked! I've added "${data.title}" to your calendar`;
+          
+          // Add Google Meet link if available
+          if (createdEvent.hangoutLink) {
+            bookSuccessMsg += `\n\nMeet link: ${createdEvent.hangoutLink}`;
           }
-          bookSuccessMsg += '.';
+          
+          if (data.attendeeEmails && data.attendeeEmails.length > 0) {
+            bookSuccessMsg += `\n\nInvitations sent to: ${data.attendeeEmails.join(', ')}`;
+          }
+          
           return bookSuccessMsg;
         } catch (dbError) {
           // Step 3: Rollback - Delete calendar event if database save failed
