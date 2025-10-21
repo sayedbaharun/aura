@@ -13,7 +13,7 @@ const app = express();
 
 // Security: HTTP headers protection with helmet
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  contentSecurityPolicy: false, // Disable CSP to prevent blocking static assets
   crossOriginEmbedderPolicy: false, // Allow embedding for Replit preview
 }));
 
