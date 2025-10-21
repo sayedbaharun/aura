@@ -5,9 +5,13 @@
 
 ## 📋 Overview
 
-Aura is an AI-powered personal assistant that manages your calendar through natural conversation via Telegram. Built on cutting-edge AI and calendar technologies, Aura transforms calendar management from a chore into a conversation.
+Aura is an AI-powered personal assistant that manages your calendar and email through natural conversation via Telegram. Built on cutting-edge AI, calendar, and email technologies, Aura transforms calendar management and email intelligence from chores into conversations.
 
-**Primary Use Case:** Calendar Management & Scheduling  
+**Primary Use Cases:** 
+- Calendar Management & Scheduling
+- Email Intelligence & Management
+- Meeting Request Extraction
+
 **Platform:** Telegram (with optional WhatsApp support)  
 **Authorized User:** Chat ID 7964798688
 
@@ -52,7 +56,30 @@ Aura is an AI-powered personal assistant that manages your calendar through natu
 
 ---
 
-### 3. **Telegram Bot API** (User Interface)
+### 3. **Gmail API** (Email Management)
+**What it provides:**
+- Full email access (read, send, modify)
+- Advanced email search capabilities
+- Email thread tracking
+- Label management
+- Message metadata and body parsing
+
+**Features enabled:**
+- Check and read emails
+- Search emails by any criteria
+- Send emails with confirmation
+- AI-powered meeting request extraction
+- Email conversation tracking
+- Smart email categorization
+
+**Authentication:**
+- Manual OAuth2 with full scopes (primary)
+- Automatic refresh token management
+- Replit Connector fallback (limited scopes)
+
+---
+
+### 4. **Telegram Bot API** (User Interface)
 **What it provides:**
 - Real-time messaging interface
 - Push notifications
@@ -67,18 +94,21 @@ Aura is an AI-powered personal assistant that manages your calendar through natu
 
 ---
 
-### 4. **PostgreSQL Database** (Data Persistence)
+### 5. **PostgreSQL Database** (Data Persistence)
 **What it provides:**
 - Message history storage
 - Appointment tracking
 - Settings persistence
 - Attendee response tracking
+- Email thread tracking
 - Audit logging
 
 **Features enabled:**
 - Conversation history
 - Pending confirmation management
 - Attendee status change detection
+- Email conversation tracking
+- Meeting request detection storage
 - Security audit trails
 
 ---
@@ -189,6 +219,168 @@ Discover available time periods for scheduling.
 - Returns up to 5 available slots
 - Considers your existing appointments
 - Checks every 30 minutes
+
+---
+
+## 📧 STEP 2: Email Management (Gmail Integration)
+### Core Email Features
+
+#### **Check Emails**
+View your recent emails, unread messages, or search for specific content.
+
+**How to use:**
+- "Check my emails"
+- "Do I have any unread emails?"
+- "Show me my last 5 emails"
+
+**What happens:**
+- AI retrieves emails from Gmail
+- Returns sender, subject, snippet, and read/unread status
+- Sorted by most recent first
+- Can filter by unread only
+
+**What you get:**
+```
+You have 3 unread emails:
+
+From: john@company.com
+Subject: Project Update
+Preview: Hey, I wanted to share the latest progress on...
+
+From: sarah@client.com
+Subject: Meeting Follow-up
+Preview: Thanks for the great discussion yesterday...
+```
+
+---
+
+#### **Search Emails**
+Find specific emails by sender, subject, or content.
+
+**How to use:**
+- "Search my emails for invoice"
+- "Find emails from john@company.com"
+- "Show emails about project budget"
+
+**What happens:**
+- AI uses Gmail's powerful search
+- Supports full Gmail query syntax
+- Returns matching emails with context
+- Can search body, subject, sender, or all
+
+**Search capabilities:**
+- By sender: "from:john@company.com"
+- By subject: "subject:invoice"
+- By content: Any keyword or phrase
+- Date ranges: "after:2024/10/01"
+- Combinations: Multiple criteria at once
+
+---
+
+#### **Send Emails**
+Compose and send emails through natural conversation with confirmation workflow.
+
+**How to use:**
+- "Send an email to john@company.com saying thanks for the update"
+- "Email sarah@client.com about tomorrow's meeting"
+- "Reply to john@company.com with the project timeline"
+
+**What happens:**
+- AI asks for confirmation with full email preview
+- You review recipient, subject, and body
+- Confirm to send
+- Email sent through your Gmail account
+- Confirmation with message ID
+
+**Confirmation flow:**
+```
+I'll send this email to john@company.com:
+
+Subject: Thanks for the update
+Body: Thanks for the update
+
+Ready to send? (yes/no)
+
+[You confirm]
+
+Email sent successfully! Message ID: abc123
+```
+
+---
+
+#### **AI Meeting Request Extraction**
+Automatically detect and extract meeting requests from your emails.
+
+**How to use:**
+- "Check if I have any meeting requests in my email"
+- "Are there any emails asking to schedule a meeting?"
+
+**What happens:**
+- AI scans your emails for meeting-related content
+- Identifies requests to schedule, calendar invites, or meeting suggestions
+- Extracts key details: proposed times, attendees, topics
+- Can automatically convert to calendar events
+
+**What it detects:**
+- Direct meeting requests
+- Calendar invitations
+- Rescheduling requests
+- Availability inquiries
+- Conference call details
+
+**Example response:**
+```
+Found 2 meeting requests:
+
+1. From: client@external.com
+   Topic: Q4 Planning Discussion
+   Proposed: Next Tuesday 2pm or Wednesday 10am
+   
+2. From: team@company.com
+   Topic: Sprint Retrospective
+   Proposed: Friday at 3pm
+```
+
+---
+
+#### **Email Conversation Tracking**
+Track email threads with AI-generated summaries and categorization.
+
+**How to use:**
+- Automatic: All emails are tracked in conversation threads
+- Manual: "What's the latest on the project discussion thread?"
+
+**What it provides:**
+- Thread continuity across multiple emails
+- AI-generated summaries of conversations
+- Meeting request flags on relevant threads
+- Action vs FYI categorization
+
+**Database storage:**
+- Thread ID linking related emails
+- Conversation summaries
+- Meeting request detection flags
+- Read/unread status per thread
+
+---
+
+### Gmail OAuth Setup
+
+Aura uses **manual OAuth2** authentication for full Gmail access with these scopes:
+- **gmail.readonly**: Read all emails and settings
+- **gmail.send**: Send emails on your behalf
+- **gmail.modify**: Mark emails as read/unread, add labels
+- **gmail.labels**: Manage email labels
+
+**Setup process:**
+1. Create OAuth client in Google Cloud Console (Web application type)
+2. Add credentials to Replit Secrets (GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET)
+3. Visit `/oauth/gmail/authorize` to get refresh token
+4. Add refresh token to Replit Secrets (GMAIL_REFRESH_TOKEN)
+
+**Fallback:** Replit Connector with limited scopes (if manual OAuth not configured)
+
+**Documentation:** See `GMAIL_QUICK_START.md` and `GMAIL_OAUTH_SETUP.md` for detailed setup instructions.
 
 ---
 
@@ -474,9 +666,11 @@ Attendance: 1 accepted, 1 declined, 1 tentative
 
 ## 📊 Feature Statistics
 
-**Total Features:** 16 major features  
-**Completed Roadmap Items:** 6 of 13 from Phase 2  
-**Integration Partners:** 4 (OpenAI, Google, Telegram, PostgreSQL)  
+**Total Features:** 21 major features  
+**Calendar Features:** 11 features
+**Email Features:** 5 features
+**Intelligence Features:** 5 features (AI, tracking, search, reminders, focus time)
+**Integration Partners:** 5 (OpenAI, Google Calendar, Gmail, Telegram, PostgreSQL)  
 **Supported Platforms:** Telegram (primary), WhatsApp (optional)
 
 ---
@@ -540,6 +734,65 @@ Aura: "Done! Rescheduled 'Project Discussion' to Thursday, Oct 24 at 10:00 AM.
       Warren has been notified of the change."
 ```
 
+### Managing Emails
+```
+You: "Check my emails"
+
+Aura: "You have 5 unread emails:
+
+      1. From: client@company.com
+         Subject: Project proposal review
+         Preview: I've reviewed the proposal and have a few questions...
+      
+      2. From: john@team.com
+         Subject: Meeting request for Q4 planning
+         Preview: Can we schedule a meeting next week to discuss...
+      
+      3. From: newsletter@startup.com
+         Subject: Weekly digest
+         Preview: This week's top stories in tech..."
+
+You: "Send an email to client@company.com saying I'll review the questions
+     and send my response by end of day"
+
+Aura: "I'll send this email to client@company.com:
+
+      Subject: Re: Project proposal review
+      Body: I'll review the questions and send my response by end of day
+
+      Ready to send?"
+
+You: "yes"
+
+Aura: "Email sent successfully! Message ID: 18c5a2f3b4d1e9a7"
+```
+
+### Meeting Request Extraction
+```
+You: "Check if I have any meeting requests"
+
+Aura: "Found 1 meeting request in your emails:
+
+      From: john@team.com
+      Subject: Meeting request for Q4 planning
+      Proposed time: Next Tuesday 2pm or Wednesday 10am
+      Topic: Q4 planning discussion
+      
+      Would you like me to schedule this?"
+
+You: "Yes, book it for Tuesday at 2pm with John"
+
+Aura: "I'll book 'Q4 planning discussion' for Oct 29, 2:00 PM and send
+      an invite to john@team.com. Confirm?"
+
+You: "confirm"
+
+Aura: "Booked! I've added 'Q4 planning discussion' to your calendar.
+      
+      Meet link: meet.google.com/xyz-abcd-efg
+      Invitation sent to john@team.com"
+```
+
 ---
 
 ## 🔐 Security & Privacy
@@ -577,5 +830,34 @@ Aura: "Done! Rescheduled 'Project Discussion' to Thursday, Oct 24 at 10:00 AM.
 ---
 
 **Last Updated:** October 21, 2025  
-**Version:** Phase 2 (16 features live)  
+**Version:** Phase 2 with Gmail Integration (21 features live)  
 **Status:** Production-ready and deployed at aurasb.replit.app
+
+---
+
+## 🔧 Technical Architecture
+
+### Email Integration Stack
+- **Gmail API**: Full OAuth2 access with manual credentials
+- **Authentication**: Dual-mode (Manual OAuth2 primary, Replit Connector fallback)
+- **Scopes**: gmail.readonly, gmail.send, gmail.modify, gmail.labels
+- **Security**: Refresh token management, automatic token refresh
+- **Storage**: Email thread tracking with AI summaries in PostgreSQL
+- **AI Processing**: Meeting request extraction, email categorization
+
+### OAuth Authorization Flow
+1. User visits `/oauth/gmail/authorize` endpoint
+2. Redirected to Google for consent
+3. Callback receives authorization code
+4. Exchange code for refresh token
+5. Store refresh token in environment
+6. Automatic access token refresh on each request
+
+---
+
+## 📚 Documentation Files
+
+- **AURA_MASTER_DOCUMENTATION.md**: Complete feature documentation (this file)
+- **GMAIL_QUICK_START.md**: 15-minute Gmail setup guide
+- **GMAIL_OAUTH_SETUP.md**: Detailed OAuth2 configuration instructions
+- **replit.md**: Technical architecture and system design
