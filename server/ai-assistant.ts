@@ -17,10 +17,142 @@ export interface PendingConfirmationData {
   messageText: string;
 }
 
+/**
+ * Parse user intent for confirmation/rejection
+ * Handles natural language while preventing false positives
+ * Returns: 'confirm' | 'reject' | 'unknown'
+ */
+function parseConfirmationIntent(text: string): 'confirm' | 'reject' | 'unknown' {
+  // Normalize: lowercase, expand contractions, remove punctuation, collapse whitespace
+  let normalized = text.toLowerCase();
+  
+  // Expand common negative contractions before removing punctuation
+  // Include U+2019 (') curly apostrophe in addition to ASCII apostrophe
+  normalized = normalized
+    .replace(/\bdon['\u2019]?t\b/gi, 'do not')
+    .replace(/\bcan['\u2019]?t\b/gi, 'can not')
+    .replace(/\bcannot\b/gi, 'can not')
+    .replace(/\bwon['\u2019]?t\b/gi, 'will not')
+    .replace(/\bain['\u2019]?t\b/gi, 'is not')
+    .replace(/\bisn['\u2019]?t\b/gi, 'is not')
+    .replace(/\baren['\u2019]?t\b/gi, 'are not')
+    .replace(/\bwasn['\u2019]?t\b/gi, 'was not')
+    .replace(/\bweren['\u2019]?t\b/gi, 'were not')
+    .replace(/\bhasn['\u2019]?t\b/gi, 'has not')
+    .replace(/\bhaven['\u2019]?t\b/gi, 'have not')
+    .replace(/\bhadn['\u2019]?t\b/gi, 'had not')
+    .replace(/\bdidn['\u2019]?t\b/gi, 'did not')
+    .replace(/\bshouldn['\u2019]?t\b/gi, 'should not')
+    .replace(/\bwouldn['\u2019]?t\b/gi, 'would not')
+    .replace(/\bcouldn['\u2019]?t\b/gi, 'could not');
+  
+  // Remove punctuation (including curly quotes, parentheses, slashes, unicode quotes)
+  normalized = normalized
+    .replace(/[.,!?;:'""`\u201C\u201D\u2018\u2019—–\-…()/\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Special case: phrases that contain "no" but aren't rejections
+  if (normalized.startsWith('no worries') || normalized.startsWith('no problem')) {
+    // Check if there's a strong rejection later (use word boundaries)
+    if (!/\bcancel\b|\bnevermind\b/.test(normalized)) {
+      return 'unknown'; // Neutral phrase, not a rejection
+    }
+  }
+  
+  // Special case: "never mind" phrase (two words)
+  if (/\bnever\s+mind\b/.test(normalized)) {
+    return 'reject';
+  }
+  
+  // Tokenize
+  const tokens = normalized.split(' ');
+  const firstToken = tokens[0];
+  
+  // Define word sets
+  const confirmWords = ['yes', 'y', 'confirm', 'ok', 'okay', 'sure', 'yep', 'yeah', 'yup'];
+  const strongRejectWords = ['cancel', 'nevermind']; // Anywhere in message
+  const weakRejectWords = ['no', 'n', 'nope', 'nah']; // First token or after confirm word
+  const neutralHedgeWords = ['maybe', 'later', 'noted', 'unsure', 'idk', 'think']; // Uncertainty markers
+  
+  // Check for strong rejection words anywhere (e.g., "cancel", "nevermind")
+  const hasStrongRejection = tokens.some(token => strongRejectWords.includes(token));
+  if (hasStrongRejection) {
+    return 'reject';
+  }
+  
+  // Check for negation using word boundary (prevents "nothing", "noted", "knot")
+  const hasNegation = /\bnot\b/.test(normalized) || tokens.includes('can not');
+  if (hasNegation) {
+    return 'unknown';
+  }
+  
+  // Check for weak rejection words in first position (e.g., "no", "nope")
+  // But skip if it's a neutral phrase we already handled
+  if (weakRejectWords.includes(firstToken) && 
+      !normalized.startsWith('no worries') && 
+      !normalized.startsWith('no problem')) {
+    return 'reject';
+  }
+  
+  // Check if message starts with a confirmation word
+  if (confirmWords.includes(firstToken)) {
+    // Check for uncertainty/hedging or rejection in rest of message
+    const restTokens = tokens.slice(1);
+    
+    // Check for strong rejections
+    const hasStrongRejectInRest = restTokens.some(token => strongRejectWords.includes(token));
+    
+    // Check for weak rejections, but exclude neutral idioms like "no worries"
+    const restText = restTokens.join(' ');
+    const hasWeakRejectInRest = restTokens.some(token => weakRejectWords.includes(token)) &&
+                                 !restText.startsWith('no worries') &&
+                                 !restText.startsWith('no problem');
+    
+    const hasNeutralInRest = restTokens.some(token => neutralHedgeWords.includes(token));
+    
+    // Additional phrase checks for common patterns
+    const hasUncertainPhrase = normalized.includes('not now') || 
+                                normalized.includes('not yet') || 
+                                normalized.includes('think about it');
+    
+    const hasNeutralPhrase = restText.startsWith('no worries') || 
+                              restText.startsWith('no problem');
+    
+    if (hasStrongRejectInRest || hasWeakRejectInRest) {
+      return 'reject'; // "ok, cancel" or "yes, no" → reject
+    }
+    
+    if (hasNeutralInRest || hasUncertainPhrase || hasNeutralPhrase) {
+      return 'unknown'; // "ok, maybe later" or "ok no worries" → unknown
+    }
+    
+    return 'confirm'; // "ok thanks" → confirm
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Check if message is an explicit confirmation
+ * Examples: "yes", "yes please", "ok thanks", "sure, go ahead"
+ */
+function isConfirmation(text: string): boolean {
+  return parseConfirmationIntent(text) === 'confirm';
+}
+
+/**
+ * Check if message is an explicit rejection
+ * Examples: "no", "no thanks", "nah not now", "cancel please"
+ */
+function isRejection(text: string): boolean {
+  return parseConfirmationIntent(text) === 'reject';
+}
+
 export async function processMessage(messageText: string, identifier: string, platform: 'whatsapp' | 'telegram' = 'whatsapp') {
   // Check if user is responding to a confirmation request
   const pendingConfirmation = await storage.getPendingConfirmation(identifier);
-  if (pendingConfirmation && (messageText.toLowerCase().includes('yes') || messageText.toLowerCase().includes('confirm'))) {
+  if (pendingConfirmation && isConfirmation(messageText)) {
     // Execute the pending action
     const confirmData: PendingConfirmationData = {
       action: pendingConfirmation.action,
@@ -30,7 +162,7 @@ export async function processMessage(messageText: string, identifier: string, pl
     const result = await executePendingAction(identifier, confirmData, platform);
     await storage.deletePendingConfirmation(identifier);
     return result;
-  } else if (pendingConfirmation && (messageText.toLowerCase().includes('no') || messageText.toLowerCase().includes('cancel'))) {
+  } else if (pendingConfirmation && isRejection(messageText)) {
     await storage.deletePendingConfirmation(identifier);
     return "No problem! Let me know if you need anything else.";
   }
