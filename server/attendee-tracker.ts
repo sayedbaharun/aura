@@ -14,20 +14,12 @@ interface AttendeeUpdate {
   newStatus: string;
 }
 
-// Status emoji mapping
-const statusEmoji: Record<string, string> = {
-  'accepted': '✅',
-  'declined': '❌',
-  'tentative': '⏳',
-  'needsAction': '❓',
-};
-
-// Human-readable status
+// Human-readable status with symbols
 const statusText: Record<string, string> = {
-  'accepted': 'Accepted',
-  'declined': 'Declined',
-  'tentative': 'Tentative',
-  'needsAction': 'Hasn\'t responded',
+  'accepted': '[ACCEPTED]',
+  'declined': '[DECLINED]',
+  'tentative': '[TENTATIVE]',
+  'needsAction': '[PENDING]',
 };
 
 export async function checkAttendeeUpdates() {
@@ -140,12 +132,11 @@ async function sendAttendeeNotifications(chatId: string, updates: AttendeeUpdate
     for (const [eventId, eventUpdates] of Array.from(byEvent.entries())) {
       const eventTitle = eventUpdates[0].eventTitle;
       
-      let message = `📬 Meeting Update: "${eventTitle}"\n\n`;
+      let message = `Meeting Update: "${eventTitle}"\n\n`;
       
       for (const update of eventUpdates) {
-        const emoji = statusEmoji[update.newStatus] || '❓';
-        const status = statusText[update.newStatus] || update.newStatus;
-        message += `${emoji} ${update.attendeeEmail} → ${status}\n`;
+        const status = statusText[update.newStatus] || `[${update.newStatus.toUpperCase()}]`;
+        message += `${update.attendeeEmail} - ${status}\n`;
       }
       
       // Add attendance summary
@@ -153,7 +144,7 @@ async function sendAttendeeNotifications(chatId: string, updates: AttendeeUpdate
       const declinedCount = eventUpdates.filter((u: AttendeeUpdate) => u.newStatus === 'declined').length;
       const tentativeCount = eventUpdates.filter((u: AttendeeUpdate) => u.newStatus === 'tentative').length;
       
-      message += `\n📊 Status: ${acceptedCount} accepted`;
+      message += `\nAttendance: ${acceptedCount} accepted`;
       if (declinedCount > 0) message += `, ${declinedCount} declined`;
       if (tentativeCount > 0) message += `, ${tentativeCount} tentative`;
       

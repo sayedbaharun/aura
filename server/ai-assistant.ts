@@ -316,7 +316,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
       type: "function",
       function: {
         name: "request_book_appointment",
-        description: "Request to book a new appointment (requires user confirmation). Can include attendee emails to send calendar invites.",
+        description: "Request to book a new appointment (requires user confirmation). Can include attendee emails to send calendar invites, set up recurring events, and configure reminders.",
         parameters: {
           type: "object",
           properties: {
@@ -340,6 +340,39 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               type: "array",
               items: { type: "string" },
               description: "Email addresses of attendees to invite (optional)",
+            },
+            recurrenceRule: {
+              type: "string",
+              description: "RFC5545 RRULE format for recurring events (optional). Examples: 'FREQ=DAILY;COUNT=10' for 10 days, 'FREQ=WEEKLY;BYDAY=MO,WE,FR' for Mon/Wed/Fri weekly, 'FREQ=MONTHLY;BYMONTHDAY=15' for 15th of each month, 'FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1' for yearly on Jan 1st",
+            },
+            reminders: {
+              type: "object",
+              description: "Custom reminder settings (optional)",
+              properties: {
+                useDefault: {
+                  type: "boolean",
+                  description: "Use default calendar reminders (true) or custom reminders (false)",
+                },
+                overrides: {
+                  type: "array",
+                  description: "Custom reminder overrides (max 5)",
+                  items: {
+                    type: "object",
+                    properties: {
+                      method: {
+                        type: "string",
+                        enum: ["email", "popup"],
+                        description: "Reminder delivery method",
+                      },
+                      minutes: {
+                        type: "number",
+                        description: "Minutes before event to send reminder (0-40320, which is 4 weeks)",
+                      },
+                    },
+                    required: ["method", "minutes"],
+                  },
+                },
+              },
             },
           },
           required: ["title", "startTime", "endTime"],
@@ -515,9 +548,23 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               timeStyle: 'short'
             })}`;
 
+            if (args.recurrenceRule) {
+              const freq = args.recurrenceRule.match(/FREQ=([A-Z]+)/)?.[1] || 'recurring';
+              bookMessage += ` (${freq.toLowerCase()} recurring)`;
+            }
+
             if (args.attendeeEmails && args.attendeeEmails.length > 0) {
               bookMessage += ` and send invites to ${args.attendeeEmails.join(', ')}`;
             }
+
+            if (args.reminders && args.reminders.overrides && args.reminders.overrides.length > 0) {
+              const reminderDesc = args.reminders.overrides.map((r: any) => {
+                const time = r.minutes >= 1440 ? `${Math.round(r.minutes / 1440)} day(s)` : `${r.minutes} min`;
+                return `${r.method} ${time} before`;
+              }).join(', ');
+              bookMessage += ` with reminders: ${reminderDesc}`;
+            }
+            
             bookMessage += '. Confirm?';
 
             // Store in database with 5-minute TTL
@@ -634,7 +681,9 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
             new Date(data.startTime),
             new Date(data.endTime),
             data.description,
-            data.attendeeEmails
+            data.attendeeEmails,
+            data.recurrenceRule,
+            data.reminders
           );
           
           // Step 2: Store in database (may fail)
@@ -648,6 +697,9 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
             status: "confirmed",
             googleEventId: createdEvent.id || null,
             notes: data.description || null,
+            attendeeEmails: data.attendeeEmails || null,
+            recurrenceRule: data.recurrenceRule || null,
+            reminders: data.reminders || null,
           });
 
           // Both operations succeeded
