@@ -122,8 +122,15 @@ Three main tables:
 
 1. **Saga-Style Compensation** - Ensures atomicity between Google Calendar and database:
    - Book: Create calendar event → Save to DB → Rollback calendar if DB fails
-   - Cancel: Update DB → Delete from calendar → Rollback DB if calendar fails (idempotent)
+   - Cancel: Update DB → Delete from calendar → Verify deletion with exponential backoff (5 retries: 1s, 2s, 4s, 8s, 16s) → Rollback DB if delete call fails, warn user if verification inconclusive
    - Reschedule: Update DB → Update calendar → Rollback DB if calendar fails
+
+1a. **Calendar Deletion Verification** - Handles Google Calendar's eventual consistency:
+   - After deleteEvent API call, verifies deletion with up to 5 retry attempts
+   - Exponential backoff (1s, 2s, 4s, 8s, 16s totaling ~31 seconds) accommodates propagation delays
+   - If verification inconclusive after retries, warns user: "⚠️ Cancellation initiated... please check your calendar"
+   - Prevents false rollbacks when deletion succeeded but hasn't propagated yet
+   - Detailed logging tracks retry progress for debugging
 
 2. **Confirmation Text Matching** - Exact word matching prevents false positives:
    - Expands contractions (don't → do not, can't → can not)
