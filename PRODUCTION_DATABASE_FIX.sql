@@ -2,6 +2,9 @@
 -- Run this in the Database Pane (Production tab) BEFORE deploying
 
 -- Step 1: Fix appointments table
+-- Drop default first, then change type, then add new default
+ALTER TABLE appointments ALTER COLUMN appointment_duration DROP DEFAULT;
+
 ALTER TABLE appointments
 ALTER COLUMN appointment_duration
 TYPE integer USING CASE
@@ -9,10 +12,12 @@ TYPE integer USING CASE
   ELSE 60
 END;
 
-ALTER TABLE appointments
-ALTER COLUMN appointment_duration SET DEFAULT 60;
+ALTER TABLE appointments ALTER COLUMN appointment_duration SET DEFAULT 60;
 
 -- Step 2: Fix assistant_settings table
+-- Drop default first, then change type, then add new default
+ALTER TABLE assistant_settings ALTER COLUMN default_meeting_duration DROP DEFAULT;
+
 ALTER TABLE assistant_settings
 ALTER COLUMN default_meeting_duration
 TYPE integer USING CASE
@@ -20,8 +25,7 @@ TYPE integer USING CASE
   ELSE 60
 END;
 
-ALTER TABLE assistant_settings
-ALTER COLUMN default_meeting_duration SET DEFAULT 60;
+ALTER TABLE assistant_settings ALTER COLUMN default_meeting_duration SET DEFAULT 60;
 
 -- Step 3: Verify the fix
 SELECT
