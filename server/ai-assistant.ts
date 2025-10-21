@@ -687,17 +687,55 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           if (!appointment) {
             logger.warn({ eventId: data.eventId }, "No appointment found in DB, deleting calendar-only event");
             // Proceed with calendar deletion even if not in DB
+            let verified = false; // Declare in outer scope for access in return statement
             try {
               await calendar.deleteEvent(data.eventId);
+              logger.info({ eventId: data.eventId }, "Calendar deletion call completed, verifying with retry...");
+              
+              // CRITICAL: Verify deletion with retries for eventual consistency
+              let lastError: any = null;
+              const maxRetries = 5; // Extended from 3 to handle slower propagation
+              
+              for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                  // Exponential backoff: 1s, 2s, 4s, 8s, 16s (total ~31s)
+                  await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+                  await calendar.getEventById(data.eventId);
+                  // Event still exists
+                  logger.warn({ eventId: data.eventId, attempt, maxRetries }, "Event still exists after deletion, retrying...");
+                  lastError = new Error("Event still exists");
+                } catch (verifyError: any) {
+                  // 404/410 = event is gone (success!)
+                  if (verifyError?.code === 404 || verifyError?.code === 410 || verifyError?.message?.includes('404') || verifyError?.message?.includes('410')) {
+                    logger.info({ eventId: data.eventId, attempt }, "✓ Verified: Event successfully deleted from Google Calendar");
+                    verified = true;
+                    break;
+                  }
+                  // Other errors during verification
+                  logger.warn({ eventId: data.eventId, attempt, error: verifyError }, "Verification attempt failed");
+                  lastError = verifyError;
+                }
+              }
+              
+              if (!verified) {
+                logger.error({ eventId: data.eventId, lastError }, "WARNING: Could not verify deletion after retries - proceeding with uncertainty");
+                // DON'T throw - deletion call succeeded, so likely just eventual consistency lag
+                // User will be warned, but we don't rollback since the delete API call succeeded
+              }
             } catch (deleteError: any) {
               // Treat 404/410 as success (idempotent delete)
               if (deleteError?.code === 404 || deleteError?.code === 410 || deleteError?.message?.includes('404') || deleteError?.message?.includes('410')) {
                 logger.info({ eventId: data.eventId }, "Calendar event already deleted (404/410)");
               } else {
+                logger.error({ eventId: data.eventId, error: deleteError }, "Calendar deletion failed");
                 throw deleteError; // Re-throw non-idempotent errors
               }
             }
             await logCancellation(identifier, true, data.eventId, data.eventTitle);
+            
+            if (!verified) {
+              return `⚠️ Cancellation initiated for "${data.eventTitle}". The delete request was sent to Google Calendar, but I couldn't immediately confirm it completed. Please check your calendar in a few moments to verify the event is gone.`;
+            }
             return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
           }
           
@@ -705,8 +743,41 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           cancelledAppointment = await storage.cancelAppointment(appointment.id);
           
           // Step 3: Delete from Google Calendar (may fail)
+          let verifiedDbTracked = false; // Declare in outer scope for access in return statement
           try {
             await calendar.deleteEvent(data.eventId);
+            logger.info({ eventId: data.eventId }, "Calendar deletion call completed, verifying with retry...");
+            
+            // CRITICAL: Verify deletion with retries for eventual consistency
+            let lastError: any = null;
+            const maxRetries = 5; // Extended from 3 to handle slower propagation
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              try {
+                // Exponential backoff: 1s, 2s, 4s, 8s, 16s (total ~31s)
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+                await calendar.getEventById(data.eventId);
+                // Event still exists
+                logger.warn({ eventId: data.eventId, attempt, maxRetries }, "Event still exists after deletion, retrying...");
+                lastError = new Error("Event still exists");
+              } catch (verifyError: any) {
+                // 404/410 = event is gone (success!)
+                if (verifyError?.code === 404 || verifyError?.code === 410 || verifyError?.message?.includes('404') || verifyError?.message?.includes('410')) {
+                  logger.info({ eventId: data.eventId, attempt }, "✓ Verified: Event successfully deleted from Google Calendar");
+                  verifiedDbTracked = true;
+                  break;
+                }
+                // Other errors during verification
+                logger.warn({ eventId: data.eventId, attempt, error: verifyError }, "Verification attempt failed");
+                lastError = verifyError;
+              }
+            }
+            
+            if (!verifiedDbTracked) {
+              logger.error({ eventId: data.eventId, lastError }, "WARNING: Could not verify deletion after retries - proceeding with uncertainty");
+              // DON'T throw - deletion call succeeded, so likely just eventual consistency lag
+              // User will be warned, but we don't rollback since the delete API call succeeded
+            }
           } catch (deleteError: any) {
             // Treat 404/410 as success (already deleted, idempotent)
             if (deleteError?.code === 404 || deleteError?.code === 410 || deleteError?.message?.includes('404') || deleteError?.message?.includes('410')) {
@@ -716,11 +787,16 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
               return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
             }
             // For other errors, proceed to rollback
+            logger.error({ eventId: data.eventId, error: deleteError }, "Calendar deletion failed");
             throw deleteError;
           }
 
           // Both operations succeeded
           await logCancellation(identifier, true, data.eventId, data.eventTitle);
+          
+          if (!verifiedDbTracked) {
+            return `⚠️ Cancellation initiated for "${data.eventTitle}". The delete request was sent to Google Calendar, but I couldn't immediately confirm it completed. Please check your calendar in a few moments to verify the event is gone.`;
+          }
           return `✓ Cancelled! "${data.eventTitle}" has been removed from your calendar.`;
         } catch (calendarError) {
           // Step 4: Rollback - Restore DB status if calendar deletion failed with non-idempotent error
