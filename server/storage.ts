@@ -19,6 +19,9 @@ import { randomUUID } from "crypto";
 import { eq, desc, lt } from "drizzle-orm";
 import { db as database } from "../db";
 
+// Singleton ID for assistant settings - ensures only one settings row exists
+const SETTINGS_SINGLETON_ID = '00000000-0000-0000-0000-000000000001';
+
 export interface IStorage {
   // User operations - Required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
@@ -150,51 +153,64 @@ export class DBStorage implements IStorage {
     return this.updateAppointment(id, { status: 'cancelled' });
   }
 
-  // Assistant Settings
+  // Assistant Settings (Singleton pattern)
   async getSettings(): Promise<AssistantSettings | undefined> {
-    const [settings] = await this.db
+    // Try to get settings by singleton ID
+    let [settings] = await this.db
       .select()
       .from(assistantSettings)
+      .where(eq(assistantSettings.id, SETTINGS_SINGLETON_ID))
       .limit(1);
     
-    // Initialize default settings if none exist
+    // Initialize default settings if none exist using the singleton ID
+    // Use ON CONFLICT DO NOTHING to handle concurrent initialization safely
     if (!settings) {
-      const [newSettings] = await this.db
+      await this.db
         .insert(assistantSettings)
         .values({
+          id: SETTINGS_SINGLETON_ID,
           assistantName: "Aura",
           workingHours: "9:00 AM - 6:00 PM, Monday - Friday",
           defaultMeetingDuration: "60",
           timezone: "Asia/Dubai",
         })
-        .returning();
-      return newSettings;
+        .onConflictDoNothing();
+      
+      // Re-select to get the row (either our insert or concurrent winner)
+      [settings] = await this.db
+        .select()
+        .from(assistantSettings)
+        .where(eq(assistantSettings.id, SETTINGS_SINGLETON_ID))
+        .limit(1);
     }
     
     return settings;
   }
 
   async updateSettings(updates: Partial<InsertAssistantSettings>): Promise<AssistantSettings> {
-    const existing = await this.getSettings();
+    // Filter out undefined values to prevent setting columns to NULL
+    const cleanUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    ) as Partial<InsertAssistantSettings>;
     
-    if (!existing) {
-      const [newSettings] = await this.db
-        .insert(assistantSettings)
-        .values({
-          assistantName: "Aura",
-          workingHours: "9:00 AM - 6:00 PM, Monday - Friday",
-          defaultMeetingDuration: "60",
-          timezone: "Asia/Dubai",
-          ...updates,
-        })
-        .returning();
-      return newSettings;
-    }
-
+    // Use upsert with singleton ID to prevent multiple settings rows
     const [updated] = await this.db
-      .update(assistantSettings)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(assistantSettings.id, existing.id))
+      .insert(assistantSettings)
+      .values({
+        id: SETTINGS_SINGLETON_ID,
+        assistantName: "Aura",
+        workingHours: "9:00 AM - 6:00 PM, Monday - Friday",
+        defaultMeetingDuration: "60",
+        timezone: "Asia/Dubai",
+        ...cleanUpdates,
+      })
+      .onConflictDoUpdate({
+        target: assistantSettings.id,
+        set: {
+          ...cleanUpdates,
+          updatedAt: new Date(),
+        }
+      })
       .returning();
     
     return updated;
