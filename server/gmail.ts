@@ -93,13 +93,20 @@ export async function listMessages(options: {
     const subject = headers.find(h => h.name?.toLowerCase() === 'subject')?.value || '';
     const dateStr = headers.find(h => h.name?.toLowerCase() === 'date')?.value || '';
     
+    // Helper function to decode Gmail's URL-safe base64
+    const decodeBase64Url = (data: string): string => {
+      const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+      const paddedBase64 = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      return Buffer.from(paddedBase64, 'base64').toString('utf-8');
+    };
+    
     let body = '';
     if (fullMessage.data.payload?.body?.data) {
-      body = Buffer.from(fullMessage.data.payload.body.data, 'base64').toString('utf-8');
+      body = decodeBase64Url(fullMessage.data.payload.body.data);
     } else if (fullMessage.data.payload?.parts) {
       const textPart = fullMessage.data.payload.parts.find(p => p.mimeType === 'text/plain');
       if (textPart?.body?.data) {
-        body = Buffer.from(textPart.body.data, 'base64').toString('utf-8');
+        body = decodeBase64Url(textPart.body.data);
       }
     }
 
