@@ -33,6 +33,7 @@ export interface IStorage {
   getAppointments(): Promise<Appointment[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   getAppointment(id: string): Promise<Appointment | undefined>;
+  getAppointmentByGoogleEventId(googleEventId: string): Promise<Appointment | undefined>;
   updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined>;
   cancelAppointment(id: string): Promise<Appointment | undefined>;
 
@@ -123,6 +124,15 @@ export class DBStorage implements IStorage {
       .select()
       .from(appointments)
       .where(eq(appointments.id, id))
+      .limit(1);
+    return appointment;
+  }
+
+  async getAppointmentByGoogleEventId(googleEventId: string): Promise<Appointment | undefined> {
+    const [appointment] = await this.db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.googleEventId, googleEventId))
       .limit(1);
     return appointment;
   }

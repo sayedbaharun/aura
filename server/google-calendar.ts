@@ -210,6 +210,20 @@ export async function updateEvent(eventId: string, updates: {
   });
 }
 
+export async function getEventById(eventId: string) {
+  return retryGoogleAPI(async () => {
+    const calendar = await getUncachableGoogleCalendarClient();
+
+    const response = await calendar.events.get({
+      calendarId: 'primary',
+      eventId,
+    });
+
+    logger.debug({ eventId }, 'Retrieved calendar event by ID');
+    return response.data;
+  });
+}
+
 export async function deleteEvent(eventId: string) {
   return retryGoogleAPI(async () => {
     const calendar = await getUncachableGoogleCalendarClient();
