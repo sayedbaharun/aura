@@ -564,13 +564,13 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
       type: "function",
       function: {
         name: "create_notion_note",
-        description: "Create a new note/page in Notion under a specific parent page",
+        description: "Create a new note/page in Notion. If no parent page is specified, it will be created at the workspace root or under the user's default parent page.",
         parameters: {
           type: "object",
           properties: {
             parentId: {
               type: "string",
-              description: "Parent page ID where this note should be created",
+              description: "Optional: Parent page ID where this note should be created. If not provided, uses the default parent page from settings or creates at workspace root.",
             },
             title: {
               type: "string",
@@ -581,7 +581,7 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
               description: "Content/body of the note",
             },
           },
-          required: ["parentId", "title"],
+          required: ["title"],
         },
       },
     },
@@ -653,6 +653,23 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
             },
           },
           required: ["pageId"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_default_notion_parent",
+        description: "Set the default parent page for new Notion notes. This allows creating notes without specifying a parent each time.",
+        parameters: {
+          type: "object",
+          properties: {
+            parentId: {
+              type: "string",
+              description: "Notion page ID to use as the default parent for new notes",
+            },
+          },
+          required: ["parentId"],
         },
       },
     },
@@ -988,8 +1005,15 @@ Return as JSON with keys: hasMeetingRequest (boolean), proposedTimes (array of s
             break;
 
           case "create_notion_note":
+            const parentId = args.parentId || settings?.defaultNotionParentId;
+            
+            if (!parentId) {
+              toolResult = "ERROR: No parent page specified and no default parent page set. Please either:\n1. Specify a parent page ID, or\n2. Set a default parent page by telling me 'Set my default Notion parent page to [page_id]'";
+              break;
+            }
+            
             const createdPage = await notion.createNotionPage({
-              parentId: args.parentId,
+              parentId: parentId,
               title: args.title,
               content: args.content,
             });
@@ -1081,6 +1105,14 @@ Return as JSON with keys: hasMeetingRequest (boolean), proposedTimes (array of s
             });
             
             toolResult = `Successfully updated page ${args.pageId}`;
+            break;
+
+          case "set_default_notion_parent":
+            await storage.updateSettings({
+              defaultNotionParentId: args.parentId,
+            });
+            
+            toolResult = `Successfully set default Notion parent page to ${args.parentId}. You can now create notes without specifying a parent page.`;
             break;
 
           default:

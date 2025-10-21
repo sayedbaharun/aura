@@ -109,6 +109,7 @@ export const assistantSettings = pgTable("assistant_settings", {
   whatsappWebhookUrl: text("whatsapp_webhook_url"),
   telegramBotUsername: text("telegram_bot_username"),
   telegramWebhookUrl: text("telegram_webhook_url"),
+  defaultNotionParentId: text("default_notion_parent_id"), // Default parent page ID for new Notion notes
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
