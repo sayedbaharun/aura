@@ -644,7 +644,7 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
             contactName: data.contactName || null,
             appointmentTitle: data.title,
             appointmentDate: new Date(data.startTime),
-            appointmentDuration: String(Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000)),
+            appointmentDuration: Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000),
             status: "confirmed",
             googleEventId: createdEvent.id || null,
             notes: data.description || null,
@@ -742,7 +742,7 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           return "Cannot reschedule: No event ID provided.";
         }
 
-        let oldAppointmentData: { date: Date; duration: string } | null = null;
+        let oldAppointmentData: { date: Date; duration: number } | null = null;
         let rescheduleAppointment: any = null;
         
         try {
@@ -772,13 +772,13 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
           // Step 2: Save original appointment data for potential rollback
           oldAppointmentData = {
             date: appointment.appointmentDate!,
-            duration: appointment.appointmentDuration || '60'
+            duration: appointment.appointmentDuration || 60
           };
           
           // Step 3: Update database
           rescheduleAppointment = await storage.updateAppointment(appointment.id, {
             appointmentDate: new Date(data.newStartTime),
-            appointmentDuration: String(Math.round((new Date(data.newEndTime).getTime() - new Date(data.newStartTime).getTime()) / 60000)),
+            appointmentDuration: Math.round((new Date(data.newEndTime).getTime() - new Date(data.newStartTime).getTime()) / 60000),
           });
           
           // Step 4: Update Google Calendar (may fail)

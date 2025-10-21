@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, uuid, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, uuid, jsonb, index, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -67,7 +67,7 @@ export const appointments = pgTable(
     contactName: text("contact_name"),
     appointmentDate: timestamp("appointment_date"),
     appointmentTitle: text("appointment_title"),
-    appointmentDuration: text("appointment_duration").default("60"),
+    appointmentDuration: integer("appointment_duration").default(60),
     status: text("status").default("pending").notNull(),
     googleEventId: text("google_event_id"),
     notes: text("notes"),
@@ -99,7 +99,7 @@ export const assistantSettings = pgTable("assistant_settings", {
   userEmail: text("user_email"),
   userPhone: text("user_phone"),
   workingHours: text("working_hours").default("9:00 AM - 6:00 PM, Monday - Friday"),
-  defaultMeetingDuration: text("default_meeting_duration").default("60"),
+  defaultMeetingDuration: integer("default_meeting_duration").default(60),
   timezone: text("timezone").default("Asia/Dubai"),
   preferences: text("preferences"),
   whatsappNumber: text("whatsapp_number"),
