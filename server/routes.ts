@@ -60,6 +60,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(statusCode).json(health);
   });
 
+  // Gmail OAuth2 setup routes (unauthenticated for initial setup)
+  app.get('/oauth/gmail/authorize', async (req, res) => {
+    try {
+      const authUrl = gmail.getAuthUrl();
+      if (!authUrl) {
+        res.status(400).send(`
+          <h1>Gmail OAuth Not Configured</h1>
+          <p>Please set the following environment variables in Replit Secrets:</p>
+          <ul>
+            <li><code>GMAIL_CLIENT_ID</code></li>
+            <li><code>GMAIL_CLIENT_SECRET</code></li>
+            <li><code>GMAIL_REDIRECT_URI</code> (optional, defaults to http://localhost:5000/oauth/gmail/callback)</li>
+          </ul>
+          <p>See <a href="/GMAIL_OAUTH_SETUP.md">Setup Guide</a> for instructions.</p>
+        `);
+        return;
+      }
+      res.redirect(authUrl);
+    } catch (error) {
+      logger.error({ error }, 'Error generating Gmail auth URL');
+      res.status(500).send('Failed to generate authorization URL');
+    }
+  });
+
+  app.get('/oauth/gmail/callback', async (req, res) => {
+    try {
+      const code = req.query.code as string;
+      if (!code) {
+        res.status(400).send('Authorization code not provided');
+        return;
+      }
+
+      const tokens = await gmail.getTokensFromCode(code);
+      
+      if (!tokens.refresh_token) {
+        res.status(400).send(`
+          <h1>No Refresh Token Received</h1>
+          <p>Google did not return a refresh token. This usually happens when you've already authorized this app before.</p>
+          <p><strong>To fix this:</strong></p>
+          <ol>
+            <li>Go to <a href="https://myaccount.google.com/permissions" target="_blank">Google Account Permissions</a></li>
+            <li>Find "Aura Personal Assistant" and remove access</li>
+            <li>Try <a href="/oauth/gmail/authorize">authorizing again</a></li>
+          </ol>
+          <p>The refresh token is only returned on the first authorization with <code>prompt=consent</code>.</p>
+        `);
+        return;
+      }
+      
+      res.send(`
+        <h1>Gmail Authorization Successful!</h1>
+        <p>Your refresh token (save this in Replit Secrets as <code>GMAIL_REFRESH_TOKEN</code>):</p>
+        <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto;">${tokens.refresh_token}</pre>
+        <p><strong>Next steps:</strong></p>
+        <ol>
+          <li>Copy the refresh token above</li>
+          <li>Go to Replit Secrets (Tools → Secrets in the left sidebar)</li>
+          <li>Add a new secret: <code>GMAIL_REFRESH_TOKEN</code> = (paste the token)</li>
+          <li>Restart your application</li>
+        </ol>
+        <p>Gmail integration will now work with full permissions!</p>
+      `);
+    } catch (error) {
+      logger.error({ error }, 'Error exchanging code for tokens');
+      res.status(500).send('Failed to exchange authorization code for tokens');
+    }
+  });
+
   // Auth route - get current user
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

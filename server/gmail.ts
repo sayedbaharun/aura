@@ -3,7 +3,72 @@ import type { gmail_v1 } from 'googleapis';
 
 let connectionSettings: any;
 
-async function getAccessToken() {
+const GMAIL_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.modify',
+  'https://www.googleapis.com/auth/gmail.labels',
+];
+
+function createOAuth2Client() {
+  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  const redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:5000/oauth/gmail/callback';
+
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+export function getAuthUrl(): string | null {
+  const oauth2Client = createOAuth2Client();
+  if (!oauth2Client) {
+    return null;
+  }
+
+  return oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: GMAIL_SCOPES,
+    prompt: 'consent',
+  });
+}
+
+export async function getTokensFromCode(code: string) {
+  const oauth2Client = createOAuth2Client();
+  if (!oauth2Client) {
+    throw new Error('OAuth2 client not configured');
+  }
+
+  const { tokens } = await oauth2Client.getToken(code);
+  return tokens;
+}
+
+async function getAccessTokenViaManualOAuth() {
+  const oauth2Client = createOAuth2Client();
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+
+  if (!oauth2Client || !refreshToken) {
+    return null;
+  }
+
+  oauth2Client.setCredentials({
+    refresh_token: refreshToken,
+  });
+
+  try {
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    oauth2Client.setCredentials(credentials);
+    return oauth2Client;
+  } catch (error: any) {
+    const { logger } = await import('./logger');
+    logger.error({ error: error?.message || error }, 'Failed to refresh Gmail access token');
+    return null;
+  }
+}
+
+async function getAccessTokenViaReplitConnector() {
   if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
     return connectionSettings.settings.access_token;
   }
@@ -15,37 +80,53 @@ async function getAccessToken() {
     ? 'depl ' + process.env.WEB_REPL_RENEWAL 
     : null;
 
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!xReplitToken || !hostname) {
+    return null;
   }
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-mail',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
+  try {
+    connectionSettings = await fetch(
+      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-mail',
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X_REPLIT_TOKEN': xReplitToken
+        }
       }
+    ).then(res => res.json()).then(data => data.items?.[0]);
+
+    const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
+
+    if (!connectionSettings || !accessToken) {
+      return null;
     }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Gmail not connected');
+    return accessToken;
+  } catch (error: any) {
+    const { logger } = await import('./logger');
+    logger.error({ error: error?.message || error }, 'Failed to get token via Replit connector');
+    return null;
   }
-  return accessToken;
 }
 
 export async function getUncachableGmailClient() {
-  const accessToken = await getAccessToken();
+  let oauth2Client = await getAccessTokenViaManualOAuth();
+  
+  if (oauth2Client) {
+    return google.gmail({ version: 'v1', auth: oauth2Client });
+  }
 
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({
+  const accessToken = await getAccessTokenViaReplitConnector();
+  
+  if (!accessToken) {
+    throw new Error('Gmail not connected. Please set up manual OAuth2 credentials or use Replit connector.');
+  }
+
+  const simpleAuth = new google.auth.OAuth2();
+  simpleAuth.setCredentials({
     access_token: accessToken
   });
 
-  return google.gmail({ version: 'v1', auth: oauth2Client });
+  return google.gmail({ version: 'v1', auth: simpleAuth });
 }
 
 interface EmailMessage {
