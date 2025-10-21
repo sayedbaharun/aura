@@ -11,12 +11,15 @@ import {
   type InsertPendingConfirmation,
   type EventAttendee,
   type InsertEventAttendee,
+  type EmailSummary,
+  type InsertEmailSummary,
   whatsappMessages,
   appointments,
   assistantSettings,
   users,
   pendingConfirmations,
-  eventAttendees
+  eventAttendees,
+  emailSummaries
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, lt, and } from "drizzle-orm";
@@ -58,6 +61,12 @@ export interface IStorage {
   createEventAttendee(attendee: InsertEventAttendee): Promise<EventAttendee>;
   updateEventAttendee(googleEventId: string, attendeeEmail: string, responseStatus: string): Promise<void>;
   getEventAttendees(googleEventId: string): Promise<EventAttendee[]>;
+
+  // Email Summaries
+  getEmailSummary(gmailMessageId: string): Promise<EmailSummary | undefined>;
+  createEmailSummary(summary: InsertEmailSummary): Promise<EmailSummary>;
+  getEmailSummariesByChat(chatId: string, limit?: number): Promise<EmailSummary[]>;
+  getEmailSummariesByCategory(chatId: string, category: string): Promise<EmailSummary[]>;
 }
 
 // PostgreSQL Storage Implementation
@@ -313,6 +322,53 @@ export class DBStorage implements IStorage {
       .select()
       .from(eventAttendees)
       .where(eq(eventAttendees.googleEventId, googleEventId));
+  }
+
+  // Email Summaries
+  async getEmailSummary(gmailMessageId: string): Promise<EmailSummary | undefined> {
+    const [summary] = await this.db
+      .select()
+      .from(emailSummaries)
+      .where(eq(emailSummaries.gmailMessageId, gmailMessageId))
+      .limit(1);
+    return summary;
+  }
+
+  async createEmailSummary(insertSummary: InsertEmailSummary): Promise<EmailSummary> {
+    const [summary] = await this.db
+      .insert(emailSummaries)
+      .values(insertSummary)
+      .onConflictDoUpdate({
+        target: emailSummaries.gmailMessageId,
+        set: {
+          summary: insertSummary.summary,
+          category: insertSummary.category,
+          hasMeetingRequest: insertSummary.hasMeetingRequest,
+          extractedMeetingDetails: insertSummary.extractedMeetingDetails,
+        }
+      })
+      .returning();
+    return summary;
+  }
+
+  async getEmailSummariesByChat(chatId: string, limit: number = 50): Promise<EmailSummary[]> {
+    return await this.db
+      .select()
+      .from(emailSummaries)
+      .where(eq(emailSummaries.chatId, chatId))
+      .orderBy(desc(emailSummaries.receivedDate))
+      .limit(limit);
+  }
+
+  async getEmailSummariesByCategory(chatId: string, category: string): Promise<EmailSummary[]> {
+    return await this.db
+      .select()
+      .from(emailSummaries)
+      .where(and(
+        eq(emailSummaries.chatId, chatId),
+        eq(emailSummaries.category, category)
+      ))
+      .orderBy(desc(emailSummaries.receivedDate));
   }
 }
 
