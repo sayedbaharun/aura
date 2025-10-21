@@ -60,7 +60,9 @@ Preferred communication style: Simple, everyday language.
 **Calendar Integration**
 - **Google Calendar API** via googleapis library
 - OAuth2 authentication through Replit Connectors
-- Token refresh handling with expiry checking
+- Token refresh handling with 5-minute TTL buffer to prevent mid-call expirations
+- Single-flight mutex for concurrency-safe token refresh
+- Supports multiple connector response shapes (settings.access_token and oauth.credentials paths)
 - Uncacheable client pattern to ensure fresh credentials
 
 ### Data Storage
@@ -83,24 +85,71 @@ Three main tables:
 
 2. **appointments** - Calendar event records
    - Links to phone numbers for user association (or chat_id for Telegram)
-   - Stores appointment metadata (title, date, duration)
+   - Stores appointment metadata (title, date, duration as INTEGER for type safety)
    - Status tracking (pending, confirmed, cancelled)
    - Google Calendar event ID for synchronization
    - Platform field to distinguish between Telegram and WhatsApp
    - Automatic timestamp updates via triggers
+   - B-tree indexes on phoneNumber, googleEventId, appointmentDate for query optimization
 
 3. **assistant_settings** - AI configuration
    - Personalization (assistant name, user name)
    - Timezone and working hours
-   - Default meeting duration
+   - Default meeting duration (INTEGER for type safety)
    - Telegram bot username
    - WhatsApp Business number (optional)
    - Custom preferences text
+   - Singleton pattern with fixed ID for concurrency-safe initialization
+
+4. **pendingConfirmations** - Persistent confirmation state
+   - Unique constraint on chatId prevents duplicate confirmations
+   - TTL-based expiration (5 minutes)
+   - Atomic upsert operations prevent race conditions
+   - Indexed on expiresAt for efficient cleanup
+
+5. **auditLogs** - Security and compliance tracking
+   - Records all calendar operations (view, book, cancel, reschedule)
+   - Success/failure tracking with error messages
+   - Composite indexes on (chatId, timestamp) for efficient queries
 
 **Data Access Pattern**
 - Storage abstraction layer (`IStorage` interface)
 - `DBStorage` implementation using Drizzle
 - Direct SQL for complex queries, ORM for CRUD operations
+- Single shared database connection pool (prevents connection leaks)
+
+**Production Hardening (Completed)**
+
+1. **Saga-Style Compensation** - Ensures atomicity between Google Calendar and database:
+   - Book: Create calendar event → Save to DB → Rollback calendar if DB fails
+   - Cancel: Update DB → Delete from calendar → Rollback DB if calendar fails (idempotent)
+   - Reschedule: Update DB → Update calendar → Rollback DB if calendar fails
+
+2. **Confirmation Text Matching** - Exact word matching prevents false positives:
+   - Expands contractions (don't → do not, can't → can not)
+   - Handles curly apostrophes and unicode quotes
+   - Detects uncertainty markers (maybe, later, not now)
+   - Prevents false positives (yesterday, no worries)
+
+3. **Database Optimization**:
+   - B-tree indexes on all frequently queried columns
+   - Composite indexes for dominant query patterns (phone+time, chat+time)
+   - Unique constraints prevent race conditions
+   - Singleton settings pattern with atomic upsert
+
+4. **Environment Validation** - Fail-fast startup checks:
+   - Validates DATABASE_URL (accepts both postgres:// and postgresql://)
+   - Verifies OpenAI API credentials
+   - Checks Replit connector configuration
+   - Validates Telegram bot token
+   - Ensures session secret is set
+   - Warnings for optional features (WhatsApp)
+
+5. **Type Safety**:
+   - Duration fields stored as INTEGER (was TEXT)
+   - No parsing required for calculations
+   - Database-level numeric validation
+   - End-to-end TypeScript type enforcement
 
 ### External Dependencies
 
