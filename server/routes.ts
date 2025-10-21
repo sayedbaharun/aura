@@ -4,12 +4,7 @@ import { storage } from "./storage";
 import { insertWhatsappMessageSchema, insertAppointmentSchema, insertAssistantSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { processMessage } from "./ai-assistant";
-import {
-  detectWebhookType,
-  extractTwilioMessage,
-  extractFacebookMessage,
-  extractMessageBirdMessage
-} from "./twilio-whatsapp";
+// WhatsApp webhook removed - not needed for Phase 1
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { logger } from "./logger";
 
@@ -209,98 +204,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // WhatsApp Webhook - Supports Twilio, Facebook/Meta, and MessageBird/Bird
-  app.post("/api/whatsapp-webhook", async (req, res) => {
-    try {
-      // Detect webhook type
-      const webhookType = detectWebhookType(req);
-      
-      // Extract message data based on type
-      let messageData: { from: string; message: string } | null = null;
-      
-      if (webhookType === 'twilio') {
-        messageData = extractTwilioMessage(req);
-      } else if (webhookType === 'facebook') {
-        messageData = extractFacebookMessage(req);
-      } else if (webhookType === 'messagebird') {
-        messageData = extractMessageBirdMessage(req);
-      }
-
-      if (!messageData) {
-        logger.warn({ webhookType, body: req.body }, `Invalid ${webhookType} webhook data`);
-        return res.status(400).json({ error: "Invalid webhook data" });
-      }
-
-      const { from: phoneNumber, message: messageText } = messageData;
-      logger.info({ webhookType, phoneNumber, messageText }, `Received ${webhookType} message`);
-
-      // Store the incoming user message
-      await storage.createMessage({
-        phoneNumber,
-        messageContent: messageText,
-        sender: "user",
-        messageType: "text",
-        platform: "whatsapp",
-        processed: false,
-      });
-
-      // Process message with AI assistant
-      const aiResponse = await processMessage(messageText, phoneNumber, 'whatsapp');
-
-      // Store AI response
-      await storage.createMessage({
-        phoneNumber,
-        messageContent: aiResponse,
-        sender: "assistant",
-        messageType: "text",
-        platform: "whatsapp",
-        processed: true,
-      });
-
-      // Return response in appropriate format
-      if (webhookType === 'twilio') {
-        // Return TwiML XML format for Twilio
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>${aiResponse.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
-</Response>`;
-        res.set('Content-Type', 'text/xml');
-        res.send(twiml);
-      } else if (webhookType === 'facebook') {
-        // Facebook expects 200 OK, actual reply is sent via API
-        res.status(200).json({ success: true });
-      } else if (webhookType === 'messagebird') {
-        // MessageBird expects JSON response
-        res.status(200).json({
-          content: {
-            text: aiResponse
-          }
-        });
-      } else {
-        // Generic response
-        res.status(200).json({ message: aiResponse });
-      }
-    } catch (error) {
-      logger.error({ error }, "Webhook error");
-
-      // Return appropriate error format
-      if (req.body.From || req.body.from) {
-        res.status(500).send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>Sorry, I'm having trouble processing your request. Please try again later.</Message>
-</Response>`);
-      } else {
-        res.status(500).json({ error: "Internal server error" });
-      }
-    }
-  });
-
   // Telegram Webhook - Use Telegraf's webhookCallback for proper handling
+  // with secret token validation for security
   const setupTelegramWebhookRoute = async () => {
     try {
       const { bot } = await import('./telegram-bot');
       if (bot) {
-        app.use(bot.webhookCallback('/api/telegram-webhook'));
+        // Validate webhook secret token to prevent unauthorized webhook calls
+        app.post('/api/telegram-webhook', (req, res, next) => {
+          const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+          // Skip validation in development if no secret is set
+          if (!webhookSecret && process.env.NODE_ENV === 'development') {
+            logger.warn('Telegram webhook running without secret validation in development mode');
+            return next();
+          }
+
+          // In production, require secret token
+          if (!webhookSecret) {
+            logger.error('TELEGRAM_WEBHOOK_SECRET not set in production');
+            return res.status(500).json({ error: 'Server misconfigured' });
+          }
+
+          const receivedToken = req.headers['x-telegram-bot-api-secret-token'];
+          if (receivedToken !== webhookSecret) {
+            logger.warn({ receivedToken }, 'Invalid Telegram webhook secret token');
+            return res.status(403).json({ error: 'Forbidden' });
+          }
+
+          next();
+        }, bot.webhookCallback('/api/telegram-webhook'));
       }
     } catch (error) {
       logger.error({ error }, 'Failed to setup Telegram webhook route');

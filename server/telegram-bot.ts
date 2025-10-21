@@ -54,9 +54,14 @@ if (bot) {
   bot.use((ctx, next) => {
     const chatId = ctx.chat?.id.toString();
 
-    // Skip authorization check if no authorized IDs are configured (development mode)
+    // In production, REQUIRE authorized chat IDs - fail closed
     if (AUTHORIZED_CHAT_IDS.length === 0) {
-      console.warn('⚠️  No AUTHORIZED_TELEGRAM_CHAT_IDS configured - running in open mode');
+      if (process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT) {
+        console.error('⛔ CRITICAL: AUTHORIZED_TELEGRAM_CHAT_IDS not set in production - BLOCKING ALL ACCESS');
+        return ctx.reply("⛔ Bot is misconfigured. Contact administrator.");
+      }
+      // Development mode: allow access but warn
+      console.warn('⚠️ Development mode: No AUTHORIZED_TELEGRAM_CHAT_IDS configured - running in open mode');
       return next();
     }
 
@@ -148,15 +153,26 @@ if (bot) {
   console.log('Telegram bot not initialized - missing BOT_TOKEN');
 }
 
-// Setup webhook
+// Setup webhook with secret token for security
 export async function setupTelegramWebhook(webhookUrl: string) {
   if (!bot) {
     throw new Error('Telegram bot not initialized');
   }
 
   try {
-    await bot.telegram.setWebhook(webhookUrl);
-    console.log(`Telegram webhook set to: ${webhookUrl}`);
+    const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+    if (webhookSecret) {
+      // Set webhook with secret token for validation
+      await bot.telegram.setWebhook(webhookUrl, {
+        secret_token: webhookSecret
+      });
+      console.log(`Telegram webhook set to: ${webhookUrl} (with secret validation)`);
+    } else {
+      // Development mode: webhook without secret
+      await bot.telegram.setWebhook(webhookUrl);
+      console.log(`⚠️ Telegram webhook set to: ${webhookUrl} (NO SECRET - development only)`);
+    }
   } catch (error) {
     console.error('Failed to set Telegram webhook:', error);
     throw error;
