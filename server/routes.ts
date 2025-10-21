@@ -79,7 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           </ul>
           <p><strong>Your redirect URI for Google Cloud Console:</strong></p>
           <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${defaultRedirectUri}</pre>
-          <p>See <a href="/GMAIL_OAUTH_SETUP.md">Setup Guide</a> for instructions.</p>
+          <p>See <a href="/docs/GMAIL_OAUTH_SETUP.md">Setup Guide</a> for instructions.</p>
         `);
         return;
       }
