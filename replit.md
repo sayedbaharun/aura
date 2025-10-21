@@ -252,8 +252,18 @@ If you need to test the production build in development:
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` - OpenAI endpoint
 - `REPLIT_CONNECTORS_HOSTNAME` - Replit services endpoint
 - `REPL_IDENTITY` or `WEB_REPL_RENEWAL` - Authentication tokens
+- `REPLIT_DOMAINS` - Auto-populated by Replit in deployments (e.g., "aurasb.replit.app")
+- `ALLOWED_ORIGINS` - Optional custom CORS origins (comma-separated)
 - `TWILIO_ACCOUNT_SID` - Twilio account identifier (manual setup)
 - `TWILIO_AUTH_TOKEN` - Twilio authentication token (manual setup)
+
+**CORS Configuration**
+
+The server automatically allows CORS requests from:
+- Localhost development servers (`http://localhost:5000`, `http://localhost:5173`)
+- Replit deployment domains (auto-detected from `REPLIT_DOMAINS` in production)
+- Custom origins specified in `ALLOWED_ORIGINS` environment variable
+- All origins when running in development mode (`NODE_ENV=development`)
 
 **Note on Twilio Integration**
 - User opted for manual Twilio credential setup instead of Replit connector

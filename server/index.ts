@@ -18,9 +18,26 @@ app.use(helmet({
 }));
 
 // Security: CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5000', 'http://localhost:5173']; // Development defaults
+const buildAllowedOrigins = () => {
+  const origins = ['http://localhost:5000', 'http://localhost:5173'];
+  
+  // Add Replit deployment domains for production
+  if (process.env.REPLIT_DOMAINS) {
+    const domains = process.env.REPLIT_DOMAINS.split(',');
+    domains.forEach(domain => {
+      origins.push(`https://${domain.trim()}`);
+    });
+  }
+  
+  // Add custom origins from environment variable
+  if (process.env.ALLOWED_ORIGINS) {
+    origins.push(...process.env.ALLOWED_ORIGINS.split(','));
+  }
+  
+  return origins;
+};
+
+const allowedOrigins = buildAllowedOrigins();
 
 app.use(cors({
   origin: (origin, callback) => {
