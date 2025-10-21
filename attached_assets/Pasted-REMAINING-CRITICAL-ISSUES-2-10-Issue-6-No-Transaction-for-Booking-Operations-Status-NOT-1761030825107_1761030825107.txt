@@ -1,0 +1,92 @@
+REMAINING CRITICAL ISSUES (2/10)
+
+  ❌ Issue #6: No Transaction for Booking Operations
+
+  Status: NOT FIXED - PRODUCTION RISK
+
+  Problem:
+  // server/ai-assistant.ts (current implementation)
+  const event = await calendar.createEvent(...);  // Step 1:
+   Google Calendar
+  const appointment = await storage.createAppointment({  // 
+  Step 2: Database
+    googleEventId: event.id,
+    ...
+  });
+
+  Risk: If database insert fails after Google Calendar
+  succeeds, you have:
+  - Event in Google Calendar ✓
+  - NO record in database ✗
+  - User can't cancel/reschedule (no database entry)
+  - Audit log incomplete
+
+  Fix Required:
+  // Drizzle ORM doesn't support transactions directly
+  // Must use raw PostgreSQL transaction syntax
+  import { sql } from 'drizzle-orm';
+
+  // Wrap in try-catch and rollback Google Calendar on DB 
+  failure
+  try {
+    const event = await calendar.createEvent(...);
+    const appointment = await storage.createAppointment({
+      googleEventId: event.id,
+      ...
+    });
+  } catch (error) {
+    // Rollback: delete Google Calendar event
+    if (event?.id) {
+      await calendar.deleteEvent(event.id);
+    }
+    throw error;
+  }
+
+  Severity: HIGH - Can cause data inconsistencies in
+  production
+
+  ---
+  ❌ Issue #10: Appointment Duration Stored as String
+
+  Status: NOT FIXED - TYPE SAFETY ISSUE
+
+  Current Schema (shared/schema.ts:70):
+  appointmentDuration:
+  text("appointment_duration").default("60"),  // ❌ String
+
+  Should Be:
+  appointmentDuration:
+  integer("appointment_duration").default(60),  // ✓ Integer
+
+  Impact:
+  - Type mismatches in TypeScript (number vs string)
+  - Requires parsing before calculations:
+  parseInt(appointment.appointmentDuration)
+  - Database queries with duration filtering won't work
+  correctly
+  - No validation of numeric values ("abc" could be stored)
+
+  Fix: Change schema + run migration
+  # After fixing schema.ts
+  npm run db:push  # Creates migration
+
+  Severity: MEDIUM - Functional but not type-safe
+
+  ---
+  🎁 BONUS IMPROVEMENTS FOUND
+
+  ✅ Unique Constraint on Chat ID
+
+  - shared/schema.ts:127: .unique() on chatId in
+  pendingConfirmations
+  - Prevents duplicate confirmations per chat
+  (database-level enforcement)
+  - Great addition! ✓
+
+  ✅ New Query Method
+
+  - server/storage.ts:134-141:
+  getAppointmentByGoogleEventId()
+  - Enables bidirectional lookup between database and Google
+   Calendar
+  - Good for sync operations ✓
