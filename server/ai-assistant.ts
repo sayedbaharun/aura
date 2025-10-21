@@ -536,7 +536,11 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
                 start: e.start?.dateTime || e.start?.date,
                 end: e.end?.dateTime || e.end?.date,
                 id: e.id,
-                description: e.description
+                description: e.description,
+                attendees: e.attendees?.map((a: any) => a.email) || [],
+                meetLink: e.hangoutLink,
+                location: e.location,
+                recurring: !!e.recurrence
               })));
             }
             break;
