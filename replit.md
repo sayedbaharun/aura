@@ -56,6 +56,8 @@ Preferred communication style: Simple, everyday language.
 - Pending confirmation system for user actions requiring approval
 - Function calling pattern for calendar operations with structured tool results
 - Support for search_events, cancel_appointment, reschedule_appointment, and booking with attendees
+- Natural language parsing for recurring events ("every Monday", "daily for 2 weeks")
+- Custom reminder configuration via natural language ("remind me 1 hour before")
 
 **Calendar Integration**
 - **Google Calendar API** via googleapis library
@@ -64,6 +66,16 @@ Preferred communication style: Simple, everyday language.
 - Single-flight mutex for concurrency-safe token refresh
 - Supports multiple connector response shapes (settings.access_token and oauth.credentials paths)
 - Uncacheable client pattern to ensure fresh credentials
+- Recurring events using RFC5545 RRULE format (daily, weekly, monthly, yearly patterns)
+- Custom reminders with email and popup notifications (configurable minutes before event)
+- Attendee tracking with automatic polling every 10 minutes
+
+**Attendee Response Tracking**
+- **Polling Service** - Runs every 10 minutes to check for attendee status changes
+- **Status Detection** - Tracks needsAction, accepted, declined, and tentative responses
+- **Telegram Notifications** - Sends grouped updates per event when attendees respond
+- **Persistent Storage** - event_attendees table stores last known status to detect changes
+- **Emoji-free Messages** - Uses text-based status indicators for compliance
 
 ### Data Storage
 
@@ -74,7 +86,7 @@ Preferred communication style: Simple, everyday language.
 
 **Schema Design**
 
-Three main tables:
+Six main tables:
 
 1. **whatsapp_messages** - Message history tracking
    - Stores user and assistant messages
@@ -89,6 +101,9 @@ Three main tables:
    - Status tracking (pending, confirmed, cancelled)
    - Google Calendar event ID for synchronization
    - Platform field to distinguish between Telegram and WhatsApp
+   - **attendeeEmails** - JSON array of invited attendee email addresses
+   - **recurrenceRule** - RFC5545 RRULE format for recurring events (e.g., "FREQ=DAILY;COUNT=10")
+   - **reminders** - JSON object with useDefault flag and overrides array for custom reminders
    - Automatic timestamp updates via triggers
    - B-tree indexes on phoneNumber, googleEventId, appointmentDate for query optimization
 
@@ -111,6 +126,13 @@ Three main tables:
    - Records all calendar operations (view, book, cancel, reschedule)
    - Success/failure tracking with error messages
    - Composite indexes on (chatId, timestamp) for efficient queries
+
+6. **event_attendees** - Attendee response tracking
+   - Links to Google Calendar event IDs and chat IDs
+   - Stores attendee email and last known response status
+   - Updated every 10 minutes by polling service
+   - Composite unique constraint on (eventId, attendeeEmail) prevents duplicates
+   - Used to detect status changes and trigger notifications
 
 **Data Access Pattern**
 - Storage abstraction layer (`IStorage` interface)
