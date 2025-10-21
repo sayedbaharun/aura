@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
 import * as calendar from "./google-calendar";
+import * as gmail from "./gmail";
 import { logBooking, logCancellation, logReschedule, logViewSchedule } from "./audit-logger";
 import { logger } from "./logger";
 import { retryOpenAI } from "./retry-utils";
@@ -193,6 +194,10 @@ Your capabilities:
 - Book appointments/meetings
 - Reschedule appointments
 - Cancel appointments
+- Check emails and extract meeting requests
+- Send emails on behalf of the user
+- Search emails by keywords or sender
+- Summarize unread emails by priority
 
 Important rules:
 1. ALWAYS ask for confirmation before booking, canceling, or rescheduling appointments
@@ -467,6 +472,72 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "check_emails",
+        description: "Check emails in inbox. Can filter by unread status or search by keywords. Returns recent emails with sender, subject, snippet.",
+        parameters: {
+          type: "object",
+          properties: {
+            maxResults: {
+              type: "number",
+              description: "Maximum number of emails to return (default 10, max 50)",
+            },
+            unreadOnly: {
+              type: "boolean",
+              description: "Only return unread emails (default false)",
+            },
+            searchQuery: {
+              type: "string",
+              description: "Optional Gmail search query (e.g., 'from:sarah@example.com', 'subject:meeting', 'is:unread')",
+            },
+          },
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "send_email",
+        description: "Send an email to someone (requires user confirmation)",
+        parameters: {
+          type: "object",
+          properties: {
+            to: {
+              type: "string",
+              description: "Recipient email address",
+            },
+            subject: {
+              type: "string",
+              description: "Email subject line",
+            },
+            body: {
+              type: "string",
+              description: "Email body content",
+            },
+          },
+          required: ["to", "subject", "body"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "analyze_email_for_meeting_request",
+        description: "Analyze an email to extract meeting request details like proposed times, attendees, and subject",
+        parameters: {
+          type: "object",
+          properties: {
+            emailId: {
+              type: "string",
+              description: "Gmail message ID to analyze",
+            },
+          },
+          required: ["emailId"],
+        },
+      },
+    },
   ];
 
   // Multi-turn tool calling loop - allows AI to use search results for follow-up actions
@@ -680,6 +751,99 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
 
             toolResult = "PENDING_CONFIRMATION";
             finalResponse = rescheduleMessage;
+            break;
+
+          case "check_emails":
+            const maxResults = Math.min(args.maxResults || 10, 50);
+            let query = args.searchQuery || '';
+            
+            if (args.unreadOnly) {
+              query = query ? `${query} is:unread` : 'is:unread';
+            }
+            
+            const emails = await gmail.listMessages({
+              maxResults,
+              query: query || undefined,
+            });
+            
+            if (emails.length === 0) {
+              toolResult = "No emails found matching your criteria";
+            } else {
+              toolResult = JSON.stringify(emails.map(e => ({
+                id: e.id,
+                from: e.from,
+                subject: e.subject,
+                snippet: e.snippet,
+                date: e.date,
+                isUnread: e.isUnread,
+              })));
+            }
+            break;
+
+          case "send_email":
+            const sendMessage = `I'll send an email to ${args.to} with subject "${args.subject}". Confirm?`;
+            
+            await storage.createPendingConfirmation({
+              chatId: identifier,
+              action: 'send_email',
+              data: args,
+              messageText: sendMessage,
+              expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+            });
+            
+            toolResult = "PENDING_CONFIRMATION";
+            finalResponse = sendMessage;
+            break;
+
+          case "analyze_email_for_meeting_request":
+            // Fetch the email
+            const emailList = await gmail.listMessages({ maxResults: 1, query: `rfc822msgid:${args.emailId}` });
+            if (emailList.length === 0) {
+              toolResult = "Email not found";
+              break;
+            }
+            
+            const email = emailList[0];
+            
+            // Use OpenAI to extract meeting details from email body
+            const analysisPrompt = `Analyze this email and extract any meeting request details:
+
+From: ${email.from}
+Subject: ${email.subject}
+Body: ${email.body.substring(0, 2000)}
+
+Extract the following if present:
+1. Proposed meeting times (as specific dates/times)
+2. Meeting subject/purpose
+3. List of attendees mentioned
+4. Any other relevant details
+
+Return as JSON with keys: hasMeetingRequest (boolean), proposedTimes (array of strings), subject (string), attendees (array of strings), notes (string)`;
+
+            const analysisResponse = await retryOpenAI(() =>
+              openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [{ role: "user", content: analysisPrompt }],
+                response_format: { type: "json_object" },
+              })
+            );
+            
+            const analysis = JSON.parse(analysisResponse.choices[0].message.content || '{}');
+            
+            // Store summary in database
+            await storage.createEmailSummary({
+              chatId: identifier,
+              gmailMessageId: email.id,
+              from: email.from,
+              subject: email.subject,
+              summary: email.snippet,
+              category: analysis.hasMeetingRequest ? 'action' : 'fyi',
+              hasMeetingRequest: analysis.hasMeetingRequest || false,
+              extractedMeetingDetails: analysis,
+              receivedDate: email.date,
+            });
+            
+            toolResult = JSON.stringify(analysis);
             break;
 
           default:
@@ -999,6 +1163,19 @@ async function executePendingAction(identifier: string, confirmation: PendingCon
             }
           }
           throw calendarError; // Re-throw to be caught by outer catch
+        }
+
+      case 'send_email':
+        const result = await gmail.sendEmail({
+          to: data.to,
+          subject: data.subject,
+          body: data.body,
+        });
+        
+        if (result.success) {
+          return `Email sent successfully to ${data.to}!`;
+        } else {
+          throw new Error(result.error || 'Failed to send email');
         }
 
       default:
