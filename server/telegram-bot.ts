@@ -1,6 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { processMessage } from './ai-assistant';
 import { storage } from './storage';
+import { extractTextFromPhoto } from './photo-ocr';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -140,6 +141,66 @@ if (bot) {
     } catch (error) {
       console.error('Error processing Telegram message:', error);
       await ctx.reply('Sorry, I encountered an error processing your message. Please try again.');
+    }
+  });
+
+  // Handle photo messages with OCR
+  bot.on('photo', async (ctx) => {
+    try {
+      const chatId = ctx.chat.id.toString();
+      const caption = ctx.message.caption || '';
+      
+      await ctx.reply('📸 Processing photo...');
+
+      // Get the highest quality photo
+      const photos = ctx.message.photo;
+      const photo = photos[photos.length - 1];
+
+      // Get download URL
+      const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+      
+      // Extract text using GPT-4 Vision (directly from Telegram URL)
+      const ocrResult = await extractTextFromPhoto(fileLink.href);
+
+      // Guard: Check if OCR returned any text
+      if (!ocrResult.extractedText || ocrResult.extractedText.trim().length === 0) {
+        await ctx.reply('I couldn\'t extract any text from this photo. Please try again with a clearer image or add a caption to describe what you want to save.');
+        return;
+      }
+
+      // Create quick note with OCR result and optional caption
+      const noteContent = `${ocrResult.extractedText}${caption ? `\n\nCaption: ${caption}` : ''}`;
+      
+      // Process as a quick note command with OCR metadata hints
+      const quickNoteMessage = `Save this as a quick note: ${noteContent}`;
+      const aiResponse = await processMessage(quickNoteMessage, chatId, 'telegram');
+
+      // Save photo message in history
+      await storage.createMessage({
+        phoneNumber: chatId,
+        messageContent: `Photo note: ${noteContent}`,
+        sender: 'user',
+        messageType: 'photo',
+        platform: 'telegram',
+        processed: true,
+      });
+
+      // Save assistant response in history (symmetric with text handler)
+      await storage.createMessage({
+        phoneNumber: chatId,
+        messageContent: aiResponse,
+        sender: 'assistant',
+        messageType: 'text',
+        platform: 'telegram',
+        processed: true,
+        aiResponse: aiResponse,
+      });
+
+      // Send confirmation
+      await ctx.reply(aiResponse);
+    } catch (error) {
+      console.error('Error processing photo message:', error);
+      await ctx.reply('Sorry, I encountered an error processing your photo. Please try again.');
     }
   });
 
