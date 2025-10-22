@@ -199,6 +199,7 @@ Your capabilities:
 - Send emails on behalf of the user
 - Search emails by keywords or sender
 - Summarize unread emails by priority
+- Quick Notes: Instantly save thoughts, ideas, tasks with auto-categorization and optional Notion sync
 
 Important rules:
 1. ALWAYS ask for confirmation before booking, canceling, or rescheduling appointments
@@ -673,6 +674,73 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
         },
       },
     },
+    {
+      type: "function",
+      function: {
+        name: "quick_note",
+        description: "Instantly capture a quick note with automatic categorization. Use this when the user wants to save a thought, idea, task, or reminder. AI will automatically categorize it (work/personal/ideas/follow-ups), detect priority, generate tags, and optionally link to recent calendar events or sync to Notion.",
+        parameters: {
+          type: "object",
+          properties: {
+            content: {
+              type: "string",
+              description: "The note content - can be a task, idea, meeting note, or general thought",
+            },
+            noteType: {
+              type: "string",
+              enum: ["task", "idea", "meeting_note", "general"],
+              description: "Type of note (optional - AI will auto-detect if not specified)",
+            },
+            category: {
+              type: "string",
+              enum: ["work", "personal", "ideas", "follow_ups"],
+              description: "Category of note (optional - AI will auto-detect if not specified)",
+            },
+            priority: {
+              type: "string",
+              enum: ["high", "normal", "low"],
+              description: "Priority level (optional - AI will auto-detect if not specified)",
+            },
+            tags: {
+              type: "array",
+              items: { type: "string" },
+              description: "Optional tags for the note",
+            },
+            syncToNotion: {
+              type: "boolean",
+              description: "Whether to automatically create this note in Notion (default true)",
+            },
+          },
+          required: ["content"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "view_notes",
+        description: "View saved quick notes. Can filter by category (work/personal/ideas/follow_ups) or note type (task/idea/meeting_note/general).",
+        parameters: {
+          type: "object",
+          properties: {
+            category: {
+              type: "string",
+              enum: ["work", "personal", "ideas", "follow_ups"],
+              description: "Optional: Filter notes by category",
+            },
+            noteType: {
+              type: "string",
+              enum: ["task", "idea", "meeting_note", "general"],
+              description: "Optional: Filter notes by type",
+            },
+            limit: {
+              type: "number",
+              description: "Maximum number of notes to return (default 20)",
+            },
+          },
+        },
+      },
+    },
   ];
 
   // Multi-turn tool calling loop - allows AI to use search results for follow-up actions
@@ -1113,6 +1181,139 @@ Return as JSON with keys: hasMeetingRequest (boolean), proposedTimes (array of s
             });
             
             toolResult = `Successfully set default Notion parent page to ${args.parentId}. You can now create notes without specifying a parent page.`;
+            break;
+
+          case "view_notes":
+            let notes;
+            if (args.category) {
+              notes = await storage.getQuickNotesByCategory(identifier, args.category, args.limit || 20);
+            } else if (args.noteType) {
+              notes = await storage.getQuickNotesByType(identifier, args.noteType, args.limit || 20);
+            } else {
+              notes = await storage.getQuickNotes(identifier, args.limit || 20);
+            }
+
+            if (notes.length === 0) {
+              toolResult = `No notes found${args.category ? ` in category "${args.category}"` : ''}${args.noteType ? ` of type "${args.noteType}"` : ''}.`;
+            } else {
+              const notesText = notes.map((note, idx) => {
+                const linkedEvent = note.linkedEventId ? ' 🔗' : '';
+                const notionSync = note.notionPageId ? ' 📒' : '';
+                const tagsDisplay = note.tags && note.tags.length > 0 ? note.tags.join(', ') : 'none';
+                return `${idx + 1}. [${note.priority.toUpperCase()}] ${note.content}${linkedEvent}${notionSync}\n   📁 ${note.category} | 📝 ${note.noteType} | 🏷️ ${tagsDisplay}`;
+              }).join('\n\n');
+              
+              toolResult = `📋 **Your Notes** (${notes.length})\n\n${notesText}`;
+            }
+            break;
+
+          case "quick_note":
+            // Auto-categorize using AI if not provided
+            let noteType = args.noteType || "general";
+            let category = args.category || "personal";
+            let priority = args.priority || "normal";
+            let tags = args.tags || [];
+
+            // Use AI to auto-detect metadata if not provided
+            if (!args.noteType || !args.category || !args.priority || tags.length === 0) {
+              const categorizationPrompt = `Analyze this note and categorize it:
+Note: "${args.content}"
+
+Return JSON with:
+- noteType: "task" | "idea" | "meeting_note" | "general"
+- category: "work" | "personal" | "ideas" | "follow_ups"
+- priority: "high" | "normal" | "low"
+- tags: array of 2-5 relevant keywords
+- suggestedNotionTitle: concise title (3-8 words)`;
+
+              const categorizationResponse = await retryOpenAI(() => 
+                openai.chat.completions.create({
+                  model: "gpt-4o-mini",
+                  messages: [{ role: "user", content: categorizationPrompt }],
+                  response_format: { type: "json_object" },
+                  max_tokens: 200,
+                })
+              );
+
+              const categorization = JSON.parse(categorizationResponse.choices[0]?.message?.content || "{}");
+              noteType = args.noteType || categorization.noteType || "general";
+              category = args.category || categorization.category || "personal";
+              priority = args.priority || categorization.priority || "normal";
+              tags = args.tags || categorization.tags || [];
+            }
+
+            // Check for calendar event linking - search for events in last 7 days
+            let linkedEventId: string | null = null;
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            
+            try {
+              const recentEvents = await calendar.searchEvents(
+                args.content.substring(0, 100),
+                sevenDaysAgo,
+                new Date()
+              );
+
+              if (recentEvents && recentEvents.length > 0 && recentEvents[0].id) {
+                linkedEventId = recentEvents[0].id;
+              }
+            } catch (error) {
+              logger.error({ error }, "Failed to link note to calendar event");
+            }
+
+            // Create the quick note
+            const quickNote = await storage.createQuickNote({
+              chatId: identifier,
+              noteType,
+              category,
+              priority,
+              content: args.content,
+              tags,
+              linkedEventId,
+              photoUrl: null,
+              notionPageId: null,
+            });
+
+            // Sync to Notion if requested (default true)
+            const shouldSyncToNotion = args.syncToNotion !== false;
+            if (shouldSyncToNotion) {
+              const parentId = settings?.defaultNotionParentId;
+              
+              if (parentId) {
+                try {
+                  const notionPage = await notion.createNotionPage({
+                    parentId,
+                    title: `Quick Note: ${args.content.substring(0, 50)}${args.content.length > 50 ? '...' : ''}`,
+                    content: `${args.content}\n\n---\n**Type:** ${noteType}\n**Category:** ${category}\n**Priority:** ${priority}\n**Tags:** ${tags.join(', ')}`,
+                  });
+
+                  // Update quick note with Notion page ID
+                  await storage.updateQuickNote(quickNote.id, {
+                    notionPageId: notionPage.id,
+                  });
+
+                  await storage.createNotionOperation({
+                    chatId: identifier,
+                    operation: 'create_page',
+                    notionObjectId: notionPage.id,
+                    notionObjectType: 'page',
+                    title: `Quick Note`,
+                    success: true,
+                    metadata: { quickNoteId: quickNote.id },
+                  });
+
+                  const pageUrl = 'url' in notionPage ? notionPage.url : `Page created: ${notionPage.id}`;
+                  toolResult = `✅ Quick note saved!\n\n📝 **Type:** ${noteType}\n📁 **Category:** ${category}\n⚡ **Priority:** ${priority}\n🏷️ **Tags:** ${tags.join(', ')}\n${linkedEventId ? `🔗 Linked to calendar event\n` : ''}📒 Synced to Notion: ${pageUrl}`;
+                } catch (error) {
+                  logger.error({ error }, "Failed to sync note to Notion");
+                  toolResult = `✅ Quick note saved!\n\n📝 **Type:** ${noteType}\n📁 **Category:** ${category}\n⚡ **Priority:** ${priority}\n🏷️ **Tags:** ${tags.join(', ')}\n${linkedEventId ? `🔗 Linked to calendar event\n` : ''}\n⚠️ Note: Could not sync to Notion`;
+                }
+              } else {
+                toolResult = `✅ Quick note saved!\n\n📝 **Type:** ${noteType}\n📁 **Category:** ${category}\n⚡ **Priority:** ${priority}\n🏷️ **Tags:** ${tags.join(', ')}\n${linkedEventId ? `🔗 Linked to calendar event\n` : ''}\n💡 Set a default Notion parent page to auto-sync notes`;
+              }
+            } else {
+              toolResult = `✅ Quick note saved!\n\n📝 **Type:** ${noteType}\n📁 **Category:** ${category}\n⚡ **Priority:** ${priority}\n🏷️ **Tags:** ${tags.join(', ')}\n${linkedEventId ? `🔗 Linked to calendar event` : ''}`;
+            }
             break;
 
           default:

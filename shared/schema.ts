@@ -264,3 +264,36 @@ export const insertNotionOperationSchema = createInsertSchema(notionOperations).
 
 export type InsertNotionOperation = z.infer<typeof insertNotionOperationSchema>;
 export type NotionOperation = typeof notionOperations.$inferSelect;
+
+// Quick Notes Table - For instant thought capture with AI categorization
+export const quickNotes = pgTable(
+  "quick_notes",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    chatId: text("chat_id").notNull(),
+    noteType: text("note_type").notNull(), // 'task', 'idea', 'meeting_note', 'general'
+    category: text("category").notNull(), // 'work', 'personal', 'ideas', 'follow_ups'
+    priority: text("priority").notNull().default("normal"), // 'high', 'normal', 'low'
+    content: text("content").notNull(),
+    photoUrl: text("photo_url"), // URL to stored photo in object storage
+    linkedEventId: text("linked_event_id"), // Google Calendar event ID if auto-linked
+    notionPageId: text("notion_page_id"), // Notion page ID if synced to Notion
+    tags: text("tags").array().default(sql`ARRAY[]::text[]`), // AI-generated tags
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_quick_notes_chat_id").on(table.chatId),
+    index("idx_quick_notes_note_type").on(table.noteType),
+    index("idx_quick_notes_category").on(table.category),
+    index("idx_quick_notes_created_at").on(table.createdAt),
+    index("idx_quick_notes_chat_created").on(table.chatId, table.createdAt),
+  ],
+);
+
+export const insertQuickNoteSchema = createInsertSchema(quickNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertQuickNote = z.infer<typeof insertQuickNoteSchema>;
+export type QuickNote = typeof quickNotes.$inferSelect;

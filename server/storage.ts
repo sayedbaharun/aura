@@ -15,6 +15,8 @@ import {
   type InsertEmailSummary,
   type NotionOperation,
   type InsertNotionOperation,
+  type QuickNote,
+  type InsertQuickNote,
   whatsappMessages,
   appointments,
   assistantSettings,
@@ -22,7 +24,8 @@ import {
   pendingConfirmations,
   eventAttendees,
   emailSummaries,
-  notionOperations
+  notionOperations,
+  quickNotes
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, lt, and } from "drizzle-orm";
@@ -74,6 +77,14 @@ export interface IStorage {
   // Notion Operations
   createNotionOperation(operation: InsertNotionOperation): Promise<NotionOperation>;
   getNotionOperationsByChat(chatId: string, limit?: number): Promise<NotionOperation[]>;
+
+  // Quick Notes
+  createQuickNote(note: InsertQuickNote): Promise<QuickNote>;
+  getQuickNotes(chatId: string, limit?: number): Promise<QuickNote[]>;
+  getQuickNotesByCategory(chatId: string, category: string, limit?: number): Promise<QuickNote[]>;
+  getQuickNotesByType(chatId: string, noteType: string, limit?: number): Promise<QuickNote[]>;
+  updateQuickNote(id: string, updates: Partial<InsertQuickNote>): Promise<QuickNote | undefined>;
+  deleteQuickNote(id: string): Promise<void>;
 }
 
 // PostgreSQL Storage Implementation
@@ -394,6 +405,63 @@ export class DBStorage implements IStorage {
       .where(eq(notionOperations.chatId, chatId))
       .orderBy(desc(notionOperations.timestamp))
       .limit(limit);
+  }
+
+  // Quick Notes
+  async createQuickNote(insertNote: InsertQuickNote): Promise<QuickNote> {
+    const [note] = await this.db
+      .insert(quickNotes)
+      .values(insertNote)
+      .returning();
+    return note;
+  }
+
+  async getQuickNotes(chatId: string, limit: number = 50): Promise<QuickNote[]> {
+    return await this.db
+      .select()
+      .from(quickNotes)
+      .where(eq(quickNotes.chatId, chatId))
+      .orderBy(desc(quickNotes.createdAt))
+      .limit(limit);
+  }
+
+  async getQuickNotesByCategory(chatId: string, category: string, limit: number = 50): Promise<QuickNote[]> {
+    return await this.db
+      .select()
+      .from(quickNotes)
+      .where(and(
+        eq(quickNotes.chatId, chatId),
+        eq(quickNotes.category, category)
+      ))
+      .orderBy(desc(quickNotes.createdAt))
+      .limit(limit);
+  }
+
+  async getQuickNotesByType(chatId: string, noteType: string, limit: number = 50): Promise<QuickNote[]> {
+    return await this.db
+      .select()
+      .from(quickNotes)
+      .where(and(
+        eq(quickNotes.chatId, chatId),
+        eq(quickNotes.noteType, noteType)
+      ))
+      .orderBy(desc(quickNotes.createdAt))
+      .limit(limit);
+  }
+
+  async updateQuickNote(id: string, updates: Partial<InsertQuickNote>): Promise<QuickNote | undefined> {
+    const [note] = await this.db
+      .update(quickNotes)
+      .set(updates)
+      .where(eq(quickNotes.id, id))
+      .returning();
+    return note;
+  }
+
+  async deleteQuickNote(id: string): Promise<void> {
+    await this.db
+      .delete(quickNotes)
+      .where(eq(quickNotes.id, id));
   }
 }
 
