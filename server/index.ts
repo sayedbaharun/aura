@@ -193,6 +193,20 @@ app.use((req, res, next) => {
     } catch (error) {
       log('Telegram bot setup skipped:', String(error));
     }
+
+    // Initialize scheduled jobs (proactive briefings and suggestions)
+    try {
+      const { initializeScheduledJobs, stopScheduledJobs } = await import('./scheduled-jobs');
+      const { sendProactiveMessage } = await import('./telegram-bot');
+      
+      initializeScheduledJobs(sendProactiveMessage);
+      log('✓ Scheduled jobs system initialized (briefings, proactive checks)');
+      
+      // Store reference for cleanup
+      (globalThis as any).stopScheduledJobs = stopScheduledJobs;
+    } catch (error) {
+      log('Scheduled jobs setup skipped:', String(error));
+    }
     
     // Graceful shutdown
     const gracefulShutdown = async () => {
@@ -206,6 +220,16 @@ app.use((req, res, next) => {
         log('Attendee tracking stopped');
       } catch (error) {
         log('Error stopping attendee tracking:', String(error));
+      }
+      
+      // Stop scheduled jobs
+      try {
+        if ((globalThis as any).stopScheduledJobs) {
+          (globalThis as any).stopScheduledJobs();
+          log('Scheduled jobs stopped');
+        }
+      } catch (error) {
+        log('Error stopping scheduled jobs:', String(error));
       }
       
       if (telegramBot) {

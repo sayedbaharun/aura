@@ -254,3 +254,24 @@ export async function removeTelegramWebhook() {
     throw error;
   }
 }
+
+/**
+ * Send proactive message (briefings, suggestions) to a user
+ * Used by scheduled jobs system
+ */
+export async function sendProactiveMessage(chatId: string, message: string): Promise<void> {
+  if (!bot) {
+    console.error('Cannot send proactive message: Bot not initialized');
+    return;
+  }
+
+  try {
+    await bot.telegram.sendMessage(chatId, message, {
+      parse_mode: 'HTML',
+    });
+    console.log(`Proactive message sent to ${chatId}`);
+  } catch (error) {
+    console.error(`Failed to send proactive message to ${chatId}:`, error);
+    throw error;
+  }
+}

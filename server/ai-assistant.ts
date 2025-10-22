@@ -6,12 +6,69 @@ import * as notion from "./notion";
 import { logBooking, logCancellation, logReschedule, logViewSchedule } from "./audit-logger";
 import { logger } from "./logger";
 import { retryOpenAI } from "./retry-utils";
+import * as modelManager from "./model-manager";
+import * as contextMemory from "./context-memory";
 
-// Initialize OpenAI with Replit AI Integrations credentials
+// Initialize OpenAI with Replit AI Integrations credentials  
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+/**
+ * Integrated AI completion with context injection, multi-model fallback, and interaction tracking
+ */
+async function aiCompletionWithTracking(
+  chatId: string,
+  messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  tools?: OpenAI.Chat.ChatCompletionTool[],
+  userInput?: string,
+  complexity: modelManager.TaskComplexity = "complex"
+): Promise<OpenAI.Chat.ChatCompletion> {
+  try {
+    // 1. Inject RAG context from user history
+    const messagesWithContext = await contextMemory.injectContext(chatId, messages);
+
+    // 2. Call model manager with fallback
+    const { response, metrics } = await modelManager.chatCompletion(
+      {
+        messages: messagesWithContext,
+        tools,
+        temperature: 0.7,
+      },
+      complexity
+    );
+
+    // 3. Track interaction for pattern learning
+    await contextMemory.trackInteraction(
+      chatId,
+      "message",
+      "ai_completion",
+      userInput || null,
+      response.choices[0]?.message?.content || null,
+      { complexity, toolCalls: response.choices[0]?.message?.tool_calls?.length || 0 },
+      true,
+      metrics.modelUsed,
+      metrics.tokensUsed
+    );
+
+    return response;
+  } catch (error: any) {
+    // Track failed interactions too
+    await contextMemory.trackInteraction(
+      chatId,
+      "message",
+      "ai_completion",
+      userInput || null,
+      null,
+      { error: error.message },
+      false,
+      "unknown",
+      0
+    );
+    throw error;
+  }
+}
 
 export interface PendingConfirmationData {
   action: string;
@@ -749,13 +806,13 @@ Current date/time: ${new Date().toLocaleString('en-US', { timeZone: settings?.ti
   const maxTurns = 5; // Prevent infinite loops
   
   for (let turn = 0; turn < maxTurns; turn++) {
-    const completion = await retryOpenAI(() =>
-      openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: conversationMessages,
-        tools,
-        temperature: 0.7,
-      })
+    // Use integrated AI completion with context, fallback, and tracking
+    const completion = await aiCompletionWithTracking(
+      identifier,
+      conversationMessages,
+      tools,
+      messageText,
+      "complex" // Main message handling is complex
     );
 
     const choice = completion.choices[0];
@@ -1023,12 +1080,13 @@ Extract the following if present:
 
 Return as JSON with keys: hasMeetingRequest (boolean), proposedTimes (array of strings), subject (string), attendees (array of strings), notes (string)`;
 
-            const analysisResponse = await retryOpenAI(() =>
-              openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [{ role: "user", content: analysisPrompt }],
-                response_format: { type: "json_object" },
-              })
+            // Use integrated AI with fallback for email analysis (simpler task)
+            const analysisResponse = await aiCompletionWithTracking(
+              identifier,
+              [{ role: "user", content: analysisPrompt }],
+              undefined,
+              `Analyze email ${args.emailId}`,
+              "simple" // Email analysis is a simpler structured extraction task
             );
             
             const analysis = JSON.parse(analysisResponse.choices[0].message.content || '{}');
@@ -1226,13 +1284,13 @@ Return JSON with:
 - tags: array of 2-5 relevant keywords
 - suggestedNotionTitle: concise title (3-8 words)`;
 
-              const categorizationResponse = await retryOpenAI(() => 
-                openai.chat.completions.create({
-                  model: "gpt-4o-mini",
-                  messages: [{ role: "user", content: categorizationPrompt }],
-                  response_format: { type: "json_object" },
-                  max_tokens: 200,
-                })
+              // Use integrated AI with fallback for note categorization (simple structured task)
+              const categorizationResponse = await aiCompletionWithTracking(
+                identifier,
+                [{ role: "user", content: categorizationPrompt }],
+                undefined,
+                `Categorize note: ${args.content.substring(0, 50)}...`,
+                "simple" // Note categorization is a simple structured extraction
               );
 
               const categorization = JSON.parse(categorizationResponse.choices[0]?.message?.content || "{}");

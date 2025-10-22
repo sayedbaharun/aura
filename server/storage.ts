@@ -17,6 +17,12 @@ import {
   type InsertNotionOperation,
   type QuickNote,
   type InsertQuickNote,
+  type UserProfile,
+  type InsertUserProfile,
+  type InteractionHistory,
+  type InsertInteractionHistory,
+  type ProactiveSuggestion,
+  type InsertProactiveSuggestion,
   whatsappMessages,
   appointments,
   assistantSettings,
@@ -25,10 +31,13 @@ import {
   eventAttendees,
   emailSummaries,
   notionOperations,
-  quickNotes
+  quickNotes,
+  userProfiles,
+  interactionHistory,
+  proactiveSuggestions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, lt, and } from "drizzle-orm";
+import { eq, desc, lt, gt, and } from "drizzle-orm";
 import { db as database } from "../db";
 
 // Singleton ID for assistant settings - ensures only one settings row exists
@@ -85,6 +94,26 @@ export interface IStorage {
   getQuickNotesByType(chatId: string, noteType: string, limit?: number): Promise<QuickNote[]>;
   updateQuickNote(id: string, updates: Partial<InsertQuickNote>): Promise<QuickNote | undefined>;
   deleteQuickNote(id: string): Promise<void>;
+
+  // User Profiles (Context Memory)
+  getUserProfile(chatId: string): Promise<UserProfile | undefined>;
+  createUserProfile(profile: InsertUserProfile): Promise<UserProfile>;
+  updateUserProfile(chatId: string, updates: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
+  incrementInteractionCount(chatId: string): Promise<void>;
+
+  // Interaction History
+  createInteractionHistory(interaction: InsertInteractionHistory): Promise<InteractionHistory>;
+  getInteractionHistory(chatId: string, limit?: number): Promise<InteractionHistory[]>;
+  getInteractionsByType(chatId: string, interactionType: string, limit?: number): Promise<InteractionHistory[]>;
+  getRecentInteractions(chatId: string, hours: number): Promise<InteractionHistory[]>;
+
+  // Proactive Suggestions
+  createProactiveSuggestion(suggestion: InsertProactiveSuggestion): Promise<ProactiveSuggestion>;
+  getProactiveSuggestions(chatId: string, limit?: number): Promise<ProactiveSuggestion[]>;
+  getPendingSuggestions(chatId: string): Promise<ProactiveSuggestion[]>;
+  getScheduledSuggestions(): Promise<ProactiveSuggestion[]>;
+  updateSuggestionStatus(id: string, status: string, userResponse?: string): Promise<ProactiveSuggestion | undefined>;
+  markSuggestionSent(id: string): Promise<void>;
 }
 
 // PostgreSQL Storage Implementation
@@ -462,6 +491,154 @@ export class DBStorage implements IStorage {
     await this.db
       .delete(quickNotes)
       .where(eq(quickNotes.id, id));
+  }
+
+  // User Profiles (Context Memory)
+  async getUserProfile(chatId: string): Promise<UserProfile | undefined> {
+    const [profile] = await this.db
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.chatId, chatId))
+      .limit(1);
+    return profile;
+  }
+
+  async createUserProfile(insertProfile: InsertUserProfile): Promise<UserProfile> {
+    const [profile] = await this.db
+      .insert(userProfiles)
+      .values(insertProfile)
+      .returning();
+    return profile;
+  }
+
+  async updateUserProfile(chatId: string, updates: Partial<InsertUserProfile>): Promise<UserProfile | undefined> {
+    const [profile] = await this.db
+      .update(userProfiles)
+      .set({
+        ...updates,
+        lastUpdated: new Date(),
+      })
+      .where(eq(userProfiles.chatId, chatId))
+      .returning();
+    return profile;
+  }
+
+  async incrementInteractionCount(chatId: string): Promise<void> {
+    const profile = await this.getUserProfile(chatId);
+    if (profile) {
+      await this.db
+        .update(userProfiles)
+        .set({
+          totalInteractions: (profile.totalInteractions || 0) + 1,
+          lastUpdated: new Date(),
+        })
+        .where(eq(userProfiles.chatId, chatId));
+    }
+  }
+
+  // Interaction History
+  async createInteractionHistory(insertInteraction: InsertInteractionHistory): Promise<InteractionHistory> {
+    const [interaction] = await this.db
+      .insert(interactionHistory)
+      .values(insertInteraction)
+      .returning();
+    return interaction;
+  }
+
+  async getInteractionHistory(chatId: string, limit: number = 100): Promise<InteractionHistory[]> {
+    return await this.db
+      .select()
+      .from(interactionHistory)
+      .where(eq(interactionHistory.chatId, chatId))
+      .orderBy(desc(interactionHistory.timestamp))
+      .limit(limit);
+  }
+
+  async getInteractionsByType(chatId: string, interactionType: string, limit: number = 50): Promise<InteractionHistory[]> {
+    return await this.db
+      .select()
+      .from(interactionHistory)
+      .where(and(
+        eq(interactionHistory.chatId, chatId),
+        eq(interactionHistory.interactionType, interactionType)
+      ))
+      .orderBy(desc(interactionHistory.timestamp))
+      .limit(limit);
+  }
+
+  async getRecentInteractions(chatId: string, hours: number): Promise<InteractionHistory[]> {
+    const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
+    return await this.db
+      .select()
+      .from(interactionHistory)
+      .where(and(
+        eq(interactionHistory.chatId, chatId),
+        gt(interactionHistory.timestamp, cutoffTime) // Get interactions after the cutoff time
+      ))
+      .orderBy(desc(interactionHistory.timestamp));
+  }
+
+  // Proactive Suggestions
+  async createProactiveSuggestion(insertSuggestion: InsertProactiveSuggestion): Promise<ProactiveSuggestion> {
+    const [suggestion] = await this.db
+      .insert(proactiveSuggestions)
+      .values(insertSuggestion)
+      .returning();
+    return suggestion;
+  }
+
+  async getProactiveSuggestions(chatId: string, limit: number = 50): Promise<ProactiveSuggestion[]> {
+    return await this.db
+      .select()
+      .from(proactiveSuggestions)
+      .where(eq(proactiveSuggestions.chatId, chatId))
+      .orderBy(desc(proactiveSuggestions.createdAt))
+      .limit(limit);
+  }
+
+  async getPendingSuggestions(chatId: string): Promise<ProactiveSuggestion[]> {
+    return await this.db
+      .select()
+      .from(proactiveSuggestions)
+      .where(and(
+        eq(proactiveSuggestions.chatId, chatId),
+        eq(proactiveSuggestions.status, 'pending')
+      ))
+      .orderBy(desc(proactiveSuggestions.createdAt));
+  }
+
+  async getScheduledSuggestions(): Promise<ProactiveSuggestion[]> {
+    const now = new Date();
+    return await this.db
+      .select()
+      .from(proactiveSuggestions)
+      .where(and(
+        eq(proactiveSuggestions.status, 'pending'),
+        lt(proactiveSuggestions.scheduledFor, now)
+      ))
+      .orderBy(desc(proactiveSuggestions.scheduledFor));
+  }
+
+  async updateSuggestionStatus(id: string, status: string, userResponse?: string): Promise<ProactiveSuggestion | undefined> {
+    const [suggestion] = await this.db
+      .update(proactiveSuggestions)
+      .set({
+        status,
+        userResponse,
+        respondedAt: new Date(),
+      })
+      .where(eq(proactiveSuggestions.id, id))
+      .returning();
+    return suggestion;
+  }
+
+  async markSuggestionSent(id: string): Promise<void> {
+    await this.db
+      .update(proactiveSuggestions)
+      .set({
+        sentAt: new Date(),
+      })
+      .where(eq(proactiveSuggestions.id, id));
   }
 }
 

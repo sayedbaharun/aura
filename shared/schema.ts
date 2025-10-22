@@ -297,3 +297,139 @@ export const insertQuickNoteSchema = createInsertSchema(quickNotes).omit({
 
 export type InsertQuickNote = z.infer<typeof insertQuickNoteSchema>;
 export type QuickNote = typeof quickNotes.$inferSelect;
+
+// User Profile Table - Advanced context memory for learning user patterns
+export const userProfiles = pgTable(
+  "user_profiles",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    chatId: text("chat_id").notNull().unique(), // Unique per user
+    
+    // Learned Preferences
+    preferredMeetingTimes: jsonb("preferred_meeting_times"), // { day: string, hour: number }[]
+    preferredMeetingDuration: integer("preferred_meeting_duration"), // In minutes
+    commonAttendees: text("common_attendees").array().default(sql`ARRAY[]::text[]`),
+    frequentMeetingTypes: jsonb("frequent_meeting_types"), // { type: string, count: number }[]
+    
+    // Communication Patterns
+    responseStyle: text("response_style"), // 'brief', 'detailed', 'conversational'
+    preferredLanguage: text("preferred_language").default("en"),
+    commonPhrases: text("common_phrases").array().default(sql`ARRAY[]::text[]`),
+    
+    // Work Patterns
+    workingHours: jsonb("working_hours"), // { start: string, end: string, timezone: string }
+    peakProductivityHours: jsonb("peak_productivity_hours"), // { start: number, end: number }[]
+    focusTimePreferences: jsonb("focus_time_preferences"), // { frequency: string, duration: number }
+    
+    // Email & Note Patterns
+    emailResponsePatterns: jsonb("email_response_patterns"), // { urgentKeywords: string[], actionKeywords: string[] }
+    noteCategorization: jsonb("note_categorization"), // { commonTags: string[], categoryDistribution: object }
+    
+    // Metadata
+    totalInteractions: integer("total_interactions").default(0).notNull(),
+    lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_user_profiles_chat_id").on(table.chatId),
+    index("idx_user_profiles_last_updated").on(table.lastUpdated),
+  ],
+);
+
+export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({
+  id: true,
+  createdAt: true,
+  lastUpdated: true,
+});
+
+export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
+export type UserProfile = typeof userProfiles.$inferSelect;
+
+// Interaction History Table - Track all user actions for pattern analysis
+export const interactionHistory = pgTable(
+  "interaction_history",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    chatId: text("chat_id").notNull(),
+    
+    // Interaction Details
+    interactionType: text("interaction_type").notNull(), // 'message', 'calendar_action', 'email_action', 'note_creation'
+    action: text("action").notNull(), // 'book', 'cancel', 'reschedule', 'check_email', 'create_note', etc.
+    userInput: text("user_input"), // Original user message
+    aiResponse: text("ai_response"), // AI's response
+    
+    // Context Data
+    metadata: jsonb("metadata"), // Additional data like event details, email info, etc.
+    success: boolean("success").notNull(),
+    
+    // Timing
+    timeOfDay: integer("time_of_day"), // Hour of day (0-23)
+    dayOfWeek: integer("day_of_week"), // Day of week (0-6, 0=Sunday)
+    
+    // Model Information
+    modelUsed: text("model_used"), // Which GPT model was used
+    tokenCount: integer("token_count"), // Token usage for this interaction
+    
+    timestamp: timestamp("timestamp").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_interaction_history_chat_id").on(table.chatId),
+    index("idx_interaction_history_timestamp").on(table.timestamp),
+    index("idx_interaction_history_type").on(table.interactionType),
+    index("idx_interaction_history_chat_timestamp").on(table.chatId, table.timestamp),
+  ],
+);
+
+export const insertInteractionHistorySchema = createInsertSchema(interactionHistory).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertInteractionHistory = z.infer<typeof insertInteractionHistorySchema>;
+export type InteractionHistory = typeof interactionHistory.$inferSelect;
+
+// Proactive Suggestions Table - Track AI-generated suggestions and user responses
+export const proactiveSuggestions = pgTable(
+  "proactive_suggestions",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    chatId: text("chat_id").notNull(),
+    
+    // Suggestion Details
+    suggestionType: text("suggestion_type").notNull(), // 'briefing', 'conflict_alert', 'focus_time', 'follow_up', 'optimization'
+    priority: text("priority").notNull().default("normal"), // 'high', 'normal', 'low'
+    content: text("content").notNull(), // The suggestion message
+    
+    // Context
+    trigger: text("trigger").notNull(), // What triggered this suggestion
+    relatedEventId: text("related_event_id"), // Google Calendar event if relevant
+    relatedNoteId: text("related_note_id"), // Quick note if relevant
+    metadata: jsonb("metadata"), // Additional context
+    
+    // User Response
+    status: text("status").default("pending").notNull(), // 'pending', 'accepted', 'dismissed', 'acted_upon'
+    userResponse: text("user_response"), // User's reply or action
+    respondedAt: timestamp("responded_at"),
+    
+    // Scheduling (for future suggestions)
+    scheduledFor: timestamp("scheduled_for"), // When to send this suggestion
+    sentAt: timestamp("sent_at"), // When it was actually sent
+    
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_proactive_suggestions_chat_id").on(table.chatId),
+    index("idx_proactive_suggestions_status").on(table.status),
+    index("idx_proactive_suggestions_scheduled").on(table.scheduledFor),
+    index("idx_proactive_suggestions_type").on(table.suggestionType),
+    index("idx_proactive_suggestions_chat_created").on(table.chatId, table.createdAt),
+  ],
+);
+
+export const insertProactiveSuggestionSchema = createInsertSchema(proactiveSuggestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProactiveSuggestion = z.infer<typeof insertProactiveSuggestionSchema>;
+export type ProactiveSuggestion = typeof proactiveSuggestions.$inferSelect;
