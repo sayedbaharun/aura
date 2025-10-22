@@ -561,6 +561,75 @@ Attendance: 1 accepted, 1 declined, 1 tentative
 
 ---
 
+### **Knowledge Management**
+
+#### ✅ Quick Notes - Text Capture
+**What it does:** Instantly save thoughts, ideas, tasks, or meeting notes with AI-powered auto-categorization.
+
+**How to use:**
+- "Remind me to call Dr. Smith tomorrow"
+- "Idea: Build analytics dashboard for user metrics"
+- "Meeting note: John approved 20% budget increase"
+- "Save this: Review Q4 performance next week"
+
+**What you get:**
+- Automatic categorization (work/personal/ideas/follow_ups)
+- Note type detection (task/idea/meeting_note/general)
+- Priority assignment (high/normal/low)
+- Auto-generated tags (2-5 keywords)
+- Notion sync (creates page automatically)
+- Calendar linking (connects to recent meetings)
+
+**Example Response:**
+```
+✅ Note saved! I've categorized this as a "work" note (type: task) 
+with priority: high and tags: budget, q4-planning
+Synced to Notion ✓
+```
+
+---
+
+#### ✅ Quick Notes - Photo OCR
+**What it does:** Extract text from photos using GPT-4 Vision and save as organized notes.
+
+**How to use:**
+- Send a photo of whiteboard notes, business cards, or handwritten text
+- Add optional caption for context
+- Aura extracts text and auto-categorizes
+
+**What you can capture:**
+- Whiteboard brainstorming sessions
+- Business cards with contact info
+- Meeting agendas and handwritten notes
+- Printed documents or screenshots
+
+**Processing:**
+- GPT-4 Vision OCR for high-accuracy extraction
+- Combines extracted text with caption
+- Empty text protection (won't create blank notes)
+- Same auto-categorization as text notes
+
+---
+
+#### ✅ View & Filter Notes
+**What it does:** Access all saved notes with smart filtering options.
+
+**How to use:**
+- "Show me my notes" - all recent notes
+- "Show me my work notes" - filter by category
+- "Show me my task notes" - filter by type
+- "Show me my ideas" - filter for ideas only
+
+**Display includes:**
+- Priority level indicator
+- Note content
+- Category and type
+- Tags
+- 🔗 Calendar link (if connected to event)
+- 📒 Notion sync status
+
+---
+
 ### **Smart Scheduling**
 
 #### ✅ Time Extraction & Parsing
@@ -666,11 +735,13 @@ Attendance: 1 accepted, 1 declined, 1 tentative
 
 ## 📊 Feature Statistics
 
-**Total Features:** 21 major features  
+**Total Features:** 28 major features  
 **Calendar Features:** 11 features
 **Email Features:** 5 features
+**Knowledge Management:** 9 features (Notion integration + Quick Notes)
+**Quick Notes:** 3 features (text notes, photo OCR, view/filter notes)
 **Intelligence Features:** 5 features (AI, tracking, search, reminders, focus time)
-**Integration Partners:** 5 (OpenAI, Google Calendar, Gmail, Telegram, PostgreSQL)  
+**Integration Partners:** 6 (OpenAI, Google Calendar, Gmail, Notion, Telegram, PostgreSQL)  
 **Supported Platforms:** Telegram (primary), WhatsApp (optional)
 
 ---
@@ -953,9 +1024,149 @@ Modify existing pages or database entries.
 
 ---
 
-**Last Updated:** October 21, 2025  
-**Version:** Phase 2.1 with Notion Integration (26 features live)  
+**Last Updated:** October 22, 2025  
+**Version:** Phase 2.2 with Quick Notes (28 features live)  
 **Status:** Production-ready and deployed at aurasb.replit.app
+
+---
+
+## 📝 STEP 4: Quick Notes with Auto-Categorization
+
+Instantly capture thoughts, ideas, tasks, and meeting notes with AI-powered organization. Aura automatically categorizes your notes, detects priority, generates tags, and optionally syncs to Notion.
+
+### Core Quick Notes Features
+
+#### **Text Notes - Instant Capture**
+Save any thought or idea instantly with automatic AI categorization.
+
+**How to use:**
+- "Remind me to call Dr. Smith tomorrow"
+- "Idea: Build a new analytics dashboard"
+- "Meeting note: John agreed to 20% budget increase"
+- "Save this: Review Q4 performance metrics"
+
+**AI Auto-Categorization:**
+- **Note Type**: task, idea, meeting_note, general
+- **Category**: work, personal, ideas, follow_ups
+- **Priority**: high, normal, low
+- **Tags**: 2-5 relevant keywords automatically generated
+
+**Smart Features:**
+- Calendar linking - connects meeting notes to recent events (last 7 days)
+- Notion sync - automatically creates pages in your default parent
+- Priority detection - identifies urgency from context
+- Tag generation - extracts key topics and themes
+
+---
+
+#### **Photo Notes - OCR Extraction**
+Take a photo of anything with text and Aura will extract and organize it.
+
+**How to use:**
+- Send a photo of a whiteboard, business card, or handwritten notes
+- Add an optional caption to provide context
+- Aura extracts text using GPT-4 Vision
+- Automatically categorizes and saves as a note
+
+**What you can capture:**
+- Whiteboard diagrams and brainstorming sessions
+- Business cards with contact information
+- Handwritten meeting notes
+- Printed documents or agendas
+- Screenshots with important text
+
+**Photo Processing:**
+- GPT-4 Vision OCR - high-accuracy text extraction
+- Caption support - add context to your photos
+- Empty text protection - won't create blank notes
+- Automatic categorization of extracted content
+
+**Example:**
+```
+[Send photo of whiteboard]
+Caption: "Product roadmap ideas from team meeting"
+
+Aura Response:
+✅ Photo note saved! I've categorized this as a "work" note (type: meeting_note) 
+with tags: product-roadmap, team-meeting, q4-planning
+Synced to Notion ✓
+```
+
+---
+
+#### **View Notes**
+Access all your saved notes with smart filtering.
+
+**How to use:**
+- "Show me my notes" - view all recent notes
+- "Show me my work notes" - filter by category
+- "Show me my task notes" - filter by note type
+- "Show me my ideas" - see just ideas
+
+**Display Format:**
+Each note shows:
+- Priority level (HIGH/NORMAL/LOW)
+- Note content
+- Category and note type
+- Tags
+- 🔗 Calendar link indicator (if linked to event)
+- 📒 Notion sync indicator (if synced)
+
+**Example Response:**
+```
+📋 Your Notes (5)
+
+1. [HIGH] Call Dr. Smith tomorrow
+   📁 personal | 📝 task | 🏷️ health, appointment
+
+2. [NORMAL] Build analytics dashboard 🔗 📒
+   📁 work | 📝 idea | 🏷️ product, analytics, dashboard
+
+3. [NORMAL] John agreed to 20% budget increase 🔗 📒
+   📁 work | 📝 meeting_note | 🏷️ budget, approval, john
+```
+
+---
+
+### **Quick Notes Technology Stack**
+
+**AI Processing:**
+- GPT-4o - natural language understanding for categorization
+- GPT-4 Vision - OCR for photo text extraction
+- Structured outputs - consistent note metadata
+
+**Database Storage:**
+- `quick_notes` table - stores all note metadata
+- Fields: noteType, category, priority, content, tags
+- Photo URL tracking for image notes
+- Calendar event linking (linkedEventId)
+- Notion page tracking (notionPageId)
+
+**Integrations:**
+- **Notion**: Auto-sync to default parent page
+- **Google Calendar**: Link notes to recent meeting events
+- **Telegram**: Text and photo message handlers
+
+---
+
+### **Benefits of Quick Notes**
+
+**Never Lose a Thought:**
+- Capture ideas instantly via text or photo
+- No need to switch apps or format notes
+- AI handles organization automatically
+
+**Smart Organization:**
+- Automatic categorization (work vs personal)
+- Priority detection from context
+- Relevant tags generated automatically
+- Connected to calendar events when relevant
+
+**Seamless Workflow:**
+- Syncs to Notion for permanent storage
+- Links to calendar events for context
+- View and filter notes anytime
+- Photo OCR for capturing physical notes
 
 ---
 
