@@ -76,6 +76,7 @@ export function createMockOpenAIResponse(
           role: 'assistant',
           content,
           tool_calls: toolCalls,
+          refusal: null,
         },
         finish_reason: toolCalls ? 'tool_calls' : 'stop',
         logprobs: null,

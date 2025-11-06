@@ -20,20 +20,17 @@ app.use(helmet({
 // Security: CORS configuration
 const buildAllowedOrigins = () => {
   const origins = ['http://localhost:5000', 'http://localhost:5173'];
-  
-  // Add Replit deployment domains for production
-  if (process.env.REPLIT_DOMAINS) {
-    const domains = process.env.REPLIT_DOMAINS.split(',');
-    domains.forEach(domain => {
-      origins.push(`https://${domain.trim()}`);
-    });
+
+  // Add Railway deployment domain (automatically set by Railway)
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    origins.push(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
   }
-  
+
   // Add custom origins from environment variable
   if (process.env.ALLOWED_ORIGINS) {
     origins.push(...process.env.ALLOWED_ORIGINS.split(','));
   }
-  
+
   return origins;
 };
 
@@ -155,18 +152,20 @@ app.use((req, res, next) => {
       telegramBot = bot;
       
       if (bot) {
-        const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT;
-        
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
+
         if (isProduction) {
-          // Production: use webhook with published domain
-          // REPLIT_DOMAINS is available in published deployments (e.g., "aurasb.replit.app")
-          const domain = process.env.REPLIT_DOMAINS 
-            ? process.env.REPLIT_DOMAINS.split(',')[0] 
-            : `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-          
-          const webhookUrl = `https://${domain}/api/telegram-webhook`;
-          await setupTelegramWebhook(webhookUrl);
-          log(`Telegram webhook configured: ${webhookUrl}`);
+          // Production: use webhook with Railway domain
+          const domain = process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL;
+
+          if (!domain) {
+            log('⚠️ No Railway domain found, Telegram webhook not configured');
+            log('Set RAILWAY_PUBLIC_DOMAIN environment variable or use Railway auto-generated domain');
+          } else {
+            const webhookUrl = `https://${domain}/api/telegram-webhook`;
+            await setupTelegramWebhook(webhookUrl);
+            log(`Telegram webhook configured: ${webhookUrl}`);
+          }
         } else {
           // Development: use polling
           log('Starting Telegram bot in development mode...');
