@@ -1,7 +1,6 @@
 import { google } from 'googleapis';
 import type { gmail_v1 } from 'googleapis';
-
-let connectionSettings: any;
+import { logger } from './logger';
 
 const GMAIL_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -13,22 +12,21 @@ const GMAIL_SCOPES = [
 function createOAuth2Client() {
   const clientId = process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  
-  let redirectUri = process.env.GMAIL_REDIRECT_URI;
-  if (!redirectUri) {
-    const replitDomain = process.env.REPLIT_DEV_DOMAIN;
-    if (replitDomain) {
-      redirectUri = `https://${replitDomain}/oauth/gmail/callback`;
-    } else {
-      redirectUri = 'http://localhost:5000/oauth/gmail/callback';
-    }
-  }
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret) {
     return null;
   }
 
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, 'http://localhost:5000/oauth/gmail/callback');
+
+  if (refreshToken) {
+    oauth2Client.setCredentials({
+      refresh_token: refreshToken,
+    });
+  }
+
+  return oauth2Client;
 }
 
 export function getAuthUrl(): string | null {
@@ -54,88 +52,23 @@ export async function getTokensFromCode(code: string) {
   return tokens;
 }
 
-async function getAccessTokenViaManualOAuth() {
+export async function getUncachableGmailClient() {
   const oauth2Client = createOAuth2Client();
   const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
 
   if (!oauth2Client || !refreshToken) {
-    return null;
+    throw new Error('Gmail not connected. Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN environment variables.');
   }
 
-  oauth2Client.setCredentials({
-    refresh_token: refreshToken,
-  });
-
   try {
+    // Refresh the access token
     const { credentials } = await oauth2Client.refreshAccessToken();
     oauth2Client.setCredentials(credentials);
-    return oauth2Client;
-  } catch (error: any) {
-    const { logger } = await import('./logger');
-    logger.error({ error: error?.message || error }, 'Failed to refresh Gmail access token');
-    return null;
-  }
-}
-
-async function getAccessTokenViaReplitConnector() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken || !hostname) {
-    return null;
-  }
-
-  try {
-    connectionSettings = await fetch(
-      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-mail',
-      {
-        headers: {
-          'Accept': 'application/json',
-          'X_REPLIT_TOKEN': xReplitToken
-        }
-      }
-    ).then(res => res.json()).then(data => data.items?.[0]);
-
-    const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
-
-    if (!connectionSettings || !accessToken) {
-      return null;
-    }
-    return accessToken;
-  } catch (error: any) {
-    const { logger } = await import('./logger');
-    logger.error({ error: error?.message || error }, 'Failed to get token via Replit connector');
-    return null;
-  }
-}
-
-export async function getUncachableGmailClient() {
-  let oauth2Client = await getAccessTokenViaManualOAuth();
-  
-  if (oauth2Client) {
     return google.gmail({ version: 'v1', auth: oauth2Client });
+  } catch (error: any) {
+    logger.error({ error: error?.message || error }, 'Failed to refresh Gmail access token');
+    throw new Error('Failed to authenticate with Gmail');
   }
-
-  const accessToken = await getAccessTokenViaReplitConnector();
-  
-  if (!accessToken) {
-    throw new Error('Gmail not connected. Please set up manual OAuth2 credentials or use Replit connector.');
-  }
-
-  const simpleAuth = new google.auth.OAuth2();
-  simpleAuth.setCredentials({
-    access_token: accessToken
-  });
-
-  return google.gmail({ version: 'v1', auth: simpleAuth });
 }
 
 interface EmailMessage {
@@ -157,7 +90,7 @@ export async function listMessages(options: {
   labelIds?: string[];
 }): Promise<EmailMessage[]> {
   const gmail = await getUncachableGmailClient();
-  
+
   const response = await gmail.users.messages.list({
     userId: 'me',
     maxResults: options.maxResults || 10,
@@ -166,11 +99,11 @@ export async function listMessages(options: {
   });
 
   const messages = response.data.messages || [];
-  
+
   const fullMessages: EmailMessage[] = [];
   for (const message of messages) {
     if (!message.id) continue;
-    
+
     const fullMessage = await gmail.users.messages.get({
       userId: 'me',
       id: message.id,
@@ -182,14 +115,14 @@ export async function listMessages(options: {
     const to = headers.find(h => h.name?.toLowerCase() === 'to')?.value || '';
     const subject = headers.find(h => h.name?.toLowerCase() === 'subject')?.value || '';
     const dateStr = headers.find(h => h.name?.toLowerCase() === 'date')?.value || '';
-    
+
     // Helper function to decode Gmail's URL-safe base64
     const decodeBase64Url = (data: string): string => {
       const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
       const paddedBase64 = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
       return Buffer.from(paddedBase64, 'base64').toString('utf-8');
     };
-    
+
     let body = '';
     if (fullMessage.data.payload?.body?.data) {
       body = decodeBase64Url(fullMessage.data.payload.body.data);
@@ -227,7 +160,7 @@ export async function sendEmail(options: {
 }): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const gmail = await getUncachableGmailClient();
-    
+
     const message = [
       `To: ${options.to}`,
       `Subject: ${options.subject}`,
@@ -263,7 +196,7 @@ export async function searchEmails(query: string, maxResults: number = 10): Prom
 
 export async function getUnreadCount(): Promise<number> {
   const gmail = await getUncachableGmailClient();
-  
+
   const response = await gmail.users.labels.get({
     userId: 'me',
     id: 'UNREAD',
@@ -274,7 +207,7 @@ export async function getUnreadCount(): Promise<number> {
 
 export async function markAsRead(messageIds: string[]): Promise<void> {
   const gmail = await getUncachableGmailClient();
-  
+
   await gmail.users.messages.batchModify({
     userId: 'me',
     requestBody: {
@@ -286,7 +219,7 @@ export async function markAsRead(messageIds: string[]): Promise<void> {
 
 export async function addLabel(messageIds: string[], labelId: string): Promise<void> {
   const gmail = await getUncachableGmailClient();
-  
+
   await gmail.users.messages.batchModify({
     userId: 'me',
     requestBody: {

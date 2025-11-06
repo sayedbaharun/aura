@@ -2,107 +2,26 @@ import { google } from 'googleapis';
 import { retryGoogleAPI } from './retry-utils';
 import { logger } from './logger';
 
-let connectionSettings: any;
-let tokenRefreshPromise: Promise<string> | null = null;
+// OAuth2 client with refresh token
+function createOAuth2Client() {
+  const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
 
-// TTL buffer: Refresh token 5 minutes before expiry to avoid edge cases
-const TOKEN_TTL_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
-
-// Helper to extract access token from connector response (supports multiple shapes)
-function extractAccessToken(settings: any): string | null {
-  return settings?.access_token || settings?.oauth?.credentials?.access_token || null;
-}
-
-// Helper to extract expiry timestamp from connector response (supports multiple shapes)
-function extractExpiryTimestamp(settings: any): number | null {
-  if (settings?.expires_at) {
-    return new Date(settings.expires_at).getTime();
-  }
-  if (settings?.oauth?.credentials?.expiry_date) {
-    // expiry_date can be number (ms) or ISO string
-    const expiryDate = settings.oauth.credentials.expiry_date;
-    return typeof expiryDate === 'number' ? expiryDate : new Date(expiryDate).getTime();
-  }
-  return null;
-}
-
-async function getAccessToken() {
-  // Check if token is still valid with TTL buffer
-  if (connectionSettings?.settings) {
-    const expiresAt = extractExpiryTimestamp(connectionSettings.settings);
-    const cachedToken = extractAccessToken(connectionSettings.settings);
-    
-    if (expiresAt && cachedToken) {
-      const now = Date.now();
-      // Token is valid if it expires more than 5 minutes from now
-      if (expiresAt - now > TOKEN_TTL_BUFFER_MS) {
-        return cachedToken;
-      }
-    }
-  }
-  
-  // If there's already a token refresh in progress, wait for it
-  if (tokenRefreshPromise) {
-    return tokenRefreshPromise;
-  }
-  
-  // Start token refresh with mutex
-  tokenRefreshPromise = refreshAccessToken();
-  
-  try {
-    const token = await tokenRefreshPromise;
-    return token;
-  } finally {
-    // Release mutex
-    tokenRefreshPromise = null;
-  }
-}
-
-async function refreshAccessToken(): Promise<string> {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Google Calendar OAuth credentials not configured. Set GOOGLE_CALENDAR_CLIENT_ID, GOOGLE_CALENDAR_CLIENT_SECRET, and GOOGLE_CALENDAR_REFRESH_TOKEN');
   }
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-calendar',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({
+    refresh_token: refreshToken,
+  });
 
-  const accessToken = extractAccessToken(connectionSettings?.settings);
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Google Calendar not connected');
-  }
-  
-  const expiresAt = extractExpiryTimestamp(connectionSettings.settings);
-  logger.debug({ 
-    expiresAt: expiresAt ? new Date(expiresAt).toISOString() : 'unknown',
-    hasToken: true
-  }, 'Refreshed Google Calendar access token');
-  
-  return accessToken;
+  return oauth2Client;
 }
 
 export async function getUncachableGoogleCalendarClient() {
-  const accessToken = await getAccessToken();
-
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({
-    access_token: accessToken
-  });
-
+  const oauth2Client = createOAuth2Client();
   return google.calendar({ version: 'v3', auth: oauth2Client });
 }
 
@@ -240,11 +159,11 @@ export async function createEvent(
       sendUpdates: attendeeEmails && attendeeEmails.length > 0 ? 'all' : 'none',
     });
 
-    logger.info({ 
-      summary, 
-      startTime, 
-      endTime, 
-      attendees: attendeeEmails?.length || 0, 
+    logger.info({
+      summary,
+      startTime,
+      endTime,
+      attendees: attendeeEmails?.length || 0,
       eventId: response.data.id,
       meetLink: response.data.hangoutLink,
       recurring: !!recurrenceRule,
@@ -396,10 +315,10 @@ export async function createFocusTimeBlock(
       requestBody: event,
     });
 
-    logger.info({ 
-      title, 
-      startTime, 
-      endTime, 
+    logger.info({
+      title,
+      startTime,
+      endTime,
       eventId: response.data.id,
       autoDecline: true
     }, 'Created focus time block with auto-decline');

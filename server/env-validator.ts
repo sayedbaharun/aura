@@ -35,21 +35,32 @@ export function validateEnvironment(): ValidationResult {
   }
 
   // OpenAI Integration
-  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-    errors.push('AI_INTEGRATIONS_OPENAI_API_KEY is required for OpenAI integration');
-  }
-  if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
-    errors.push('AI_INTEGRATIONS_OPENAI_BASE_URL is required for OpenAI integration');
-  }
-
-  // Replit Connectors (for Google Calendar OAuth)
-  if (!process.env.REPLIT_CONNECTORS_HOSTNAME) {
-    warnings.push('REPLIT_CONNECTORS_HOSTNAME not configured - Google Calendar integration may not work');
+  if (!process.env.OPENAI_API_KEY) {
+    errors.push('OPENAI_API_KEY is required for AI features');
+  } else if (!process.env.OPENAI_API_KEY.startsWith('sk-')) {
+    warnings.push('OPENAI_API_KEY may be invalid (should start with "sk-")');
   }
 
-  // Replit Identity Token (at least one required)
-  if (!process.env.REPL_IDENTITY && !process.env.WEB_REPL_RENEWAL) {
-    warnings.push('Neither REPL_IDENTITY nor WEB_REPL_RENEWAL found - Google Calendar integration may not work');
+  // Google Calendar (required for core functionality)
+  if (!process.env.GOOGLE_CALENDAR_CLIENT_ID) {
+    warnings.push('GOOGLE_CALENDAR_CLIENT_ID not configured - Calendar integration disabled');
+  }
+  if (!process.env.GOOGLE_CALENDAR_CLIENT_SECRET) {
+    warnings.push('GOOGLE_CALENDAR_CLIENT_SECRET not configured - Calendar integration disabled');
+  }
+  if (!process.env.GOOGLE_CALENDAR_REFRESH_TOKEN) {
+    warnings.push('GOOGLE_CALENDAR_REFRESH_TOKEN not configured - Calendar integration disabled');
+  }
+
+  // Gmail (optional but recommended)
+  if (!process.env.GMAIL_CLIENT_ID) {
+    warnings.push('GMAIL_CLIENT_ID not configured - Email integration disabled');
+  }
+  if (!process.env.GMAIL_CLIENT_SECRET) {
+    warnings.push('GMAIL_CLIENT_SECRET not configured - Email integration disabled');
+  }
+  if (!process.env.GMAIL_REFRESH_TOKEN) {
+    warnings.push('GMAIL_REFRESH_TOKEN not configured - Email integration disabled');
   }
 
   // Telegram Bot
@@ -74,6 +85,11 @@ export function validateEnvironment(): ValidationResult {
   // OPTIONAL ENVIRONMENT VARIABLES (Warnings)
   // ========================================
 
+  // Notion (optional)
+  if (!process.env.NOTION_API_KEY) {
+    warnings.push('NOTION_API_KEY not configured - Notion integration disabled');
+  }
+
   // Twilio (WhatsApp integration - optional)
   if (!process.env.TWILIO_ACCOUNT_SID && !process.env.TWILIO_AUTH_TOKEN) {
     warnings.push('Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) not configured - WhatsApp integration disabled');
@@ -81,13 +97,6 @@ export function validateEnvironment(): ValidationResult {
     warnings.push('TWILIO_ACCOUNT_SID is missing - WhatsApp integration may not work');
   } else if (!process.env.TWILIO_AUTH_TOKEN) {
     warnings.push('TWILIO_AUTH_TOKEN is missing - WhatsApp integration may not work');
-  }
-
-  // PostgreSQL environment variables (should be set by Replit)
-  const postgresVars = ['PGHOST', 'PGPORT', 'PGUSER', 'PGPASSWORD', 'PGDATABASE'];
-  const missingPostgresVars = postgresVars.filter(v => !process.env[v]);
-  if (missingPostgresVars.length > 0) {
-    warnings.push(`PostgreSQL variables not set: ${missingPostgresVars.join(', ')} - using DATABASE_URL instead`);
   }
 
   return {
@@ -103,7 +112,7 @@ export function validateEnvironment(): ValidationResult {
  */
 export function validateEnvironmentOrExit(): void {
   logger.info('Validating environment variables...');
-  
+
   const result = validateEnvironment();
 
   // Log warnings
@@ -120,8 +129,7 @@ export function validateEnvironmentOrExit(): void {
     result.errors.forEach(error => {
       logger.error(`  ✗ ${error}`);
     });
-    logger.error('\nPlease configure the required environment variables in Replit Secrets and restart the application.');
-    logger.error('Documentation: https://docs.replit.com/hosting/deployments/secrets-and-environment-variables');
+    logger.error('\nPlease configure the required environment variables and restart the application.');
     process.exit(1);
   }
 
