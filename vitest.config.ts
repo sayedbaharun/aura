@@ -14,7 +14,6 @@ export default defineConfig({
         'server/__tests__/**',
         'server/index.ts',
         'server/vite.ts',
-        'server/replitAuth.ts',
         '**/*.test.ts',
         '**/node_modules/**',
       ],

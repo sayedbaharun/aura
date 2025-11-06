@@ -9,10 +9,9 @@ import { retryOpenAI } from "./retry-utils";
 import * as modelManager from "./model-manager";
 import * as contextMemory from "./context-memory";
 
-// Initialize OpenAI with Replit AI Integrations credentials  
+// Initialize OpenAI with direct API key
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 /**

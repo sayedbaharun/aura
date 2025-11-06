@@ -1,16 +1,15 @@
 import { Link } from "wouter";
-import { 
-  Calendar, Clock, MessageSquare, Bot, CheckCircle2, LogIn, LogOut,
+import {
+  Calendar, Clock, MessageSquare, Bot, CheckCircle2,
   Mail, Search, Users, Repeat, Bell, Shield, Zap, FileText, Camera,
   BarChart3, Sparkles, Globe, Lock, Database, Brain, TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/hooks/useAuth";
 
 export default function Landing() {
-  const { isAuthenticated, isLoading } = useAuth();
+  // Note: Authentication removed for Railway deployment
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,33 +25,11 @@ export default function Landing() {
               <Badge variant="secondary" className="ml-2">Enterprise AI</Badge>
             </div>
             <div className="flex items-center gap-3">
-              {isLoading ? (
-                <div className="h-9 w-20 bg-secondary animate-pulse rounded"></div>
-              ) : isAuthenticated ? (
-                <>
-                  <Link href="/dashboard">
-                    <Button variant="ghost" data-testid="button-dashboard">
-                      Dashboard
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    onClick={() => window.location.href = "/api/logout"}
-                    data-testid="button-logout"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={() => window.location.href = "/api/login"}
-                  data-testid="button-login"
-                >
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Get Started
+              <Link href="/dashboard">
+                <Button variant="ghost" data-testid="button-dashboard">
+                  Dashboard
                 </Button>
-              )}
+              </Link>
             </div>
           </div>
         </div>
@@ -83,27 +60,15 @@ export default function Landing() {
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-4 mb-12">
-              {isAuthenticated ? (
-                <Link href="/dashboard">
-                  <Button size="lg" className="h-12 px-8" data-testid="button-view-dashboard">
-                    <Zap className="h-5 w-5 mr-2" />
-                    View Dashboard
-                  </Button>
-                </Link>
-              ) : (
-                <Button
-                  size="lg"
-                  className="h-12 px-8"
-                  onClick={() => window.location.href = "/api/login"}
-                  data-testid="button-get-started"
-                >
+              <Link href="/dashboard">
+                <Button size="lg" className="h-12 px-8" data-testid="button-view-dashboard">
                   <Zap className="h-5 w-5 mr-2" />
-                  Get Started Free
+                  View Dashboard
                 </Button>
-              )}
-              <Button 
-                size="lg" 
-                variant="outline" 
+              </Link>
+              <Button
+                size="lg"
+                variant="outline"
                 className="h-12 px-8"
                 onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
                 data-testid="button-explore-features"
@@ -643,27 +608,15 @@ export default function Landing() {
             and knowledge capture with enterprise AI
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            {isAuthenticated ? (
-              <Link href="/dashboard">
-                <Button size="lg" className="h-12 px-8" data-testid="button-get-started-cta">
-                  <Zap className="h-5 w-5 mr-2" />
-                  Open Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <Button
-                size="lg"
-                className="h-12 px-8"
-                onClick={() => window.location.href = "/api/login"}
-                data-testid="button-get-started-cta"
-              >
+            <Link href="/dashboard">
+              <Button size="lg" className="h-12 px-8" data-testid="button-get-started-cta">
                 <Zap className="h-5 w-5 mr-2" />
-                Get Started Free
+                Open Dashboard
               </Button>
-            )}
-            <Button 
-              size="lg" 
-              variant="outline" 
+            </Link>
+            <Button
+              size="lg"
+              variant="outline"
               className="h-12 px-8"
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               data-testid="button-back-to-top"
