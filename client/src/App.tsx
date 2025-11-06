@@ -6,35 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
-import { useAuth } from "@/hooks/useAuth";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Note: Authentication removed for Railway deployment
+  // Dashboard is publicly accessible, bot access controlled via Telegram chat IDs
   return (
     <Switch>
       <Route path="/" component={Landing} />
-      {isAuthenticated ? (
-        <Route path="/dashboard" component={Dashboard} />
-      ) : (
-        <Route path="/dashboard">
-          {() => {
-            window.location.href = "/api/login";
-            return null;
-          }}
-        </Route>
-      )}
+      <Route path="/dashboard" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>
   );
