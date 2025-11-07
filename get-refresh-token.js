@@ -1,8 +1,8 @@
-const { google } = require('googleapis');
-const http = require('http');
-const url = require('url');
-const open = require('open');
-const readline = require('readline');
+import { google } from 'googleapis';
+import http from 'http';
+import url from 'url';
+import open from 'open';
+import readline from 'readline';
 
 // Color codes for terminal output
 const colors = {
