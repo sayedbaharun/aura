@@ -1,9 +1,168 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, uuid, jsonb, index, integer } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  timestamp,
+  boolean,
+  uuid,
+  jsonb,
+  index,
+  integer,
+  real,
+  date,
+  pgEnum
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table - Required for Replit Auth
+// ============================================================================
+// HIKMA-OS DATABASE SCHEMA
+// ============================================================================
+// This schema defines the data model for Hikma-OS: The Sayed Baharun
+// Productivity Engine. It replaces the previous Aura schema.
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// ENUMS
+// ----------------------------------------------------------------------------
+
+export const ventureStatusEnum = pgEnum('venture_status', [
+  'active',
+  'development',
+  'paused',
+  'archived'
+]);
+
+export const ventureDomainEnum = pgEnum('venture_domain', [
+  'saas',
+  'media',
+  'realty',
+  'trading',
+  'personal',
+  'other'
+]);
+
+export const projectStatusEnum = pgEnum('project_status', [
+  'not_started',
+  'planning',
+  'in_progress',
+  'blocked',
+  'done',
+  'archived'
+]);
+
+export const projectCategoryEnum = pgEnum('project_category', [
+  'product',
+  'marketing',
+  'ops',
+  'fundraising',
+  'research',
+  'personal'
+]);
+
+export const priorityEnum = pgEnum('priority', ['P0', 'P1', 'P2', 'P3']);
+
+export const taskStatusEnum = pgEnum('task_status', [
+  'idea',
+  'next',
+  'in_progress',
+  'waiting',
+  'done',
+  'cancelled'
+]);
+
+export const taskTypeEnum = pgEnum('task_type', [
+  'business',
+  'deep_work',
+  'admin',
+  'health',
+  'learning',
+  'personal'
+]);
+
+export const domainEnum = pgEnum('domain', [
+  'work',
+  'health',
+  'personal',
+  'learning'
+]);
+
+export const focusSlotEnum = pgEnum('focus_slot', [
+  'morning',
+  'midday',
+  'afternoon',
+  'evening',
+  'anytime'
+]);
+
+export const captureTypeEnum = pgEnum('capture_type', [
+  'idea',
+  'task',
+  'note',
+  'link',
+  'question'
+]);
+
+export const captureSourceEnum = pgEnum('capture_source', [
+  'brain',
+  'email',
+  'chat',
+  'meeting',
+  'web'
+]);
+
+export const moodEnum = pgEnum('mood', ['low', 'medium', 'high', 'peak']);
+
+export const sleepQualityEnum = pgEnum('sleep_quality', [
+  'poor',
+  'fair',
+  'good',
+  'excellent'
+]);
+
+export const workoutTypeEnum = pgEnum('workout_type', [
+  'strength',
+  'cardio',
+  'yoga',
+  'sport',
+  'walk',
+  'none'
+]);
+
+export const stressLevelEnum = pgEnum('stress_level', ['low', 'medium', 'high']);
+
+export const mealTypeEnum = pgEnum('meal_type', [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack'
+]);
+
+export const docTypeEnum = pgEnum('doc_type', [
+  'sop',
+  'prompt',
+  'spec',
+  'template',
+  'playbook'
+]);
+
+export const docDomainEnum = pgEnum('doc_domain', [
+  'venture_ops',
+  'marketing',
+  'product',
+  'sales',
+  'personal'
+]);
+
+export const docStatusEnum = pgEnum('doc_status', ['draft', 'active', 'archived']);
+
+// ----------------------------------------------------------------------------
+// CORE TABLES (Keep from Aura)
+// ----------------------------------------------------------------------------
+
+// Session storage table - Required for authentication
 export const sessions = pgTable(
   "sessions",
   {
@@ -14,13 +173,14 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table - Required for Replit Auth
+// User storage table - Simplified for single-user (Sayed Baharun)
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  timezone: varchar("timezone").default("Asia/Dubai"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -28,408 +188,387 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
-// Messages Table (supports both Telegram and WhatsApp)
-export const whatsappMessages = pgTable(
-  "whatsapp_messages",
+// ----------------------------------------------------------------------------
+// HIKMA-OS ENTITIES
+// ----------------------------------------------------------------------------
+
+// VENTURES: Business/strategic initiatives
+export const ventures = pgTable(
+  "ventures",
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    phoneNumber: text("phone_number").notNull(), // For WhatsApp: phone number, For Telegram: chat_id
-    messageContent: text("message_content").notNull(),
-    sender: text("sender").notNull(), // 'user' or 'assistant'
-    messageType: text("message_type").notNull(),
-    platform: text("platform").default("whatsapp").notNull(), // 'whatsapp' or 'telegram'
-    aiResponse: text("ai_response"),
-    processed: boolean("processed").default(false).notNull(),
-    receivedAt: timestamp("received_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("idx_messages_phone_number").on(table.phoneNumber),
-    index("idx_messages_received_at").on(table.receivedAt),
-    index("idx_messages_phone_received").on(table.phoneNumber, table.receivedAt),
-  ],
-);
-
-export const insertWhatsappMessageSchema = createInsertSchema(whatsappMessages).omit({
-  id: true,
-  receivedAt: true,
-});
-
-export type InsertWhatsappMessage = z.infer<typeof insertWhatsappMessageSchema>;
-export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
-
-// Appointments Table
-export const appointments = pgTable(
-  "appointments",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    phoneNumber: text("phone_number").notNull(), // For WhatsApp: phone number, For Telegram: chat_id
-    platform: text("platform").default("whatsapp").notNull(), // 'whatsapp' or 'telegram'
-    contactName: text("contact_name"),
-    appointmentDate: timestamp("appointment_date"),
-    appointmentTitle: text("appointment_title"),
-    appointmentDuration: text("appointment_duration").default("60"),
-    status: text("status").default("pending").notNull(),
-    googleEventId: text("google_event_id"),
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    status: ventureStatusEnum("status").default("active").notNull(),
+    oneLiner: text("one_liner"),
+    domain: ventureDomainEnum("domain"),
+    primaryFocus: text("primary_focus"),
+    color: varchar("color", { length: 7 }), // Hex color code
+    icon: varchar("icon", { length: 10 }), // Emoji
     notes: text("notes"),
-    attendeeEmails: text("attendee_emails").array(), // Array of attendee email addresses
-    recurrenceRule: text("recurrence_rule"), // RFC5545 RRULE format (e.g., "FREQ=DAILY;COUNT=10")
-    reminders: jsonb("reminders"), // { useDefault: boolean, overrides: [{ method: 'email'|'popup', minutes: number }] }
+    externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("idx_appointments_phone_number").on(table.phoneNumber),
-    index("idx_appointments_google_event_id").on(table.googleEventId),
-    index("idx_appointments_date").on(table.appointmentDate),
-    index("idx_appointments_phone_date").on(table.phoneNumber, table.appointmentDate),
-  ],
+    index("idx_ventures_status").on(table.status),
+    index("idx_ventures_domain").on(table.domain),
+  ]
 );
 
-export const insertAppointmentSchema = createInsertSchema(appointments).omit({
+export const insertVentureSchema = createInsertSchema(ventures).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-export type Appointment = typeof appointments.$inferSelect;
+export type InsertVenture = z.infer<typeof insertVentureSchema>;
+export type Venture = typeof ventures.$inferSelect;
 
-// Assistant Settings Table
-export const assistantSettings = pgTable("assistant_settings", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  assistantName: text("assistant_name").default("Aura").notNull(),
-  userName: text("user_name"),
-  userEmail: text("user_email"),
-  userPhone: text("user_phone"),
-  workingHours: text("working_hours").default("9:00 AM - 6:00 PM, Monday - Friday"),
-  defaultMeetingDuration: text("default_meeting_duration").default("60"),
-  timezone: text("timezone").default("Asia/Dubai"),
-  preferences: text("preferences"),
-  whatsappNumber: text("whatsapp_number"),
-  whatsappWebhookUrl: text("whatsapp_webhook_url"),
-  telegramBotUsername: text("telegram_bot_username"),
-  telegramWebhookUrl: text("telegram_webhook_url"),
-  defaultNotionParentId: text("default_notion_parent_id"), // Default parent page ID for new Notion notes
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+// PROJECTS: Concrete initiatives within ventures
+export const projects = pgTable(
+  "projects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "cascade" }),
+    status: projectStatusEnum("status").default("not_started").notNull(),
+    category: projectCategoryEnum("category"),
+    priority: priorityEnum("priority"),
+    startDate: date("start_date"),
+    targetEndDate: date("target_end_date"),
+    actualEndDate: date("actual_end_date"),
+    outcome: text("outcome"),
+    notes: text("notes"),
+    externalId: text("external_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_projects_venture_id").on(table.ventureId),
+    index("idx_projects_status").on(table.status),
+    index("idx_projects_priority").on(table.priority),
+    index("idx_projects_target_end_date").on(table.targetEndDate),
+  ]
+);
 
-export const insertAssistantSettingsSchema = createInsertSchema(assistantSettings).omit({
+export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertAssistantSettings = z.infer<typeof insertAssistantSettingsSchema>;
-export type AssistantSettings = typeof assistantSettings.$inferSelect;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Project = typeof projects.$inferSelect;
 
-// Pending Confirmations Table - For persistent confirmation state
-export const pendingConfirmations = pgTable(
-  "pending_confirmations",
+// TASKS: Atomic units of execution
+export const tasks = pgTable(
+  "tasks",
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull().unique(), // Unique constraint to prevent duplicate pending confirmations per chat
-    action: text("action").notNull(),
-    data: jsonb("data").notNull(),
-    messageText: text("message_text").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    status: taskStatusEnum("status").default("idea").notNull(),
+    priority: priorityEnum("priority"),
+    type: taskTypeEnum("type"),
+    domain: domainEnum("domain"),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    dayId: text("day_id").references(() => days.id, { onDelete: "set null" }),
+    dueDate: date("due_date"),
+    focusDate: date("focus_date"),
+    focusSlot: focusSlotEnum("focus_slot"),
+    estEffort: real("est_effort"), // Hours
+    actualEffort: real("actual_effort"), // Hours
+    notes: text("notes"),
+    tags: jsonb("tags").$type<string[]>().default([]),
+    externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
   },
   (table) => [
-    index("idx_pending_confirmations_expires_at").on(table.expiresAt),
-  ],
+    index("idx_tasks_venture_id").on(table.ventureId),
+    index("idx_tasks_project_id").on(table.projectId),
+    index("idx_tasks_day_id").on(table.dayId),
+    index("idx_tasks_status").on(table.status),
+    index("idx_tasks_priority").on(table.priority),
+    index("idx_tasks_due_date").on(table.dueDate),
+    index("idx_tasks_focus_date").on(table.focusDate),
+    index("idx_tasks_type").on(table.type),
+  ]
 );
 
-export const insertPendingConfirmationSchema = createInsertSchema(pendingConfirmations).omit({
+export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-export type InsertPendingConfirmation = z.infer<typeof insertPendingConfirmationSchema>;
-export type PendingConfirmation = typeof pendingConfirmations.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
 
-// Audit Logs Table
-export const auditLogs = pgTable(
-  "audit_logs",
+// CAPTURE ITEMS: Inbox for raw thoughts
+export const captureItems = pgTable(
+  "capture_items",
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull(),
-    action: text("action").notNull(), // 'view_schedule', 'book', 'cancel', 'reschedule'
-    eventId: text("event_id"),
-    eventTitle: text("event_title"),
-    success: boolean("success").notNull(),
-    errorMessage: text("error_message"),
-    timestamp: timestamp("timestamp").defaultNow().notNull(),
-  },
-  (table) => [
-    index("idx_audit_logs_chat_id").on(table.chatId),
-    index("idx_audit_logs_timestamp").on(table.timestamp),
-    index("idx_audit_logs_chat_timestamp").on(table.chatId, table.timestamp),
-  ],
-);
-
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
-  id: true,
-  timestamp: true,
-});
-
-export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
-export type AuditLog = typeof auditLogs.$inferSelect;
-
-// Event Attendees Table - Tracks attendee response status for notifications
-export const eventAttendees = pgTable(
-  "event_attendees",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    googleEventId: text("google_event_id").notNull(),
-    attendeeEmail: text("attendee_email").notNull(),
-    responseStatus: text("response_status").notNull(), // 'needsAction', 'accepted', 'declined', 'tentative'
-    chatId: text("chat_id").notNull(), // To send notifications to the right user
-    lastChecked: timestamp("last_checked").defaultNow().notNull(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    type: captureTypeEnum("type"),
+    source: captureSourceEnum("source"),
+    domain: domainEnum("domain"),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    linkedTaskId: uuid("linked_task_id").references(() => tasks.id, { onDelete: "set null" }),
+    clarified: boolean("clarified").default(false).notNull(),
+    notes: text("notes"),
+    externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("idx_event_attendees_event_id").on(table.googleEventId),
-    index("idx_event_attendees_chat_id").on(table.chatId),
-    index("idx_event_attendees_event_email").on(table.googleEventId, table.attendeeEmail),
-  ],
+    index("idx_capture_items_clarified").on(table.clarified),
+    index("idx_capture_items_type").on(table.type),
+    index("idx_capture_items_source").on(table.source),
+    index("idx_capture_items_created_at").on(table.createdAt),
+  ]
 );
 
-export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({
+export const insertCaptureItemSchema = createInsertSchema(captureItems).omit({
   id: true,
   createdAt: true,
-  lastChecked: true,
+  updatedAt: true,
 });
 
-export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
-export type EventAttendee = typeof eventAttendees.$inferSelect;
+export type InsertCaptureItem = z.infer<typeof insertCaptureItemSchema>;
+export type CaptureItem = typeof captureItems.$inferSelect;
 
-// Email Summaries Table - Cache AI-generated email summaries
-export const emailSummaries = pgTable(
-  "email_summaries",
+// DAYS: Daily logs (central hub for each day)
+export const days = pgTable(
+  "days",
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull(),
-    gmailMessageId: text("gmail_message_id").notNull().unique(),
-    from: text("from").notNull(),
-    subject: text("subject").notNull(),
-    summary: text("summary").notNull(),
-    category: text("category").notNull(), // 'urgent', 'action', 'fyi', 'noise'
-    hasMeetingRequest: boolean("has_meeting_request").default(false).notNull(),
-    extractedMeetingDetails: jsonb("extracted_meeting_details"), // { proposedTimes: string[], attendees: string[], subject: string }
-    receivedDate: timestamp("received_date").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("idx_email_summaries_chat_id").on(table.chatId),
-    index("idx_email_summaries_category").on(table.category),
-    index("idx_email_summaries_received_date").on(table.receivedDate),
-  ],
-);
-
-export const insertEmailSummarySchema = createInsertSchema(emailSummaries).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertEmailSummary = z.infer<typeof insertEmailSummarySchema>;
-export type EmailSummary = typeof emailSummaries.$inferSelect;
-
-// Notion Operations Table - Track Notion actions for audit and debugging
-export const notionOperations = pgTable(
-  "notion_operations",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull(),
-    operation: text("operation").notNull(), // 'create_page', 'query_database', 'search', 'update_page', 'create_entry'
-    notionObjectId: text("notion_object_id"), // Page ID or Database ID
-    notionObjectType: text("notion_object_type"), // 'page', 'database', 'entry'
+    id: text("id").primaryKey(), // Format: "day_YYYY-MM-DD"
+    date: date("date").notNull().unique(),
     title: text("title"),
-    success: boolean("success").notNull(),
-    errorMessage: text("error_message"),
-    metadata: jsonb("metadata"), // Additional operation details
-    timestamp: timestamp("timestamp").defaultNow().notNull(),
+    top3Outcomes: text("top_3_outcomes"),
+    oneThingToShip: text("one_thing_to_ship"),
+    reflectionAm: text("reflection_am"),
+    reflectionPm: text("reflection_pm"),
+    mood: moodEnum("mood"),
+    primaryVentureFocus: uuid("primary_venture_focus").references(() => ventures.id, {
+      onDelete: "set null"
+    }),
+    externalId: text("external_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("idx_notion_operations_chat_id").on(table.chatId),
-    index("idx_notion_operations_timestamp").on(table.timestamp),
-    index("idx_notion_operations_chat_timestamp").on(table.chatId, table.timestamp),
-  ],
+    index("idx_days_date").on(table.date),
+    index("idx_days_mood").on(table.mood),
+    index("idx_days_primary_venture_focus").on(table.primaryVentureFocus),
+  ]
 );
 
-export const insertNotionOperationSchema = createInsertSchema(notionOperations).omit({
-  id: true,
-  timestamp: true,
+export const insertDaySchema = createInsertSchema(days).omit({
+  createdAt: true,
+  updatedAt: true,
 });
 
-export type InsertNotionOperation = z.infer<typeof insertNotionOperationSchema>;
-export type NotionOperation = typeof notionOperations.$inferSelect;
+export type InsertDay = z.infer<typeof insertDaySchema>;
+export type Day = typeof days.$inferSelect;
 
-// Quick Notes Table - For instant thought capture with AI categorization
-export const quickNotes = pgTable(
-  "quick_notes",
+// HEALTH ENTRIES: Daily health metrics
+export const healthEntries = pgTable(
+  "health_entries",
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull(),
-    noteType: text("note_type").notNull(), // 'task', 'idea', 'meeting_note', 'general'
-    category: text("category").notNull(), // 'work', 'personal', 'ideas', 'follow_ups'
-    priority: text("priority").notNull().default("normal"), // 'high', 'normal', 'low'
-    content: text("content").notNull(),
-    photoUrl: text("photo_url"), // URL to stored photo in object storage
-    linkedEventId: text("linked_event_id"), // Google Calendar event ID if auto-linked
-    notionPageId: text("notion_page_id"), // Notion page ID if synced to Notion
-    tags: text("tags").array().default(sql`ARRAY[]::text[]`), // AI-generated tags
+    id: uuid("id").primaryKey().defaultRandom(),
+    dayId: text("day_id").references(() => days.id, { onDelete: "cascade" }).notNull(),
+    date: date("date").notNull(),
+    sleepHours: real("sleep_hours"),
+    sleepQuality: sleepQualityEnum("sleep_quality"),
+    energyLevel: integer("energy_level"), // 1-5 scale
+    mood: moodEnum("mood"),
+    steps: integer("steps"),
+    workoutDone: boolean("workout_done").default(false),
+    workoutType: workoutTypeEnum("workout_type"),
+    workoutDurationMin: integer("workout_duration_min"),
+    weightKg: real("weight_kg"),
+    stressLevel: stressLevelEnum("stress_level"),
+    tags: jsonb("tags").$type<string[]>().default([]),
+    notes: text("notes"),
+    externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("idx_quick_notes_chat_id").on(table.chatId),
-    index("idx_quick_notes_note_type").on(table.noteType),
-    index("idx_quick_notes_category").on(table.category),
-    index("idx_quick_notes_created_at").on(table.createdAt),
-    index("idx_quick_notes_chat_created").on(table.chatId, table.createdAt),
-  ],
+    index("idx_health_entries_day_id").on(table.dayId),
+    index("idx_health_entries_date").on(table.date),
+    index("idx_health_entries_mood").on(table.mood),
+    index("idx_health_entries_energy_level").on(table.energyLevel),
+  ]
 );
 
-export const insertQuickNoteSchema = createInsertSchema(quickNotes).omit({
+export const insertHealthEntrySchema = createInsertSchema(healthEntries).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-export type InsertQuickNote = z.infer<typeof insertQuickNoteSchema>;
-export type QuickNote = typeof quickNotes.$inferSelect;
+export type InsertHealthEntry = z.infer<typeof insertHealthEntrySchema>;
+export type HealthEntry = typeof healthEntries.$inferSelect;
 
-// User Profile Table - Advanced context memory for learning user patterns
-export const userProfiles = pgTable(
-  "user_profiles",
+// NUTRITION ENTRIES: Meal logs
+export const nutritionEntries = pgTable(
+  "nutrition_entries",
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull().unique(), // Unique per user
-    
-    // Learned Preferences
-    preferredMeetingTimes: jsonb("preferred_meeting_times"), // { day: string, hour: number }[]
-    preferredMeetingDuration: integer("preferred_meeting_duration"), // In minutes
-    commonAttendees: text("common_attendees").array().default(sql`ARRAY[]::text[]`),
-    frequentMeetingTypes: jsonb("frequent_meeting_types"), // { type: string, count: number }[]
-    
-    // Communication Patterns
-    responseStyle: text("response_style"), // 'brief', 'detailed', 'conversational'
-    preferredLanguage: text("preferred_language").default("en"),
-    commonPhrases: text("common_phrases").array().default(sql`ARRAY[]::text[]`),
-    
-    // Work Patterns
-    workingHours: jsonb("working_hours"), // { start: string, end: string, timezone: string }
-    peakProductivityHours: jsonb("peak_productivity_hours"), // { start: number, end: number }[]
-    focusTimePreferences: jsonb("focus_time_preferences"), // { frequency: string, duration: number }
-    
-    // Email & Note Patterns
-    emailResponsePatterns: jsonb("email_response_patterns"), // { urgentKeywords: string[], actionKeywords: string[] }
-    noteCategorization: jsonb("note_categorization"), // { commonTags: string[], categoryDistribution: object }
-    
-    // Metadata
-    totalInteractions: integer("total_interactions").default(0).notNull(),
-    lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    dayId: text("day_id").references(() => days.id, { onDelete: "cascade" }).notNull(),
+    datetime: timestamp("datetime").notNull(),
+    mealType: mealTypeEnum("meal_type"),
+    description: text("description"),
+    calories: real("calories"),
+    proteinG: real("protein_g"),
+    carbsG: real("carbs_g"),
+    fatsG: real("fats_g"),
+    context: text("context"),
+    tags: jsonb("tags").$type<string[]>().default([]),
+    notes: text("notes"),
+    externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("idx_user_profiles_chat_id").on(table.chatId),
-    index("idx_user_profiles_last_updated").on(table.lastUpdated),
-  ],
+    index("idx_nutrition_entries_day_id").on(table.dayId),
+    index("idx_nutrition_entries_datetime").on(table.datetime),
+    index("idx_nutrition_entries_meal_type").on(table.mealType),
+  ]
 );
 
-export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({
+export const insertNutritionEntrySchema = createInsertSchema(nutritionEntries).omit({
   id: true,
   createdAt: true,
-  lastUpdated: true,
+  updatedAt: true,
 });
 
-export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
-export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertNutritionEntry = z.infer<typeof insertNutritionEntrySchema>;
+export type NutritionEntry = typeof nutritionEntries.$inferSelect;
 
-// Interaction History Table - Track all user actions for pattern analysis
-export const interactionHistory = pgTable(
-  "interaction_history",
+// DOCS: SOPs, prompts, playbooks, specs
+export const docs = pgTable(
+  "docs",
   {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull(),
-    
-    // Interaction Details
-    interactionType: text("interaction_type").notNull(), // 'message', 'calendar_action', 'email_action', 'note_creation'
-    action: text("action").notNull(), // 'book', 'cancel', 'reschedule', 'check_email', 'create_note', etc.
-    userInput: text("user_input"), // Original user message
-    aiResponse: text("ai_response"), // AI's response
-    
-    // Context Data
-    metadata: jsonb("metadata"), // Additional data like event details, email info, etc.
-    success: boolean("success").notNull(),
-    
-    // Timing
-    timeOfDay: integer("time_of_day"), // Hour of day (0-23)
-    dayOfWeek: integer("day_of_week"), // Day of week (0-6, 0=Sunday)
-    
-    // Model Information
-    modelUsed: text("model_used"), // Which GPT model was used
-    tokenCount: integer("token_count"), // Token usage for this interaction
-    
-    timestamp: timestamp("timestamp").defaultNow().notNull(),
-  },
-  (table) => [
-    index("idx_interaction_history_chat_id").on(table.chatId),
-    index("idx_interaction_history_timestamp").on(table.timestamp),
-    index("idx_interaction_history_type").on(table.interactionType),
-    index("idx_interaction_history_chat_timestamp").on(table.chatId, table.timestamp),
-  ],
-);
-
-export const insertInteractionHistorySchema = createInsertSchema(interactionHistory).omit({
-  id: true,
-  timestamp: true,
-});
-
-export type InsertInteractionHistory = z.infer<typeof insertInteractionHistorySchema>;
-export type InteractionHistory = typeof interactionHistory.$inferSelect;
-
-// Proactive Suggestions Table - Track AI-generated suggestions and user responses
-export const proactiveSuggestions = pgTable(
-  "proactive_suggestions",
-  {
-    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    chatId: text("chat_id").notNull(),
-    
-    // Suggestion Details
-    suggestionType: text("suggestion_type").notNull(), // 'briefing', 'conflict_alert', 'focus_time', 'follow_up', 'optimization'
-    priority: text("priority").notNull().default("normal"), // 'high', 'normal', 'low'
-    content: text("content").notNull(), // The suggestion message
-    
-    // Context
-    trigger: text("trigger").notNull(), // What triggered this suggestion
-    relatedEventId: text("related_event_id"), // Google Calendar event if relevant
-    relatedNoteId: text("related_note_id"), // Quick note if relevant
-    metadata: jsonb("metadata"), // Additional context
-    
-    // User Response
-    status: text("status").default("pending").notNull(), // 'pending', 'accepted', 'dismissed', 'acted_upon'
-    userResponse: text("user_response"), // User's reply or action
-    respondedAt: timestamp("responded_at"),
-    
-    // Scheduling (for future suggestions)
-    scheduledFor: timestamp("scheduled_for"), // When to send this suggestion
-    sentAt: timestamp("sent_at"), // When it was actually sent
-    
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    type: docTypeEnum("type"),
+    domain: docDomainEnum("domain"),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    status: docStatusEnum("status").default("draft").notNull(),
+    body: text("body"),
+    tags: jsonb("tags").$type<string[]>().default([]),
+    externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("idx_proactive_suggestions_chat_id").on(table.chatId),
-    index("idx_proactive_suggestions_status").on(table.status),
-    index("idx_proactive_suggestions_scheduled").on(table.scheduledFor),
-    index("idx_proactive_suggestions_type").on(table.suggestionType),
-    index("idx_proactive_suggestions_chat_created").on(table.chatId, table.createdAt),
-  ],
+    index("idx_docs_venture_id").on(table.ventureId),
+    index("idx_docs_project_id").on(table.projectId),
+    index("idx_docs_type").on(table.type),
+    index("idx_docs_status").on(table.status),
+    index("idx_docs_domain").on(table.domain),
+  ]
 );
 
-export const insertProactiveSuggestionSchema = createInsertSchema(proactiveSuggestions).omit({
+export const insertDocSchema = createInsertSchema(docs).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-export type InsertProactiveSuggestion = z.infer<typeof insertProactiveSuggestionSchema>;
-export type ProactiveSuggestion = typeof proactiveSuggestions.$inferSelect;
+export type InsertDoc = z.infer<typeof insertDocSchema>;
+export type Doc = typeof docs.$inferSelect;
+
+// ----------------------------------------------------------------------------
+// RELATIONS
+// ----------------------------------------------------------------------------
+
+export const venturesRelations = relations(ventures, ({ many }) => ({
+  projects: many(projects),
+  tasks: many(tasks),
+  docs: many(docs),
+  captureItems: many(captureItems),
+  days: many(days),
+}));
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  venture: one(ventures, {
+    fields: [projects.ventureId],
+    references: [ventures.id],
+  }),
+  tasks: many(tasks),
+  docs: many(docs),
+  captureItems: many(captureItems),
+}));
+
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  venture: one(ventures, {
+    fields: [tasks.ventureId],
+    references: [ventures.id],
+  }),
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
+  }),
+  day: one(days, {
+    fields: [tasks.dayId],
+    references: [days.id],
+  }),
+}));
+
+export const captureItemsRelations = relations(captureItems, ({ one }) => ({
+  venture: one(ventures, {
+    fields: [captureItems.ventureId],
+    references: [ventures.id],
+  }),
+  project: one(projects, {
+    fields: [captureItems.projectId],
+    references: [projects.id],
+  }),
+  linkedTask: one(tasks, {
+    fields: [captureItems.linkedTaskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const daysRelations = relations(days, ({ one, many }) => ({
+  primaryVenture: one(ventures, {
+    fields: [days.primaryVentureFocus],
+    references: [ventures.id],
+  }),
+  tasks: many(tasks),
+  healthEntries: many(healthEntries),
+  nutritionEntries: many(nutritionEntries),
+}));
+
+export const healthEntriesRelations = relations(healthEntries, ({ one }) => ({
+  day: one(days, {
+    fields: [healthEntries.dayId],
+    references: [days.id],
+  }),
+}));
+
+export const nutritionEntriesRelations = relations(nutritionEntries, ({ one }) => ({
+  day: one(days, {
+    fields: [nutritionEntries.dayId],
+    references: [days.id],
+  }),
+}));
+
+export const docsRelations = relations(docs, ({ one }) => ({
+  venture: one(ventures, {
+    fields: [docs.ventureId],
+    references: [ventures.id],
+  }),
+  project: one(projects, {
+    fields: [docs.projectId],
+    references: [projects.id],
+  }),
+}));
