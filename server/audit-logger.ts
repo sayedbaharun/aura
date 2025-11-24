@@ -1,9 +1,15 @@
-import { db } from "../db";
-import { auditLogs, type InsertAuditLog } from "../shared/schema";
+// NOTE: audit-logger.ts is disabled for Hikma-OS
+// The auditLogs table was removed during schema transformation
+// This file is kept for reference but functionality is disabled
+
+// import { db } from "../db";
+// import { auditLogs, type InsertAuditLog } from "../shared/schema";
 
 /**
  * Audit Logger for tracking all calendar operations
  * Logs: view_schedule, book, cancel, reschedule actions
+ *
+ * DISABLED: This functionality is not used in Hikma-OS
  */
 
 export async function logAuditEvent(
@@ -15,16 +21,16 @@ export async function logAuditEvent(
   errorMessage?: string
 ): Promise<void> {
   try {
-    const auditLog: InsertAuditLog = {
-      chatId,
-      action,
-      success,
-      eventId: eventId || null,
-      eventTitle: eventTitle || null,
-      errorMessage: errorMessage || null,
-    };
-
-    await db.insert(auditLogs).values(auditLog);
+    // Database logging disabled - auditLogs table removed in Hikma-OS schema
+    // const auditLog: InsertAuditLog = {
+    //   chatId,
+    //   action,
+    //   success,
+    //   eventId: eventId || null,
+    //   eventTitle: eventTitle || null,
+    //   errorMessage: errorMessage || null,
+    // };
+    // await db.insert(auditLogs).values(auditLog);
 
     // Log to console for monitoring
     const logLevel = success ? 'info' : 'error';
