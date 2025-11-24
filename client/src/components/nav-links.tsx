@@ -5,6 +5,7 @@ import { LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus } from "lucid
 const links = [
   { href: "/", label: "Command Center", icon: LayoutDashboard },
   { href: "/ventures", label: "Ventures", icon: Briefcase },
+  { href: "/deep-work", label: "Deep Work", icon: Focus },
   { href: "/health", label: "Health", icon: Heart },
   { href: "/nutrition", label: "Nutrition", icon: Apple },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },

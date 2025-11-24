@@ -13,6 +13,8 @@ import {
   type InsertHealthEntry,
   type NutritionEntry,
   type InsertNutritionEntry,
+  type Doc,
+  type InsertDoc,
   type User,
   type UpsertUser,
   ventures,
@@ -22,10 +24,11 @@ import {
   days,
   healthEntries,
   nutritionEntries,
+  docs,
   users,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, and, or, gte, lte, not, inArray } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, not, inArray, like } from "drizzle-orm";
 import { db as database } from "../db";
 
 export interface IStorage {
@@ -89,6 +92,20 @@ export interface IStorage {
   createNutritionEntry(data: InsertNutritionEntry): Promise<NutritionEntry>;
   updateNutritionEntry(id: string, data: Partial<InsertNutritionEntry>): Promise<NutritionEntry | undefined>;
   deleteNutritionEntry(id: string): Promise<void>;
+
+  // Docs
+  getDocs(filters?: {
+    ventureId?: string;
+    projectId?: string;
+    type?: string;
+    domain?: string;
+    status?: string;
+  }): Promise<Doc[]>;
+  getDoc(id: string): Promise<Doc | undefined>;
+  createDoc(data: InsertDoc): Promise<Doc>;
+  updateDoc(id: string, data: Partial<InsertDoc>): Promise<Doc | undefined>;
+  deleteDoc(id: string): Promise<void>;
+  searchDocs(query: string): Promise<Doc[]>;
 }
 
 // PostgreSQL Storage Implementation
@@ -561,6 +578,88 @@ export class DBStorage implements IStorage {
 
   async deleteNutritionEntry(id: string): Promise<void> {
     await this.db.delete(nutritionEntries).where(eq(nutritionEntries.id, id));
+  }
+
+  // ============================================================================
+  // DOCS
+  // ============================================================================
+
+  async getDocs(filters?: {
+    ventureId?: string;
+    projectId?: string;
+    type?: string;
+    domain?: string;
+    status?: string;
+  }): Promise<Doc[]> {
+    const conditions = [];
+
+    if (filters?.ventureId) {
+      conditions.push(eq(docs.ventureId, filters.ventureId));
+    }
+    if (filters?.projectId) {
+      conditions.push(eq(docs.projectId, filters.projectId));
+    }
+    if (filters?.type) {
+      conditions.push(eq(docs.type, filters.type as any));
+    }
+    if (filters?.domain) {
+      conditions.push(eq(docs.domain, filters.domain as any));
+    }
+    if (filters?.status) {
+      conditions.push(eq(docs.status, filters.status as any));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(docs)
+      .where(whereClause)
+      .orderBy(desc(docs.updatedAt));
+  }
+
+  async getDoc(id: string): Promise<Doc | undefined> {
+    const [doc] = await this.db
+      .select()
+      .from(docs)
+      .where(eq(docs.id, id))
+      .limit(1);
+    return doc;
+  }
+
+  async createDoc(insertDoc: InsertDoc): Promise<Doc> {
+    const [doc] = await this.db
+      .insert(docs)
+      .values(insertDoc)
+      .returning();
+    return doc;
+  }
+
+  async updateDoc(id: string, updates: Partial<InsertDoc>): Promise<Doc | undefined> {
+    const [updated] = await this.db
+      .update(docs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(docs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDoc(id: string): Promise<void> {
+    await this.db.delete(docs).where(eq(docs.id, id));
+  }
+
+  async searchDocs(query: string): Promise<Doc[]> {
+    // Search in title and body
+    return await this.db
+      .select()
+      .from(docs)
+      .where(
+        or(
+          like(docs.title, `%${query}%`),
+          like(docs.body, `%${query}%`)
+        )
+      )
+      .orderBy(desc(docs.updatedAt));
   }
 }
 

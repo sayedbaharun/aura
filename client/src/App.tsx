@@ -15,9 +15,19 @@ import VentureDetail from "@/pages/venture-detail";
 import HealthHub from "@/pages/health-hub";
 import NutritionDashboard from "@/pages/nutrition-dashboard";
 import KnowledgeHub from "@/pages/knowledge-hub";
+import DocDetail from "@/pages/doc-detail";
+import DeepWork from "@/pages/deep-work";
+import NotificationsPage from "@/pages/notifications";
 import NotFound from "@/pages/not-found";
+import { useEffect } from "react";
+import { dailyRemindersService } from "@/lib/daily-reminders";
 
 function Router() {
+  // Initialize daily reminders service on app load
+  useEffect(() => {
+    dailyRemindersService.init();
+  }, []);
+
   return (
     <Layout>
       <Switch>
@@ -27,6 +37,9 @@ function Router() {
         <Route path="/health" component={HealthHub} />
         <Route path="/nutrition" component={NutritionDashboard} />
         <Route path="/knowledge" component={KnowledgeHub} />
+        <Route path="/knowledge/:id" component={DocDetail} />
+        <Route path="/deep-work" component={DeepWork} />
+        <Route path="/notifications" component={NotificationsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
