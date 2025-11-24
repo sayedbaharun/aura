@@ -1,119 +1,94 @@
 import {
-  type WhatsappMessage,
-  type InsertWhatsappMessage,
-  type Appointment,
-  type InsertAppointment,
-  type AssistantSettings,
-  type InsertAssistantSettings,
+  type Venture,
+  type InsertVenture,
+  type Project,
+  type InsertProject,
+  type Task,
+  type InsertTask,
+  type CaptureItem,
+  type InsertCaptureItem,
+  type Day,
+  type InsertDay,
+  type HealthEntry,
+  type InsertHealthEntry,
+  type NutritionEntry,
+  type InsertNutritionEntry,
   type User,
   type UpsertUser,
-  type PendingConfirmation,
-  type InsertPendingConfirmation,
-  type EventAttendee,
-  type InsertEventAttendee,
-  type EmailSummary,
-  type InsertEmailSummary,
-  type NotionOperation,
-  type InsertNotionOperation,
-  type QuickNote,
-  type InsertQuickNote,
-  type UserProfile,
-  type InsertUserProfile,
-  type InteractionHistory,
-  type InsertInteractionHistory,
-  type ProactiveSuggestion,
-  type InsertProactiveSuggestion,
-  whatsappMessages,
-  appointments,
-  assistantSettings,
+  ventures,
+  projects,
+  tasks,
+  captureItems,
+  days,
+  healthEntries,
+  nutritionEntries,
   users,
-  pendingConfirmations,
-  eventAttendees,
-  emailSummaries,
-  notionOperations,
-  quickNotes,
-  userProfiles,
-  interactionHistory,
-  proactiveSuggestions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, lt, gt, and } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, not, inArray } from "drizzle-orm";
 import { db as database } from "../db";
 
-// Singleton ID for assistant settings - ensures only one settings row exists
-const SETTINGS_SINGLETON_ID = '00000000-0000-0000-0000-000000000001';
-
 export interface IStorage {
-  // User operations - Required for Replit Auth
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
 
-  // WhatsApp Messages
-  getMessages(limit?: number): Promise<WhatsappMessage[]>;
-  createMessage(message: InsertWhatsappMessage): Promise<WhatsappMessage>;
-  getMessagesByPhone(phoneNumber: string, limit?: number): Promise<WhatsappMessage[]>;
+  // Ventures
+  getVentures(): Promise<Venture[]>;
+  getVenture(id: string): Promise<Venture | undefined>;
+  createVenture(data: InsertVenture): Promise<Venture>;
+  updateVenture(id: string, data: Partial<InsertVenture>): Promise<Venture | undefined>;
+  deleteVenture(id: string): Promise<void>;
 
-  // Appointments
-  getAppointments(): Promise<Appointment[]>;
-  createAppointment(appointment: InsertAppointment): Promise<Appointment>;
-  getAppointment(id: string): Promise<Appointment | undefined>;
-  getAppointmentByGoogleEventId(googleEventId: string): Promise<Appointment | undefined>;
-  updateAppointment(id: string, appointment: Partial<InsertAppointment>): Promise<Appointment | undefined>;
-  cancelAppointment(id: string): Promise<Appointment | undefined>;
+  // Projects
+  getProjects(filters?: { ventureId?: string }): Promise<Project[]>;
+  getProject(id: string): Promise<Project | undefined>;
+  createProject(data: InsertProject): Promise<Project>;
+  updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
+  deleteProject(id: string): Promise<void>;
 
-  // Assistant Settings
-  getSettings(): Promise<AssistantSettings | undefined>;
-  updateSettings(settings: Partial<InsertAssistantSettings>): Promise<AssistantSettings>;
+  // Tasks
+  getTasks(filters?: {
+    ventureId?: string;
+    projectId?: string;
+    status?: string;
+    focusDate?: string;
+    dueDate?: string;
+  }): Promise<Task[]>;
+  getTasksForToday(date: string): Promise<Task[]>;
+  getTask(id: string): Promise<Task | undefined>;
+  createTask(data: InsertTask): Promise<Task>;
+  updateTask(id: string, data: Partial<InsertTask>): Promise<Task | undefined>;
+  deleteTask(id: string): Promise<void>;
 
-  // Pending Confirmations
-  getPendingConfirmation(chatId: string): Promise<PendingConfirmation | undefined>;
-  createPendingConfirmation(confirmation: InsertPendingConfirmation): Promise<PendingConfirmation>;
-  deletePendingConfirmation(chatId: string): Promise<void>;
-  cleanupExpiredConfirmations(): Promise<number>;
+  // Capture Items
+  getCaptures(filters?: { clarified?: boolean }): Promise<CaptureItem[]>;
+  getCapture(id: string): Promise<CaptureItem | undefined>;
+  createCapture(data: InsertCaptureItem): Promise<CaptureItem>;
+  updateCapture(id: string, data: Partial<InsertCaptureItem>): Promise<CaptureItem | undefined>;
+  convertCaptureToTask(captureId: string, taskData: InsertTask): Promise<{ task: Task; capture: CaptureItem }>;
+  deleteCapture(id: string): Promise<void>;
 
-  // Event Attendees
-  getEventAttendee(googleEventId: string, attendeeEmail: string): Promise<EventAttendee | undefined>;
-  createEventAttendee(attendee: InsertEventAttendee): Promise<EventAttendee>;
-  updateEventAttendee(googleEventId: string, attendeeEmail: string, responseStatus: string): Promise<void>;
-  getEventAttendees(googleEventId: string): Promise<EventAttendee[]>;
+  // Days
+  getDays(filters?: { dateGte?: string; dateLte?: string }): Promise<Day[]>;
+  getDay(date: string): Promise<Day | undefined>;
+  getDayOrCreate(date: string): Promise<Day>;
+  createDay(data: InsertDay): Promise<Day>;
+  updateDay(date: string, data: Partial<InsertDay>): Promise<Day | undefined>;
+  deleteDay(date: string): Promise<void>;
 
-  // Email Summaries
-  getEmailSummary(gmailMessageId: string): Promise<EmailSummary | undefined>;
-  createEmailSummary(summary: InsertEmailSummary): Promise<EmailSummary>;
-  getEmailSummariesByChat(chatId: string, limit?: number): Promise<EmailSummary[]>;
-  getEmailSummariesByCategory(chatId: string, category: string): Promise<EmailSummary[]>;
+  // Health Entries
+  getHealthEntries(filters?: { dateGte?: string; dateLte?: string }): Promise<HealthEntry[]>;
+  getHealthEntry(id: string): Promise<HealthEntry | undefined>;
+  createHealthEntry(data: InsertHealthEntry): Promise<HealthEntry>;
+  updateHealthEntry(id: string, data: Partial<InsertHealthEntry>): Promise<HealthEntry | undefined>;
 
-  // Notion Operations
-  createNotionOperation(operation: InsertNotionOperation): Promise<NotionOperation>;
-  getNotionOperationsByChat(chatId: string, limit?: number): Promise<NotionOperation[]>;
-
-  // Quick Notes
-  createQuickNote(note: InsertQuickNote): Promise<QuickNote>;
-  getQuickNotes(chatId: string, limit?: number): Promise<QuickNote[]>;
-  getQuickNotesByCategory(chatId: string, category: string, limit?: number): Promise<QuickNote[]>;
-  getQuickNotesByType(chatId: string, noteType: string, limit?: number): Promise<QuickNote[]>;
-  updateQuickNote(id: string, updates: Partial<InsertQuickNote>): Promise<QuickNote | undefined>;
-  deleteQuickNote(id: string): Promise<void>;
-
-  // User Profiles (Context Memory)
-  getUserProfile(chatId: string): Promise<UserProfile | undefined>;
-  createUserProfile(profile: InsertUserProfile): Promise<UserProfile>;
-  updateUserProfile(chatId: string, updates: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
-  incrementInteractionCount(chatId: string): Promise<void>;
-
-  // Interaction History
-  createInteractionHistory(interaction: InsertInteractionHistory): Promise<InteractionHistory>;
-  getInteractionHistory(chatId: string, limit?: number): Promise<InteractionHistory[]>;
-  getInteractionsByType(chatId: string, interactionType: string, limit?: number): Promise<InteractionHistory[]>;
-  getRecentInteractions(chatId: string, hours: number): Promise<InteractionHistory[]>;
-
-  // Proactive Suggestions
-  createProactiveSuggestion(suggestion: InsertProactiveSuggestion): Promise<ProactiveSuggestion>;
-  getProactiveSuggestions(chatId: string, limit?: number): Promise<ProactiveSuggestion[]>;
-  getPendingSuggestions(chatId: string): Promise<ProactiveSuggestion[]>;
-  getScheduledSuggestions(): Promise<ProactiveSuggestion[]>;
-  updateSuggestionStatus(id: string, status: string, userResponse?: string): Promise<ProactiveSuggestion | undefined>;
-  markSuggestionSent(id: string): Promise<void>;
+  // Nutrition Entries
+  getNutritionEntries(filters?: { dayId?: string; date?: string }): Promise<NutritionEntry[]>;
+  getNutritionEntry(id: string): Promise<NutritionEntry | undefined>;
+  createNutritionEntry(data: InsertNutritionEntry): Promise<NutritionEntry>;
+  updateNutritionEntry(id: string, data: Partial<InsertNutritionEntry>): Promise<NutritionEntry | undefined>;
+  deleteNutritionEntry(id: string): Promise<void>;
 }
 
 // PostgreSQL Storage Implementation
@@ -124,7 +99,10 @@ export class DBStorage implements IStorage {
     // Using shared database connection from db/index.ts
   }
 
-  // User operations - Required for Replit Auth
+  // ============================================================================
+  // USER OPERATIONS
+  // ============================================================================
+
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await this.db.select().from(users).where(eq(users.id, id));
     return user;
@@ -145,500 +123,444 @@ export class DBStorage implements IStorage {
     return user;
   }
 
-  // WhatsApp Messages
-  async getMessages(limit: number = 50): Promise<WhatsappMessage[]> {
+  // ============================================================================
+  // VENTURES
+  // ============================================================================
+
+  async getVentures(): Promise<Venture[]> {
     return await this.db
       .select()
-      .from(whatsappMessages)
-      .orderBy(desc(whatsappMessages.receivedAt))
-      .limit(limit);
+      .from(ventures)
+      .orderBy(desc(ventures.createdAt));
   }
 
-  async createMessage(insertMessage: InsertWhatsappMessage): Promise<WhatsappMessage> {
-    const [message] = await this.db
-      .insert(whatsappMessages)
-      .values(insertMessage)
-      .returning();
-    return message;
-  }
-
-  async getMessagesByPhone(phoneNumber: string, limit: number = 20): Promise<WhatsappMessage[]> {
-    return await this.db
+  async getVenture(id: string): Promise<Venture | undefined> {
+    const [venture] = await this.db
       .select()
-      .from(whatsappMessages)
-      .where(eq(whatsappMessages.phoneNumber, phoneNumber))
-      .orderBy(desc(whatsappMessages.receivedAt))
-      .limit(limit);
-  }
-
-  // Appointments
-  async getAppointments(): Promise<Appointment[]> {
-    return await this.db
-      .select()
-      .from(appointments)
-      .orderBy(desc(appointments.appointmentDate));
-  }
-
-  async createAppointment(insertAppointment: InsertAppointment): Promise<Appointment> {
-    const [appointment] = await this.db
-      .insert(appointments)
-      .values(insertAppointment)
-      .returning();
-    return appointment;
-  }
-
-  async getAppointment(id: string): Promise<Appointment | undefined> {
-    const [appointment] = await this.db
-      .select()
-      .from(appointments)
-      .where(eq(appointments.id, id))
+      .from(ventures)
+      .where(eq(ventures.id, id))
       .limit(1);
-    return appointment;
+    return venture;
   }
 
-  async getAppointmentByGoogleEventId(googleEventId: string): Promise<Appointment | undefined> {
-    const [appointment] = await this.db
-      .select()
-      .from(appointments)
-      .where(eq(appointments.googleEventId, googleEventId))
-      .limit(1);
-    return appointment;
+  async createVenture(insertVenture: InsertVenture): Promise<Venture> {
+    const [venture] = await this.db
+      .insert(ventures)
+      .values(insertVenture)
+      .returning();
+    return venture;
   }
 
-  async updateAppointment(id: string, updates: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+  async updateVenture(id: string, updates: Partial<InsertVenture>): Promise<Venture | undefined> {
     const [updated] = await this.db
-      .update(appointments)
+      .update(ventures)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(appointments.id, id))
+      .where(eq(ventures.id, id))
       .returning();
     return updated;
   }
 
-  async cancelAppointment(id: string): Promise<Appointment | undefined> {
-    return this.updateAppointment(id, { status: 'cancelled' });
+  async deleteVenture(id: string): Promise<void> {
+    await this.db.delete(ventures).where(eq(ventures.id, id));
   }
 
-  // Assistant Settings (Singleton pattern)
-  async getSettings(): Promise<AssistantSettings | undefined> {
-    // Try to get settings by singleton ID
-    let [settings] = await this.db
-      .select()
-      .from(assistantSettings)
-      .where(eq(assistantSettings.id, SETTINGS_SINGLETON_ID))
-      .limit(1);
-    
-    // Initialize default settings if none exist using the singleton ID
-    // Use ON CONFLICT DO NOTHING to handle concurrent initialization safely
-    if (!settings) {
-      await this.db
-        .insert(assistantSettings)
-        .values({
-          id: SETTINGS_SINGLETON_ID,
-          assistantName: "Aura",
-          workingHours: "9:00 AM - 6:00 PM, Monday - Friday",
-          defaultMeetingDuration: "60",
-          timezone: "Asia/Dubai",
-        })
-        .onConflictDoNothing();
-      
-      // Re-select to get the row (either our insert or concurrent winner)
-      [settings] = await this.db
+  // ============================================================================
+  // PROJECTS
+  // ============================================================================
+
+  async getProjects(filters?: { ventureId?: string }): Promise<Project[]> {
+    if (filters?.ventureId) {
+      return await this.db
         .select()
-        .from(assistantSettings)
-        .where(eq(assistantSettings.id, SETTINGS_SINGLETON_ID))
-        .limit(1);
+        .from(projects)
+        .where(eq(projects.ventureId, filters.ventureId))
+        .orderBy(desc(projects.createdAt));
     }
-    
-    return settings;
+
+    return await this.db
+      .select()
+      .from(projects)
+      .orderBy(desc(projects.createdAt));
   }
 
-  async updateSettings(updates: Partial<InsertAssistantSettings>): Promise<AssistantSettings> {
-    // Filter out undefined values to prevent setting columns to NULL
-    const cleanUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
-    ) as Partial<InsertAssistantSettings>;
-    
-    // Use upsert with singleton ID to prevent multiple settings rows
-    const [updated] = await this.db
-      .insert(assistantSettings)
-      .values({
-        id: SETTINGS_SINGLETON_ID,
-        assistantName: "Aura",
-        workingHours: "9:00 AM - 6:00 PM, Monday - Friday",
-        defaultMeetingDuration: "60",
-        timezone: "Asia/Dubai",
-        ...cleanUpdates,
-      })
-      .onConflictDoUpdate({
-        target: assistantSettings.id,
-        set: {
-          ...cleanUpdates,
-          updatedAt: new Date(),
-        }
-      })
+  async getProject(id: string): Promise<Project | undefined> {
+    const [project] = await this.db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, id))
+      .limit(1);
+    return project;
+  }
+
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const [project] = await this.db
+      .insert(projects)
+      .values(insertProject)
       .returning();
-    
+    return project;
+  }
+
+  async updateProject(id: string, updates: Partial<InsertProject>): Promise<Project | undefined> {
+    const [updated] = await this.db
+      .update(projects)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(projects.id, id))
+      .returning();
     return updated;
   }
 
-  // Pending Confirmations
-  async getPendingConfirmation(chatId: string): Promise<PendingConfirmation | undefined> {
-    const [confirmation] = await this.db
-      .select()
-      .from(pendingConfirmations)
-      .where(eq(pendingConfirmations.chatId, chatId))
-      .limit(1);
+  async deleteProject(id: string): Promise<void> {
+    await this.db.delete(projects).where(eq(projects.id, id));
+  }
 
-    // Check if expired
-    if (confirmation && new Date(confirmation.expiresAt) < new Date()) {
-      await this.deletePendingConfirmation(chatId);
-      return undefined;
+  // ============================================================================
+  // TASKS
+  // ============================================================================
+
+  async getTasks(filters?: {
+    ventureId?: string;
+    projectId?: string;
+    status?: string;
+    focusDate?: string;
+    dueDate?: string;
+  }): Promise<Task[]> {
+    const conditions = [];
+
+    if (filters?.ventureId) {
+      conditions.push(eq(tasks.ventureId, filters.ventureId));
+    }
+    if (filters?.projectId) {
+      conditions.push(eq(tasks.projectId, filters.projectId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(tasks.status, filters.status as any));
+    }
+    if (filters?.focusDate) {
+      conditions.push(eq(tasks.focusDate, filters.focusDate));
+    }
+    if (filters?.dueDate) {
+      conditions.push(eq(tasks.dueDate, filters.dueDate));
     }
 
-    return confirmation;
-  }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  async createPendingConfirmation(insertConfirmation: InsertPendingConfirmation): Promise<PendingConfirmation> {
-    // Use upsert to atomically replace existing confirmation (prevents race conditions)
-    const [confirmation] = await this.db
-      .insert(pendingConfirmations)
-      .values(insertConfirmation)
-      .onConflictDoUpdate({
-        target: pendingConfirmations.chatId,
-        set: {
-          action: insertConfirmation.action,
-          data: insertConfirmation.data,
-          messageText: insertConfirmation.messageText,
-          expiresAt: insertConfirmation.expiresAt,
-        }
-      })
-      .returning();
-    return confirmation;
-  }
-
-  async deletePendingConfirmation(chatId: string): Promise<void> {
-    await this.db
-      .delete(pendingConfirmations)
-      .where(eq(pendingConfirmations.chatId, chatId));
-  }
-
-  async cleanupExpiredConfirmations(): Promise<number> {
-    const result = await this.db
-      .delete(pendingConfirmations)
-      .where(lt(pendingConfirmations.expiresAt, new Date()))
-      .returning();
-    return result.length;
-  }
-
-  // Event Attendees
-  async getEventAttendee(googleEventId: string, attendeeEmail: string): Promise<EventAttendee | undefined> {
-    const [attendee] = await this.db
+    return await this.db
       .select()
-      .from(eventAttendees)
-      .where(and(
-        eq(eventAttendees.googleEventId, googleEventId),
-        eq(eventAttendees.attendeeEmail, attendeeEmail)
-      ))
+      .from(tasks)
+      .where(whereClause)
+      .orderBy(tasks.priority, desc(tasks.createdAt));
+  }
+
+  async getTasksForToday(date: string): Promise<Task[]> {
+    // Tasks where focus_date = today OR due_date = today OR day_id = today's day_id
+    // AND status != 'done' AND status != 'cancelled'
+    const dayId = `day_${date}`;
+
+    return await this.db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          not(inArray(tasks.status, ['done', 'cancelled'])),
+          or(
+            eq(tasks.focusDate, date),
+            eq(tasks.dueDate, date),
+            eq(tasks.dayId, dayId)
+          )
+        )
+      )
+      .orderBy(tasks.priority, desc(tasks.createdAt));
+  }
+
+  async getTask(id: string): Promise<Task | undefined> {
+    const [task] = await this.db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, id))
       .limit(1);
-    return attendee;
+    return task;
   }
 
-  async createEventAttendee(insertAttendee: InsertEventAttendee): Promise<EventAttendee> {
-    const [attendee] = await this.db
-      .insert(eventAttendees)
-      .values(insertAttendee)
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const [task] = await this.db
+      .insert(tasks)
+      .values(insertTask as any)
       .returning();
-    return attendee;
+    return task;
   }
 
-  async updateEventAttendee(googleEventId: string, attendeeEmail: string, responseStatus: string): Promise<void> {
-    await this.db
-      .update(eventAttendees)
-      .set({ 
-        responseStatus, 
-        lastChecked: new Date() 
-      })
-      .where(and(
-        eq(eventAttendees.googleEventId, googleEventId),
-        eq(eventAttendees.attendeeEmail, attendeeEmail)
-      ));
-  }
+  async updateTask(id: string, updates: Partial<InsertTask>): Promise<Task | undefined> {
+    const updateData: any = { ...updates, updatedAt: new Date() };
 
-  async getEventAttendees(googleEventId: string): Promise<EventAttendee[]> {
-    return await this.db
-      .select()
-      .from(eventAttendees)
-      .where(eq(eventAttendees.googleEventId, googleEventId));
-  }
-
-  // Email Summaries
-  async getEmailSummary(gmailMessageId: string): Promise<EmailSummary | undefined> {
-    const [summary] = await this.db
-      .select()
-      .from(emailSummaries)
-      .where(eq(emailSummaries.gmailMessageId, gmailMessageId))
-      .limit(1);
-    return summary;
-  }
-
-  async createEmailSummary(insertSummary: InsertEmailSummary): Promise<EmailSummary> {
-    const [summary] = await this.db
-      .insert(emailSummaries)
-      .values(insertSummary)
-      .onConflictDoUpdate({
-        target: emailSummaries.gmailMessageId,
-        set: {
-          summary: insertSummary.summary,
-          category: insertSummary.category,
-          hasMeetingRequest: insertSummary.hasMeetingRequest,
-          extractedMeetingDetails: insertSummary.extractedMeetingDetails,
-        }
-      })
-      .returning();
-    return summary;
-  }
-
-  async getEmailSummariesByChat(chatId: string, limit: number = 50): Promise<EmailSummary[]> {
-    return await this.db
-      .select()
-      .from(emailSummaries)
-      .where(eq(emailSummaries.chatId, chatId))
-      .orderBy(desc(emailSummaries.receivedDate))
-      .limit(limit);
-  }
-
-  async getEmailSummariesByCategory(chatId: string, category: string): Promise<EmailSummary[]> {
-    return await this.db
-      .select()
-      .from(emailSummaries)
-      .where(and(
-        eq(emailSummaries.chatId, chatId),
-        eq(emailSummaries.category, category)
-      ))
-      .orderBy(desc(emailSummaries.receivedDate));
-  }
-
-  // Notion Operations
-  async createNotionOperation(insertOperation: InsertNotionOperation): Promise<NotionOperation> {
-    const [operation] = await this.db
-      .insert(notionOperations)
-      .values(insertOperation)
-      .returning();
-    return operation;
-  }
-
-  async getNotionOperationsByChat(chatId: string, limit: number = 50): Promise<NotionOperation[]> {
-    return await this.db
-      .select()
-      .from(notionOperations)
-      .where(eq(notionOperations.chatId, chatId))
-      .orderBy(desc(notionOperations.timestamp))
-      .limit(limit);
-  }
-
-  // Quick Notes
-  async createQuickNote(insertNote: InsertQuickNote): Promise<QuickNote> {
-    const [note] = await this.db
-      .insert(quickNotes)
-      .values(insertNote)
-      .returning();
-    return note;
-  }
-
-  async getQuickNotes(chatId: string, limit: number = 50): Promise<QuickNote[]> {
-    return await this.db
-      .select()
-      .from(quickNotes)
-      .where(eq(quickNotes.chatId, chatId))
-      .orderBy(desc(quickNotes.createdAt))
-      .limit(limit);
-  }
-
-  async getQuickNotesByCategory(chatId: string, category: string, limit: number = 50): Promise<QuickNote[]> {
-    return await this.db
-      .select()
-      .from(quickNotes)
-      .where(and(
-        eq(quickNotes.chatId, chatId),
-        eq(quickNotes.category, category)
-      ))
-      .orderBy(desc(quickNotes.createdAt))
-      .limit(limit);
-  }
-
-  async getQuickNotesByType(chatId: string, noteType: string, limit: number = 50): Promise<QuickNote[]> {
-    return await this.db
-      .select()
-      .from(quickNotes)
-      .where(and(
-        eq(quickNotes.chatId, chatId),
-        eq(quickNotes.noteType, noteType)
-      ))
-      .orderBy(desc(quickNotes.createdAt))
-      .limit(limit);
-  }
-
-  async updateQuickNote(id: string, updates: Partial<InsertQuickNote>): Promise<QuickNote | undefined> {
-    const [note] = await this.db
-      .update(quickNotes)
-      .set(updates)
-      .where(eq(quickNotes.id, id))
-      .returning();
-    return note;
-  }
-
-  async deleteQuickNote(id: string): Promise<void> {
-    await this.db
-      .delete(quickNotes)
-      .where(eq(quickNotes.id, id));
-  }
-
-  // User Profiles (Context Memory)
-  async getUserProfile(chatId: string): Promise<UserProfile | undefined> {
-    const [profile] = await this.db
-      .select()
-      .from(userProfiles)
-      .where(eq(userProfiles.chatId, chatId))
-      .limit(1);
-    return profile;
-  }
-
-  async createUserProfile(insertProfile: InsertUserProfile): Promise<UserProfile> {
-    const [profile] = await this.db
-      .insert(userProfiles)
-      .values(insertProfile)
-      .returning();
-    return profile;
-  }
-
-  async updateUserProfile(chatId: string, updates: Partial<InsertUserProfile>): Promise<UserProfile | undefined> {
-    const [profile] = await this.db
-      .update(userProfiles)
-      .set({
-        ...updates,
-        lastUpdated: new Date(),
-      })
-      .where(eq(userProfiles.chatId, chatId))
-      .returning();
-    return profile;
-  }
-
-  async incrementInteractionCount(chatId: string): Promise<void> {
-    const profile = await this.getUserProfile(chatId);
-    if (profile) {
-      await this.db
-        .update(userProfiles)
-        .set({
-          totalInteractions: (profile.totalInteractions || 0) + 1,
-          lastUpdated: new Date(),
-        })
-        .where(eq(userProfiles.chatId, chatId));
+    // If status is being set to 'done', set completedAt
+    if (updates.status === 'done' && !updates.completedAt) {
+      updateData.completedAt = new Date();
     }
-  }
 
-  // Interaction History
-  async createInteractionHistory(insertInteraction: InsertInteractionHistory): Promise<InteractionHistory> {
-    const [interaction] = await this.db
-      .insert(interactionHistory)
-      .values(insertInteraction)
+    // If status is changed from 'done' to something else, clear completedAt
+    if (updates.status && updates.status !== 'done') {
+      updateData.completedAt = null;
+    }
+
+    const [updated] = await this.db
+      .update(tasks)
+      .set(updateData)
+      .where(eq(tasks.id, id))
       .returning();
-    return interaction;
+    return updated;
   }
 
-  async getInteractionHistory(chatId: string, limit: number = 100): Promise<InteractionHistory[]> {
+  async deleteTask(id: string): Promise<void> {
+    await this.db.delete(tasks).where(eq(tasks.id, id));
+  }
+
+  // ============================================================================
+  // CAPTURE ITEMS
+  // ============================================================================
+
+  async getCaptures(filters?: { clarified?: boolean }): Promise<CaptureItem[]> {
+    if (filters?.clarified !== undefined) {
+      return await this.db
+        .select()
+        .from(captureItems)
+        .where(eq(captureItems.clarified, filters.clarified))
+        .orderBy(desc(captureItems.createdAt));
+    }
+
     return await this.db
       .select()
-      .from(interactionHistory)
-      .where(eq(interactionHistory.chatId, chatId))
-      .orderBy(desc(interactionHistory.timestamp))
-      .limit(limit);
+      .from(captureItems)
+      .orderBy(desc(captureItems.createdAt));
   }
 
-  async getInteractionsByType(chatId: string, interactionType: string, limit: number = 50): Promise<InteractionHistory[]> {
-    return await this.db
+  async getCapture(id: string): Promise<CaptureItem | undefined> {
+    const [capture] = await this.db
       .select()
-      .from(interactionHistory)
-      .where(and(
-        eq(interactionHistory.chatId, chatId),
-        eq(interactionHistory.interactionType, interactionType)
-      ))
-      .orderBy(desc(interactionHistory.timestamp))
-      .limit(limit);
+      .from(captureItems)
+      .where(eq(captureItems.id, id))
+      .limit(1);
+    return capture;
   }
 
-  async getRecentInteractions(chatId: string, hours: number): Promise<InteractionHistory[]> {
-    const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
-    return await this.db
-      .select()
-      .from(interactionHistory)
-      .where(and(
-        eq(interactionHistory.chatId, chatId),
-        gt(interactionHistory.timestamp, cutoffTime) // Get interactions after the cutoff time
-      ))
-      .orderBy(desc(interactionHistory.timestamp));
-  }
-
-  // Proactive Suggestions
-  async createProactiveSuggestion(insertSuggestion: InsertProactiveSuggestion): Promise<ProactiveSuggestion> {
-    const [suggestion] = await this.db
-      .insert(proactiveSuggestions)
-      .values(insertSuggestion)
+  async createCapture(insertCapture: InsertCaptureItem): Promise<CaptureItem> {
+    const [capture] = await this.db
+      .insert(captureItems)
+      .values(insertCapture)
       .returning();
-    return suggestion;
+    return capture;
   }
 
-  async getProactiveSuggestions(chatId: string, limit: number = 50): Promise<ProactiveSuggestion[]> {
-    return await this.db
-      .select()
-      .from(proactiveSuggestions)
-      .where(eq(proactiveSuggestions.chatId, chatId))
-      .orderBy(desc(proactiveSuggestions.createdAt))
-      .limit(limit);
-  }
-
-  async getPendingSuggestions(chatId: string): Promise<ProactiveSuggestion[]> {
-    return await this.db
-      .select()
-      .from(proactiveSuggestions)
-      .where(and(
-        eq(proactiveSuggestions.chatId, chatId),
-        eq(proactiveSuggestions.status, 'pending')
-      ))
-      .orderBy(desc(proactiveSuggestions.createdAt));
-  }
-
-  async getScheduledSuggestions(): Promise<ProactiveSuggestion[]> {
-    const now = new Date();
-    return await this.db
-      .select()
-      .from(proactiveSuggestions)
-      .where(and(
-        eq(proactiveSuggestions.status, 'pending'),
-        lt(proactiveSuggestions.scheduledFor, now)
-      ))
-      .orderBy(desc(proactiveSuggestions.scheduledFor));
-  }
-
-  async updateSuggestionStatus(id: string, status: string, userResponse?: string): Promise<ProactiveSuggestion | undefined> {
-    const [suggestion] = await this.db
-      .update(proactiveSuggestions)
-      .set({
-        status,
-        userResponse,
-        respondedAt: new Date(),
-      })
-      .where(eq(proactiveSuggestions.id, id))
+  async updateCapture(id: string, updates: Partial<InsertCaptureItem>): Promise<CaptureItem | undefined> {
+    const [updated] = await this.db
+      .update(captureItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(captureItems.id, id))
       .returning();
-    return suggestion;
+    return updated;
   }
 
-  async markSuggestionSent(id: string): Promise<void> {
-    await this.db
-      .update(proactiveSuggestions)
-      .set({
-        sentAt: new Date(),
-      })
-      .where(eq(proactiveSuggestions.id, id));
+  async convertCaptureToTask(captureId: string, taskData: InsertTask): Promise<{ task: Task; capture: CaptureItem }> {
+    const capture = await this.getCapture(captureId);
+    if (!capture) {
+      throw new Error('Capture not found');
+    }
+
+    // Create task with data from capture and taskData
+    const mergedData = {
+      ...taskData,
+      title: taskData.title || capture.title,
+      status: taskData.status || 'next' as any,
+      domain: taskData.domain || capture.domain,
+      ventureId: taskData.ventureId || capture.ventureId,
+      projectId: taskData.projectId || capture.projectId,
+      notes: taskData.notes || capture.notes,
+    };
+
+    const task = await this.createTask(mergedData);
+
+    // Update capture to mark as clarified and link to task
+    const updatedCapture = await this.updateCapture(captureId, {
+      linkedTaskId: task.id,
+      clarified: true,
+    });
+
+    return { task, capture: updatedCapture! };
+  }
+
+  async deleteCapture(id: string): Promise<void> {
+    await this.db.delete(captureItems).where(eq(captureItems.id, id));
+  }
+
+  // ============================================================================
+  // DAYS
+  // ============================================================================
+
+  async getDays(filters?: { dateGte?: string; dateLte?: string }): Promise<Day[]> {
+    const conditions = [];
+
+    if (filters?.dateGte) {
+      conditions.push(gte(days.date, filters.dateGte));
+    }
+    if (filters?.dateLte) {
+      conditions.push(lte(days.date, filters.dateLte));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(days)
+      .where(whereClause)
+      .orderBy(desc(days.date));
+  }
+
+  async getDay(date: string): Promise<Day | undefined> {
+    const [day] = await this.db
+      .select()
+      .from(days)
+      .where(eq(days.date, date))
+      .limit(1);
+    return day;
+  }
+
+  async getDayOrCreate(date: string): Promise<Day> {
+    let day = await this.getDay(date);
+
+    if (!day) {
+      day = await this.createDay({
+        id: `day_${date}`,
+        date,
+        title: `${date} – [Untitled]`,
+      });
+    }
+
+    return day;
+  }
+
+  async createDay(insertDay: InsertDay): Promise<Day> {
+    const [day] = await this.db
+      .insert(days)
+      .values(insertDay)
+      .returning();
+    return day;
+  }
+
+  async updateDay(date: string, updates: Partial<InsertDay>): Promise<Day | undefined> {
+    const [updated] = await this.db
+      .update(days)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(days.date, date))
+      .returning();
+    return updated;
+  }
+
+  async deleteDay(date: string): Promise<void> {
+    await this.db.delete(days).where(eq(days.date, date));
+  }
+
+  // ============================================================================
+  // HEALTH ENTRIES
+  // ============================================================================
+
+  async getHealthEntries(filters?: { dateGte?: string; dateLte?: string }): Promise<HealthEntry[]> {
+    const conditions = [];
+
+    if (filters?.dateGte) {
+      conditions.push(gte(healthEntries.date, filters.dateGte));
+    }
+    if (filters?.dateLte) {
+      conditions.push(lte(healthEntries.date, filters.dateLte));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(healthEntries)
+      .where(whereClause)
+      .orderBy(desc(healthEntries.date));
+  }
+
+  async getHealthEntry(id: string): Promise<HealthEntry | undefined> {
+    const [entry] = await this.db
+      .select()
+      .from(healthEntries)
+      .where(eq(healthEntries.id, id))
+      .limit(1);
+    return entry;
+  }
+
+  async createHealthEntry(insertEntry: InsertHealthEntry): Promise<HealthEntry> {
+    const [entry] = await this.db
+      .insert(healthEntries)
+      .values(insertEntry as any)
+      .returning();
+    return entry;
+  }
+
+  async updateHealthEntry(id: string, updates: Partial<InsertHealthEntry>): Promise<HealthEntry | undefined> {
+    const [updated] = await this.db
+      .update(healthEntries)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(healthEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ============================================================================
+  // NUTRITION ENTRIES
+  // ============================================================================
+
+  async getNutritionEntries(filters?: { dayId?: string; date?: string }): Promise<NutritionEntry[]> {
+    const conditions = [];
+
+    if (filters?.dayId) {
+      conditions.push(eq(nutritionEntries.dayId, filters.dayId));
+    }
+    if (filters?.date) {
+      // Extract date from datetime field (PostgreSQL date casting)
+      // We'll filter by dayId instead which is more reliable
+      const dayId = `day_${filters.date}`;
+      conditions.push(eq(nutritionEntries.dayId, dayId));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(nutritionEntries)
+      .where(whereClause)
+      .orderBy(nutritionEntries.datetime);
+  }
+
+  async getNutritionEntry(id: string): Promise<NutritionEntry | undefined> {
+    const [entry] = await this.db
+      .select()
+      .from(nutritionEntries)
+      .where(eq(nutritionEntries.id, id))
+      .limit(1);
+    return entry;
+  }
+
+  async createNutritionEntry(insertEntry: InsertNutritionEntry): Promise<NutritionEntry> {
+    const [entry] = await this.db
+      .insert(nutritionEntries)
+      .values(insertEntry as any)
+      .returning();
+    return entry;
+  }
+
+  async updateNutritionEntry(id: string, updates: Partial<InsertNutritionEntry>): Promise<NutritionEntry | undefined> {
+    const [updated] = await this.db
+      .update(nutritionEntries)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(nutritionEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteNutritionEntry(id: string): Promise<void> {
+    await this.db.delete(nutritionEntries).where(eq(nutritionEntries.id, id));
   }
 }
 

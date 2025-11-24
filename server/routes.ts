@@ -1,56 +1,38 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWhatsappMessageSchema, insertAppointmentSchema, insertAssistantSettingsSchema } from "@shared/schema";
+import {
+  insertVentureSchema,
+  insertProjectSchema,
+  insertTaskSchema,
+  insertCaptureItemSchema,
+  insertDaySchema,
+  insertHealthEntrySchema,
+  insertNutritionEntrySchema,
+} from "@shared/schema";
 import { z } from "zod";
-import { processMessage } from "./ai-assistant";
-import * as gmail from "./gmail";
 import { logger } from "./logger";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Note: Authentication removed for Railway deployment
-  // Dashboard is read-only and bot access is controlled via Telegram chat IDs
+  // ============================================================================
+  // HEALTH CHECK
+  // ============================================================================
 
-  // Health check endpoint (unauthenticated)
   app.get('/health', async (req, res) => {
     const health = {
       status: 'healthy' as 'healthy' | 'degraded',
       timestamp: new Date().toISOString(),
       checks: {
         database: false,
-        openai: false,
-        calendar: false,
       }
     };
 
     // Check database connectivity
     try {
-      await storage.getSettings();
+      await storage.getVentures();
       health.checks.database = true;
     } catch (error) {
       logger.error({ error }, 'Health check: Database connectivity failed');
-      health.status = 'degraded';
-    }
-
-    // Check OpenAI connectivity (light check - just verify config)
-    try {
-      if (process.env.OPENAI_API_KEY) {
-        health.checks.openai = true;
-      } else {
-        health.status = 'degraded';
-      }
-    } catch (error) {
-      logger.error({ error }, 'Health check: OpenAI configuration check failed');
-      health.status = 'degraded';
-    }
-
-    // Check Google Calendar connectivity
-    try {
-      const { getUncachableGoogleCalendarClient } = await import('./google-calendar');
-      await getUncachableGoogleCalendarClient();
-      health.checks.calendar = true;
-    } catch (error) {
-      logger.error({ error }, 'Health check: Google Calendar connectivity failed');
       health.status = 'degraded';
     }
 
@@ -58,356 +40,660 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(statusCode).json(health);
   });
 
-  // Gmail OAuth2 setup routes (unauthenticated for initial setup)
-  app.get('/oauth/gmail/authorize', async (req, res) => {
-    try {
-      const authUrl = gmail.getAuthUrl();
-      if (!authUrl) {
-        const replitDomain = process.env.REPLIT_DEV_DOMAIN;
-        const defaultRedirectUri = replitDomain 
-          ? `https://${replitDomain}/oauth/gmail/callback`
-          : 'http://localhost:5000/oauth/gmail/callback';
-        
-        res.status(400).send(`
-          <h1>Gmail OAuth Not Configured</h1>
-          <p>Please set the following environment variables in Replit Secrets:</p>
-          <ul>
-            <li><code>GMAIL_CLIENT_ID</code></li>
-            <li><code>GMAIL_CLIENT_SECRET</code></li>
-          </ul>
-          <p><strong>Your redirect URI for Google Cloud Console:</strong></p>
-          <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${defaultRedirectUri}</pre>
-          <p>See <a href="/docs/GMAIL_OAUTH_SETUP.md">Setup Guide</a> for instructions.</p>
-        `);
-        return;
-      }
-      res.redirect(authUrl);
-    } catch (error) {
-      logger.error({ error }, 'Error generating Gmail auth URL');
-      res.status(500).send('Failed to generate authorization URL');
-    }
-  });
+  // ============================================================================
+  // AUTHENTICATION (Mock for single-user)
+  // ============================================================================
 
-  app.get('/oauth/gmail/callback', async (req, res) => {
-    try {
-      const code = req.query.code as string;
-      if (!code) {
-        res.status(400).send('Authorization code not provided');
-        return;
-      }
-
-      const tokens = await gmail.getTokensFromCode(code);
-      
-      if (!tokens.refresh_token) {
-        res.status(400).send(`
-          <h1>No Refresh Token Received</h1>
-          <p>Google did not return a refresh token. This usually happens when you've already authorized this app before.</p>
-          <p><strong>To fix this:</strong></p>
-          <ol>
-            <li>Go to <a href="https://myaccount.google.com/permissions" target="_blank">Google Account Permissions</a></li>
-            <li>Find "Aura Personal Assistant" and remove access</li>
-            <li>Try <a href="/oauth/gmail/authorize">authorizing again</a></li>
-          </ol>
-          <p>The refresh token is only returned on the first authorization with <code>prompt=consent</code>.</p>
-        `);
-        return;
-      }
-      
-      res.send(`
-        <h1>Gmail Authorization Successful!</h1>
-        <p>Your refresh token (save this in Replit Secrets as <code>GMAIL_REFRESH_TOKEN</code>):</p>
-        <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto;">${tokens.refresh_token}</pre>
-        <p><strong>Next steps:</strong></p>
-        <ol>
-          <li>Copy the refresh token above</li>
-          <li>Go to Replit Secrets (Tools → Secrets in the left sidebar)</li>
-          <li>Add a new secret: <code>GMAIL_REFRESH_TOKEN</code> = (paste the token)</li>
-          <li>Restart your application</li>
-        </ol>
-        <p>Gmail integration will now work with full permissions!</p>
-      `);
-    } catch (error) {
-      logger.error({ error }, 'Error exchanging code for tokens');
-      res.status(500).send('Failed to exchange authorization code for tokens');
-    }
-  });
-
-  // Auth route - simple mock for compatibility with frontend
   app.get('/api/auth/user', async (req: any, res) => {
     // Mock user for Railway deployment (no auth)
     res.json({
       id: 'default-user',
-      email: 'user@railway.app',
-      firstName: 'Aura',
-      lastName: 'User',
+      email: 'sayed@hikmadigital.com',
+      firstName: 'Sayed',
+      lastName: 'Baharun',
     });
   });
 
-  // Get all messages
-  app.get("/api/messages", async (req, res) => {
+  // ============================================================================
+  // VENTURES
+  // ============================================================================
+
+  // Get all ventures
+  app.get("/api/ventures", async (req, res) => {
     try {
-      const messages = await storage.getMessages();
-      res.json(messages);
+      const ventures = await storage.getVentures();
+      res.json(ventures);
     } catch (error) {
-      logger.error({ error }, "Error fetching messages");
-      res.status(500).json({ error: "Failed to fetch messages" });
+      logger.error({ error }, "Error fetching ventures");
+      res.status(500).json({ error: "Failed to fetch ventures" });
     }
   });
 
-  // Create a message (protected)
-  app.post("/api/messages", async (req, res) => {
+  // Get single venture
+  app.get("/api/ventures/:id", async (req, res) => {
     try {
-      const validatedData = insertWhatsappMessageSchema.parse(req.body);
-      const message = await storage.createMessage(validatedData);
-      res.status(201).json(message);
+      const venture = await storage.getVenture(req.params.id);
+      if (!venture) {
+        return res.status(404).json({ error: "Venture not found" });
+      }
+      res.json(venture);
+    } catch (error) {
+      logger.error({ error }, "Error fetching venture");
+      res.status(500).json({ error: "Failed to fetch venture" });
+    }
+  });
+
+  // Create venture
+  app.post("/api/ventures", async (req, res) => {
+    try {
+      const validatedData = insertVentureSchema.parse(req.body);
+      const venture = await storage.createVenture(validatedData);
+      res.status(201).json(venture);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Invalid message data", details: error.errors });
+        res.status(400).json({ error: "Invalid venture data", details: error.errors });
       } else {
-        res.status(500).json({ error: "Failed to create message" });
+        logger.error({ error }, "Error creating venture");
+        res.status(500).json({ error: "Failed to create venture" });
       }
     }
   });
 
-  // Get messages by phone number (protected)
-  app.get("/api/messages/:phoneNumber", async (req, res) => {
+  // Update venture
+  app.patch("/api/ventures/:id", async (req, res) => {
     try {
-      const messages = await storage.getMessagesByPhone(req.params.phoneNumber);
-      res.json(messages);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch messages" });
-    }
-  });
-
-  // Get all appointments (protected)
-  app.get("/api/appointments", async (req, res) => {
-    try {
-      const appointments = await storage.getAppointments();
-      res.json(appointments);
-    } catch (error) {
-      logger.error({ error }, "Error fetching appointments");
-      res.status(500).json({ error: "Failed to fetch appointments" });
-    }
-  });
-
-  // Create an appointment (protected)
-  app.post("/api/appointments", async (req, res) => {
-    try {
-      const validatedData = insertAppointmentSchema.parse(req.body);
-      const appointment = await storage.createAppointment(validatedData);
-      res.status(201).json(appointment);
+      const updates = insertVentureSchema.partial().parse(req.body);
+      const venture = await storage.updateVenture(req.params.id, updates);
+      if (!venture) {
+        return res.status(404).json({ error: "Venture not found" });
+      }
+      res.json(venture);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Invalid appointment data", details: error.errors });
+        res.status(400).json({ error: "Invalid venture data", details: error.errors });
       } else {
-        res.status(500).json({ error: "Failed to create appointment" });
+        logger.error({ error }, "Error updating venture");
+        res.status(500).json({ error: "Failed to update venture" });
       }
     }
   });
 
-  // Get a specific appointment (protected)
-  app.get("/api/appointments/:id", async (req, res) => {
+  // Delete venture
+  app.delete("/api/ventures/:id", async (req, res) => {
     try {
-      const appointment = await storage.getAppointment(req.params.id);
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-      res.json(appointment);
+      await storage.deleteVenture(req.params.id);
+      res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch appointment" });
+      logger.error({ error }, "Error deleting venture");
+      res.status(500).json({ error: "Failed to delete venture" });
     }
   });
 
-  // Update an appointment (protected)
-  app.put("/api/appointments/:id", async (req, res) => {
+  // ============================================================================
+  // PROJECTS
+  // ============================================================================
+
+  // Get all projects (optionally filter by venture)
+  app.get("/api/projects", async (req, res) => {
     try {
-      const updates = insertAppointmentSchema.partial().parse(req.body);
-      const appointment = await storage.updateAppointment(req.params.id, updates);
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
+      const ventureId = req.query.venture_id as string;
+      const projects = await storage.getProjects(ventureId ? { ventureId } : undefined);
+      res.json(projects);
+    } catch (error) {
+      logger.error({ error }, "Error fetching projects");
+      res.status(500).json({ error: "Failed to fetch projects" });
+    }
+  });
+
+  // Get single project
+  app.get("/api/projects/:id", async (req, res) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
       }
-      res.json(appointment);
+      res.json(project);
+    } catch (error) {
+      logger.error({ error }, "Error fetching project");
+      res.status(500).json({ error: "Failed to fetch project" });
+    }
+  });
+
+  // Create project
+  app.post("/api/projects", async (req, res) => {
+    try {
+      const validatedData = insertProjectSchema.parse(req.body);
+      const project = await storage.createProject(validatedData);
+      res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Invalid appointment data", details: error.errors });
+        res.status(400).json({ error: "Invalid project data", details: error.errors });
       } else {
-        res.status(500).json({ error: "Failed to update appointment" });
+        logger.error({ error }, "Error creating project");
+        res.status(500).json({ error: "Failed to create project" });
       }
     }
   });
 
-  // Cancel an appointment (protected)
-  app.delete("/api/appointments/:id", async (req, res) => {
+  // Update project
+  app.patch("/api/projects/:id", async (req, res) => {
     try {
-      const appointment = await storage.cancelAppointment(req.params.id);
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
+      const updates = insertProjectSchema.partial().parse(req.body);
+      const project = await storage.updateProject(req.params.id, updates);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
       }
-      res.json(appointment);
+      res.json(project);
     } catch (error) {
-      res.status(500).json({ error: "Failed to cancel appointment" });
-    }
-  });
-
-  // Get assistant settings (protected)
-  app.get("/api/settings", async (req, res) => {
-    try {
-      const settings = await storage.getSettings();
-      res.json(settings);
-    } catch (error) {
-      logger.error({ error }, "Error fetching settings");
-      res.status(500).json({ error: "Failed to fetch settings" });
-    }
-  });
-
-  // Update assistant settings (protected)
-  app.put("/api/settings", async (req, res) => {
-    try {
-      const updates = insertAssistantSettingsSchema.partial().parse(req.body);
-      const settings = await storage.updateSettings(updates);
-      res.json(settings);
-    } catch (error) {
-      logger.error({ error }, "Error updating settings");
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Invalid settings data", details: error.errors });
+        res.status(400).json({ error: "Invalid project data", details: error.errors });
       } else {
-        res.status(500).json({ error: "Failed to update settings" });
+        logger.error({ error }, "Error updating project");
+        res.status(500).json({ error: "Failed to update project" });
       }
     }
   });
 
-  // Email API endpoints (protected)
-  
-  // Get recent emails
-  app.get("/api/emails", async (req, res) => {
+  // Delete project
+  app.delete("/api/projects/:id", async (req, res) => {
     try {
-      const maxResults = parseInt(req.query.maxResults as string) || 10;
-      const unreadOnly = req.query.unreadOnly === 'true';
-      const query = req.query.query as string;
-      
-      const emails = await gmail.listMessages({
-        maxResults: Math.min(maxResults, 50),
-        query: unreadOnly ? (query ? `${query} is:unread` : 'is:unread') : query,
+      await storage.deleteProject(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting project");
+      res.status(500).json({ error: "Failed to delete project" });
+    }
+  });
+
+  // ============================================================================
+  // TASKS
+  // ============================================================================
+
+  // Get all tasks (with filters)
+  app.get("/api/tasks", async (req, res) => {
+    try {
+      const filters = {
+        ventureId: req.query.venture_id as string,
+        projectId: req.query.project_id as string,
+        status: req.query.status as string,
+        focusDate: req.query.focus_date as string,
+        dueDate: req.query.due_date as string,
+      };
+
+      // Remove undefined filters
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const tasks = await storage.getTasks(cleanFilters);
+      res.json(tasks);
+    } catch (error) {
+      logger.error({ error }, "Error fetching tasks");
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get today's tasks (special endpoint)
+  app.get("/api/tasks/today", async (req, res) => {
+    try {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const tasks = await storage.getTasksForToday(today);
+      res.json(tasks);
+    } catch (error) {
+      logger.error({ error }, "Error fetching today's tasks");
+      res.status(500).json({ error: "Failed to fetch today's tasks" });
+    }
+  });
+
+  // Get single task
+  app.get("/api/tasks/:id", async (req, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      logger.error({ error }, "Error fetching task");
+      res.status(500).json({ error: "Failed to fetch task" });
+    }
+  });
+
+  // Create task
+  app.post("/api/tasks", async (req, res) => {
+    try {
+      const validatedData = insertTaskSchema.parse(req.body);
+      const task = await storage.createTask(validatedData);
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid task data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating task");
+        res.status(500).json({ error: "Failed to create task" });
+      }
+    }
+  });
+
+  // Update task
+  app.patch("/api/tasks/:id", async (req, res) => {
+    try {
+      const updates = insertTaskSchema.partial().parse(req.body);
+      const task = await storage.updateTask(req.params.id, updates);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // If task was marked done and has a project, check project completion
+      if (updates.status === 'done' && task.projectId) {
+        const allTasks = await storage.getTasks({ projectId: task.projectId });
+        const allDone = allTasks.every(t => t.status === 'done');
+
+        if (allDone) {
+          // Suggest project completion (return in response)
+          return res.json({
+            task,
+            suggestion: {
+              type: 'project_completion',
+              message: `All tasks in project completed. Mark project as done?`,
+              projectId: task.projectId
+            }
+          });
+        }
+      }
+
+      res.json({ task });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid task data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating task");
+        res.status(500).json({ error: "Failed to update task" });
+      }
+    }
+  });
+
+  // Delete task
+  app.delete("/api/tasks/:id", async (req, res) => {
+    try {
+      await storage.deleteTask(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting task");
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // ============================================================================
+  // CAPTURE ITEMS
+  // ============================================================================
+
+  // Get all captures (optionally filter by clarified status)
+  app.get("/api/captures", async (req, res) => {
+    try {
+      const clarifiedParam = req.query.clarified as string;
+      const filters = clarifiedParam !== undefined
+        ? { clarified: clarifiedParam === 'true' }
+        : undefined;
+
+      const captures = await storage.getCaptures(filters);
+      res.json(captures);
+    } catch (error) {
+      logger.error({ error }, "Error fetching captures");
+      res.status(500).json({ error: "Failed to fetch captures" });
+    }
+  });
+
+  // Get single capture
+  app.get("/api/captures/:id", async (req, res) => {
+    try {
+      const capture = await storage.getCapture(req.params.id);
+      if (!capture) {
+        return res.status(404).json({ error: "Capture not found" });
+      }
+      res.json(capture);
+    } catch (error) {
+      logger.error({ error }, "Error fetching capture");
+      res.status(500).json({ error: "Failed to fetch capture" });
+    }
+  });
+
+  // Create capture
+  app.post("/api/captures", async (req, res) => {
+    try {
+      const validatedData = insertCaptureItemSchema.parse(req.body);
+      const capture = await storage.createCapture(validatedData);
+      res.status(201).json(capture);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid capture data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating capture");
+        res.status(500).json({ error: "Failed to create capture" });
+      }
+    }
+  });
+
+  // Update capture
+  app.patch("/api/captures/:id", async (req, res) => {
+    try {
+      const updates = insertCaptureItemSchema.partial().parse(req.body);
+      const capture = await storage.updateCapture(req.params.id, updates);
+      if (!capture) {
+        return res.status(404).json({ error: "Capture not found" });
+      }
+      res.json(capture);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid capture data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating capture");
+        res.status(500).json({ error: "Failed to update capture" });
+      }
+    }
+  });
+
+  // Convert capture to task (special endpoint)
+  app.post("/api/captures/:id/convert", async (req, res) => {
+    try {
+      const taskData = insertTaskSchema.partial().parse(req.body);
+      const result = await storage.convertCaptureToTask(req.params.id, taskData as any);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid task data", details: error.errors });
+      } else if (error instanceof Error && error.message === 'Capture not found') {
+        res.status(404).json({ error: "Capture not found" });
+      } else {
+        logger.error({ error }, "Error converting capture to task");
+        res.status(500).json({ error: "Failed to convert capture to task" });
+      }
+    }
+  });
+
+  // Delete capture
+  app.delete("/api/captures/:id", async (req, res) => {
+    try {
+      await storage.deleteCapture(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting capture");
+      res.status(500).json({ error: "Failed to delete capture" });
+    }
+  });
+
+  // ============================================================================
+  // DAYS
+  // ============================================================================
+
+  // Get all days (with date range filter)
+  app.get("/api/days", async (req, res) => {
+    try {
+      const filters = {
+        dateGte: req.query.date_gte as string,
+        dateLte: req.query.date_lte as string,
+      };
+
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const days = await storage.getDays(cleanFilters);
+      res.json(days);
+    } catch (error) {
+      logger.error({ error }, "Error fetching days");
+      res.status(500).json({ error: "Failed to fetch days" });
+    }
+  });
+
+  // Get today's day (auto-create if doesn't exist)
+  app.get("/api/days/today", async (req, res) => {
+    try {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const day = await storage.getDayOrCreate(today);
+      res.json(day);
+    } catch (error) {
+      logger.error({ error }, "Error fetching today's day");
+      res.status(500).json({ error: "Failed to fetch today's day" });
+    }
+  });
+
+  // Get day by date
+  app.get("/api/days/:date", async (req, res) => {
+    try {
+      const day = await storage.getDay(req.params.date);
+      if (!day) {
+        return res.status(404).json({ error: "Day not found" });
+      }
+      res.json(day);
+    } catch (error) {
+      logger.error({ error }, "Error fetching day");
+      res.status(500).json({ error: "Failed to fetch day" });
+    }
+  });
+
+  // Create day
+  app.post("/api/days", async (req, res) => {
+    try {
+      const validatedData = insertDaySchema.parse(req.body);
+      const day = await storage.createDay(validatedData);
+      res.status(201).json(day);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid day data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating day");
+        res.status(500).json({ error: "Failed to create day" });
+      }
+    }
+  });
+
+  // Update day
+  app.patch("/api/days/:date", async (req, res) => {
+    try {
+      const updates = insertDaySchema.partial().parse(req.body);
+      const day = await storage.updateDay(req.params.date, updates);
+      if (!day) {
+        return res.status(404).json({ error: "Day not found" });
+      }
+      res.json(day);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid day data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating day");
+        res.status(500).json({ error: "Failed to update day" });
+      }
+    }
+  });
+
+  // Delete day
+  app.delete("/api/days/:date", async (req, res) => {
+    try {
+      await storage.deleteDay(req.params.date);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting day");
+      res.status(500).json({ error: "Failed to delete day" });
+    }
+  });
+
+  // ============================================================================
+  // HEALTH ENTRIES
+  // ============================================================================
+
+  // Get all health entries (with date range filter)
+  app.get("/api/health", async (req, res) => {
+    try {
+      const filters = {
+        dateGte: req.query.date_gte as string,
+        dateLte: req.query.date_lte as string,
+      };
+
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const entries = await storage.getHealthEntries(cleanFilters);
+      res.json(entries);
+    } catch (error) {
+      logger.error({ error }, "Error fetching health entries");
+      res.status(500).json({ error: "Failed to fetch health entries" });
+    }
+  });
+
+  // Get single health entry
+  app.get("/api/health/:id", async (req, res) => {
+    try {
+      const entry = await storage.getHealthEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: "Health entry not found" });
+      }
+      res.json(entry);
+    } catch (error) {
+      logger.error({ error }, "Error fetching health entry");
+      res.status(500).json({ error: "Failed to fetch health entry" });
+    }
+  });
+
+  // Create health entry (auto-link to Day)
+  app.post("/api/health", async (req, res) => {
+    try {
+      const { date, ...healthData } = insertHealthEntrySchema.parse(req.body);
+
+      // Ensure Day exists for this date
+      const day = await storage.getDayOrCreate(date);
+
+      // Create health entry
+      const entry = await storage.createHealthEntry({
+        ...healthData,
+        dayId: day.id,
+        date,
       });
-      
-      res.json(emails);
-    } catch (error) {
-      logger.error({ error }, "Error fetching emails");
-      res.status(500).json({ error: "Failed to fetch emails" });
-    }
-  });
 
-  // Send an email
-  app.post("/api/emails/send", async (req, res) => {
-    try {
-      const { to, subject, body } = req.body;
-      
-      if (!to || !subject || !body) {
-        return res.status(400).json({ error: "Missing required fields: to, subject, body" });
-      }
-      
-      const result = await gmail.sendEmail({ to, subject, body });
-      
-      if (result.success) {
-        res.json({ success: true, messageId: result.messageId });
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid health entry data", details: error.errors });
       } else {
-        res.status(500).json({ error: result.error || "Failed to send email" });
+        logger.error({ error }, "Error creating health entry");
+        res.status(500).json({ error: "Failed to create health entry" });
       }
-    } catch (error) {
-      logger.error({ error }, "Error sending email");
-      res.status(500).json({ error: "Failed to send email" });
     }
   });
 
-  // Search emails
-  app.get("/api/emails/search", async (req, res) => {
+  // Update health entry
+  app.patch("/api/health/:id", async (req, res) => {
     try {
-      const query = req.query.q as string;
-      const maxResults = parseInt(req.query.maxResults as string) || 10;
-      
-      if (!query) {
-        return res.status(400).json({ error: "Missing search query parameter 'q'" });
+      const updates = insertHealthEntrySchema.partial().parse(req.body);
+      const entry = await storage.updateHealthEntry(req.params.id, updates);
+      if (!entry) {
+        return res.status(404).json({ error: "Health entry not found" });
       }
-      
-      const emails = await gmail.searchEmails(query, Math.min(maxResults, 50));
-      res.json(emails);
+      res.json(entry);
     } catch (error) {
-      logger.error({ error }, "Error searching emails");
-      res.status(500).json({ error: "Failed to search emails" });
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid health entry data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating health entry");
+        res.status(500).json({ error: "Failed to update health entry" });
+      }
     }
   });
 
-  // Get email summaries for a user
-  app.get("/api/email-summaries", async (req, res) => {
+  // ============================================================================
+  // NUTRITION ENTRIES
+  // ============================================================================
+
+  // Get all nutrition entries (with filters)
+  app.get("/api/nutrition", async (req, res) => {
     try {
-      const chatId = req.query.chatId as string;
-      
-      if (!chatId) {
-        return res.status(400).json({ error: "Missing chatId parameter" });
-      }
-      
-      const summaries = await storage.getEmailSummary(chatId);
-      res.json(summaries);
+      const filters = {
+        dayId: req.query.day_id as string,
+        date: req.query.date as string,
+      };
+
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const entries = await storage.getNutritionEntries(cleanFilters);
+      res.json(entries);
     } catch (error) {
-      logger.error({ error }, "Error fetching email summaries");
-      res.status(500).json({ error: "Failed to fetch email summaries" });
+      logger.error({ error }, "Error fetching nutrition entries");
+      res.status(500).json({ error: "Failed to fetch nutrition entries" });
     }
   });
 
-  // Notion operation history for a user
-  app.get("/api/notion/operations", async (req, res) => {
+  // Get single nutrition entry
+  app.get("/api/nutrition/:id", async (req, res) => {
     try {
-      const chatId = req.query.chatId as string;
-      const limit = parseInt(req.query.limit as string) || 50;
-      
-      if (!chatId) {
-        return res.status(400).json({ error: "Missing chatId parameter" });
+      const entry = await storage.getNutritionEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: "Nutrition entry not found" });
       }
-      
-      const operations = await storage.getNotionOperationsByChat(chatId, limit);
-      res.json(operations);
+      res.json(entry);
     } catch (error) {
-      logger.error({ error }, "Error fetching Notion operations");
-      res.status(500).json({ error: "Failed to fetch Notion operations" });
+      logger.error({ error }, "Error fetching nutrition entry");
+      res.status(500).json({ error: "Failed to fetch nutrition entry" });
     }
   });
 
-  // Telegram Webhook - Use Telegraf's webhookCallback for proper handling
-  // with secret token validation for security
-  const setupTelegramWebhookRoute = async () => {
+  // Create nutrition entry (auto-link to Day)
+  app.post("/api/nutrition", async (req, res) => {
     try {
-      const { bot } = await import('./telegram-bot');
-      if (bot) {
-        // Validate webhook secret token to prevent unauthorized webhook calls
-        app.post('/api/telegram-webhook', (req, res, next) => {
-          const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      const validatedData = insertNutritionEntrySchema.parse(req.body);
 
-          // Skip validation in development if no secret is set
-          if (!webhookSecret && process.env.NODE_ENV === 'development') {
-            logger.warn('Telegram webhook running without secret validation in development mode');
-            return next();
-          }
+      // Extract date from datetime to find/create Day
+      const date = new Date(validatedData.datetime).toISOString().split('T')[0];
+      const day = await storage.getDayOrCreate(date);
 
-          // In production, require secret token
-          if (!webhookSecret) {
-            logger.error('TELEGRAM_WEBHOOK_SECRET not set in production');
-            return res.status(500).json({ error: 'Server misconfigured' });
-          }
+      // Create nutrition entry with linked dayId
+      const entry = await storage.createNutritionEntry({
+        ...validatedData,
+        dayId: day.id,
+      });
 
-          const receivedToken = req.headers['x-telegram-bot-api-secret-token'];
-          if (receivedToken !== webhookSecret) {
-            logger.warn({ receivedToken }, 'Invalid Telegram webhook secret token');
-            return res.status(403).json({ error: 'Forbidden' });
-          }
-
-          next();
-        }, bot.webhookCallback('/api/telegram-webhook'));
-      }
+      res.status(201).json(entry);
     } catch (error) {
-      logger.error({ error }, 'Failed to setup Telegram webhook route');
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid nutrition entry data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating nutrition entry");
+        res.status(500).json({ error: "Failed to create nutrition entry" });
+      }
     }
-  };
-  await setupTelegramWebhookRoute();
+  });
+
+  // Update nutrition entry
+  app.patch("/api/nutrition/:id", async (req, res) => {
+    try {
+      const updates = insertNutritionEntrySchema.partial().parse(req.body);
+      const entry = await storage.updateNutritionEntry(req.params.id, updates);
+      if (!entry) {
+        return res.status(404).json({ error: "Nutrition entry not found" });
+      }
+      res.json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid nutrition entry data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating nutrition entry");
+        res.status(500).json({ error: "Failed to update nutrition entry" });
+      }
+    }
+  });
+
+  // Delete nutrition entry
+  app.delete("/api/nutrition/:id", async (req, res) => {
+    try {
+      await storage.deleteNutritionEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting nutrition entry");
+      res.status(500).json({ error: "Failed to delete nutrition entry" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

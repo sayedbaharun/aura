@@ -200,14 +200,29 @@ app.use((req, res, next) => {
     try {
       const { initializeScheduledJobs, stopScheduledJobs } = await import('./scheduled-jobs');
       const { sendProactiveMessage } = await import('./telegram-bot');
-      
+
       initializeScheduledJobs(sendProactiveMessage);
       log('✓ Scheduled jobs system initialized (briefings, proactive checks)');
-      
+
       // Store reference for cleanup
       (globalThis as any).stopScheduledJobs = stopScheduledJobs;
     } catch (error) {
       log('Scheduled jobs setup skipped:', String(error));
+    }
+
+    // Initialize Hikma-OS automations
+    try {
+      const { scheduleDailyDayCreation } = await import('./automations/daily-day-creation');
+      const { scheduleWeeklyPlanningReminder } = await import('./automations/weekly-planning-reminder');
+      const { scheduleDailyReflectionReminder } = await import('./automations/daily-reflection-reminder');
+
+      scheduleDailyDayCreation();
+      scheduleWeeklyPlanningReminder();
+      scheduleDailyReflectionReminder();
+
+      log('✓ Hikma-OS automations initialized (day creation, reminders)');
+    } catch (error) {
+      log('Hikma-OS automations setup skipped:', String(error));
     }
     
     // Graceful shutdown
