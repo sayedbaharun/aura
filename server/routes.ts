@@ -9,6 +9,7 @@ import {
   insertDaySchema,
   insertHealthEntrySchema,
   insertNutritionEntrySchema,
+  insertDocSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./logger";
@@ -692,6 +693,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logger.error({ error }, "Error deleting nutrition entry");
       res.status(500).json({ error: "Failed to delete nutrition entry" });
+    }
+  });
+
+  // ============================================================================
+  // DOCS
+  // ============================================================================
+
+  // Get all docs (with filters)
+  app.get("/api/docs", async (req, res) => {
+    try {
+      const filters = {
+        ventureId: req.query.venture_id as string,
+        projectId: req.query.project_id as string,
+        type: req.query.type as string,
+        domain: req.query.domain as string,
+        status: req.query.status as string,
+      };
+
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const docs = await storage.getDocs(cleanFilters);
+      res.json(docs);
+    } catch (error) {
+      logger.error({ error }, "Error fetching docs");
+      res.status(500).json({ error: "Failed to fetch docs" });
+    }
+  });
+
+  // Search docs
+  app.get("/api/docs/search", async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q) {
+        return res.status(400).json({ error: "Query parameter 'q' is required" });
+      }
+      const docs = await storage.searchDocs(q as string);
+      res.json(docs);
+    } catch (error) {
+      logger.error({ error }, "Error searching docs");
+      res.status(500).json({ error: "Failed to search docs" });
+    }
+  });
+
+  // Get single doc
+  app.get("/api/docs/:id", async (req, res) => {
+    try {
+      const doc = await storage.getDoc(req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Doc not found" });
+      }
+      res.json(doc);
+    } catch (error) {
+      logger.error({ error }, "Error fetching doc");
+      res.status(500).json({ error: "Failed to fetch doc" });
+    }
+  });
+
+  // Create doc
+  app.post("/api/docs", async (req, res) => {
+    try {
+      const validatedData = insertDocSchema.parse(req.body);
+      const doc = await storage.createDoc(validatedData);
+      res.status(201).json(doc);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid doc data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating doc");
+        res.status(500).json({ error: "Failed to create doc" });
+      }
+    }
+  });
+
+  // Update doc
+  app.patch("/api/docs/:id", async (req, res) => {
+    try {
+      const updates = insertDocSchema.partial().parse(req.body);
+      const doc = await storage.updateDoc(req.params.id, updates);
+      if (!doc) {
+        return res.status(404).json({ error: "Doc not found" });
+      }
+      res.json(doc);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid doc data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating doc");
+        res.status(500).json({ error: "Failed to update doc" });
+      }
+    }
+  });
+
+  // Delete doc
+  app.delete("/api/docs/:id", async (req, res) => {
+    try {
+      await storage.deleteDoc(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting doc");
+      res.status(500).json({ error: "Failed to delete doc" });
     }
   });
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, LayoutDashboard, Briefcase, Heart, Apple, BookOpen } from "lucide-react";
+import { Menu, LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/", label: "Command Center", icon: LayoutDashboard },
   { href: "/ventures", label: "Ventures", icon: Briefcase },
+  { href: "/deep-work", label: "Deep Work", icon: Focus },
   { href: "/health", label: "Health", icon: Heart },
   { href: "/nutrition", label: "Nutrition", icon: Apple },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },

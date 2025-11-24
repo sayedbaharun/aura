@@ -1,6 +1,7 @@
 import Logo from "./logo";
 import NavLinks from "./nav-links";
 import MobileNav from "./mobile-nav";
+import NotificationCenter from "./notifications/notification-center";
 
 export default function TopNav() {
   return (
@@ -11,6 +12,9 @@ export default function TopNav() {
           <NavLinks />
         </div>
         <div className="flex items-center gap-2">
+          {/* Notification Center */}
+          <NotificationCenter />
+
           {/* User menu placeholder for future implementation */}
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-green-500"></div>
