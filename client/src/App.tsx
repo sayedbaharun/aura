@@ -4,11 +4,14 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CaptureModalProvider } from "@/lib/capture-modal-store";
+import { TaskDetailModalProvider } from "@/lib/task-detail-modal-store";
 import CaptureModal from "@/components/capture-modal";
 import CaptureButton from "@/components/capture-button";
+import TaskDetailModal from "@/components/task-detail-modal";
 import Layout from "@/components/layout";
 import CommandCenter from "@/pages/command-center";
 import VentureHQ from "@/pages/venture-hq";
+import VentureDetail from "@/pages/venture-detail";
 import HealthHub from "@/pages/health-hub";
 import NutritionDashboard from "@/pages/nutrition-dashboard";
 import KnowledgeHub from "@/pages/knowledge-hub";
@@ -20,6 +23,7 @@ function Router() {
       <Switch>
         <Route path="/" component={CommandCenter} />
         <Route path="/ventures" component={VentureHQ} />
+        <Route path="/ventures/:id" component={VentureDetail} />
         <Route path="/health" component={HealthHub} />
         <Route path="/nutrition" component={NutritionDashboard} />
         <Route path="/knowledge" component={KnowledgeHub} />
@@ -33,12 +37,15 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <CaptureModalProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-          <CaptureButton />
-          <CaptureModal />
-        </TooltipProvider>
+        <TaskDetailModalProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+            <CaptureButton />
+            <CaptureModal />
+            <TaskDetailModal />
+          </TooltipProvider>
+        </TaskDetailModalProvider>
       </CaptureModalProvider>
     </QueryClientProvider>
   );
