@@ -408,6 +408,7 @@ export const healthEntries = pgTable(
 
 export const insertHealthEntrySchema = createInsertSchema(healthEntries).omit({
   id: true,
+  dayId: true, // Backend auto-generates from date
   createdAt: true,
   updatedAt: true,
 });
@@ -444,6 +445,7 @@ export const nutritionEntries = pgTable(
 
 export const insertNutritionEntrySchema = createInsertSchema(nutritionEntries).omit({
   id: true,
+  dayId: true, // Backend auto-generates from datetime
   createdAt: true,
   updatedAt: true,
 });
