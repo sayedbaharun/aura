@@ -7,4 +7,5 @@ vite.config.ts.*
 
 # Local environment files with secrets
 RAILWAY_ENV_VARS.txt
+.env
 .env.local
