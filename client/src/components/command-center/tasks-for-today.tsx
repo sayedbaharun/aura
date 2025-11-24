@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { useTaskDetailModal } from "@/lib/task-detail-modal-store";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ interface Project {
 
 export default function TasksForToday() {
   const { toast } = useToast();
+  const { openTaskDetail } = useTaskDetailModal();
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks/today"],
@@ -249,9 +251,10 @@ export default function TasksForToday() {
                           </div>
                           <p
                             className={cn(
-                              "text-sm font-medium",
+                              "text-sm font-medium cursor-pointer hover:underline",
                               task.status === "done" && "line-through"
                             )}
+                            onClick={() => openTaskDetail(task.id)}
                           >
                             {task.title}
                           </p>

@@ -1,0 +1,164 @@
+# Nutrition Dashboard Component Hierarchy
+
+```
+NutritionDashboard (Main Page)
+├─ NutritionDashboardHeader
+│  ├─ Date Filter Selector (Today/Week/Month)
+│  ├─ "Set Goals" Button
+│  │  └─ SetGoalsModal
+│  │     ├─ Calories Goal Input
+│  │     ├─ Protein Goal Input
+│  │     ├─ Carbs Goal Input
+│  │     ├─ Fats Goal Input
+│  │     └─ Save/Reset Buttons
+│  └─ "Log Meal" Button
+│     └─ AddMealModal
+│        ├─ Date & Time Pickers
+│        ├─ Meal Type Selector
+│        ├─ Description Input
+│        ├─ Macro Inputs (Cal/Protein/Carbs/Fats)
+│        ├─ Context Selector
+│        ├─ Tags (multi-select)
+│        ├─ Notes Textarea
+│        └─ Submit Button
+│
+├─ Grid Layout (3 columns on desktop)
+│  ├─ TodaysMeals (2 columns)
+│  │  ├─ Meals List
+│  │  │  └─ Meal Card (for each meal)
+│  │  │     ├─ Meal Type Badge
+│  │  │     ├─ Time Display
+│  │  │     ├─ Context Badge
+│  │  │     ├─ Description
+│  │  │     ├─ Macro Grid (4 columns)
+│  │  │     ├─ Tags Display
+│  │  │     ├─ View Button
+│  │  │     │  └─ MealDetailModal
+│  │  │     │     ├─ Meal Info (read-only)
+│  │  │     │     ├─ Nutrition Cards
+│  │  │     │     ├─ Tags & Notes
+│  │  │     │     ├─ Edit Button → EditMealModal
+│  │  │     │     └─ Delete Button → Confirmation Dialog
+│  │  │     └─ Edit Button
+│  │  │        └─ EditMealModal
+│  │  │           ├─ (Same fields as AddMealModal)
+│  │  │           └─ Pre-filled with existing data
+│  │  └─ Today's Totals
+│  │     ├─ Calories Progress Bar
+│  │     ├─ Protein Progress Bar
+│  │     ├─ Carbs Progress Bar
+│  │     └─ Fats Progress Bar
+│  │
+│  └─ NutritionGoals (1 column)
+│     ├─ Calories Goal Card
+│     │  ├─ Current vs Goal
+│     │  ├─ Progress Bar
+│     │  └─ Status Indicator
+│     ├─ Protein Goal Card
+│     ├─ Carbs Goal Card
+│     ├─ Fats Goal Card
+│     └─ Edit Goals Button
+│
+├─ WeeklySummary
+│  ├─ Summary Stats Cards
+│  │  ├─ Avg Calories Card
+│  │  ├─ Avg Protein Card
+│  │  ├─ Avg Carbs Card
+│  │  └─ Avg Fats Card
+│  ├─ Insights Section
+│  │  ├─ Most Common Context
+│  │  └─ Top Tags
+│  └─ Daily Breakdown Table
+│     └─ Row for each day (last 7 days)
+│
+└─ MealHistory
+   ├─ Filters & Search
+   │  ├─ Search Input (by description)
+   │  ├─ Meal Type Filter
+   │  ├─ Context Filter
+   │  ├─ Tag Filter
+   │  ├─ Sort Selector
+   │  └─ Reset Filters Button
+   ├─ Meals Table
+   │  └─ Row for each meal
+   │     ├─ Date & Time
+   │     ├─ Meal Type Badge
+   │     ├─ Description
+   │     ├─ Macros (Cal/Protein/Carbs/Fats)
+   │     └─ Actions (View/Edit)
+   └─ Pagination
+      ├─ Results Counter
+      ├─ Previous Button
+      ├─ Page Number
+      └─ Next Button
+```
+
+## Data Flow
+
+```
+User Actions → Component State → API Calls → Database
+                     ↓
+                TanStack Query
+                     ↓
+            Query Invalidation
+                     ↓
+              Auto Re-fetch
+                     ↓
+            Updated UI Display
+```
+
+## Modal Management
+
+```
+State: showAddMeal, showEditMeal, showDetailMeal, showGoals
+       ↓
+Button Click
+       ↓
+Modal Opens (Dialog component)
+       ↓
+User Interaction (form, view, delete)
+       ↓
+API Call (POST/PATCH/DELETE)
+       ↓
+Success → Close Modal + Invalidate Query + Toast
+Error → Show Error Toast
+```
+
+## Calculation Pipeline
+
+```
+Raw Meals Data (from API)
+       ↓
+Filter by Date (today/week/month)
+       ↓
+Group by Date (for weekly summary)
+       ↓
+Calculate Totals per Day
+       ↓
+Calculate Averages across Days
+       ↓
+Compare to Goals
+       ↓
+Display with Progress Bars
+```
+
+## Responsive Breakpoints
+
+```
+Mobile (< 768px)
+  - Single column layout
+  - Compact cards
+  - Minimal table columns
+  - Touch-friendly buttons
+
+Tablet (768px - 1024px)
+  - 2 column layout
+  - Medium cards
+  - Some table columns hidden
+
+Desktop (> 1024px)
+  - 3 column grid
+  - Full table
+  - All features visible
+  - Hover effects
+```

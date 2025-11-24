@@ -1,0 +1,229 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Plus, FolderKanban } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import CreateProjectModal from "./create-project-modal";
+import { cn } from "@/lib/utils";
+
+interface Project {
+  id: string;
+  name: string;
+  ventureId: string;
+  status: string;
+  category: string;
+  priority: "P0" | "P1" | "P2" | "P3";
+  startDate: string | null;
+  targetEndDate: string | null;
+  outcome: string | null;
+}
+
+interface Task {
+  id: string;
+  projectId: string | null;
+  status: string;
+}
+
+interface ProjectsBoardProps {
+  ventureId: string;
+}
+
+const STATUS_COLUMNS = [
+  { value: "not_started", label: "Not Started", color: "bg-gray-500" },
+  { value: "planning", label: "Planning", color: "bg-yellow-500" },
+  { value: "in_progress", label: "In Progress", color: "bg-blue-500" },
+  { value: "blocked", label: "Blocked", color: "bg-red-500" },
+  { value: "done", label: "Done", color: "bg-green-500" },
+];
+
+export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
+
+  const { data: projects = [], isLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects", ventureId],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects?venture_id=${ventureId}`, {
+        credentials: "include",
+      });
+      return await res.json();
+    },
+  });
+
+  const { data: allTasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks"],
+  });
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "P0":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+      case "P1":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
+      case "P2":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "P3":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
+      default:
+        return "bg-secondary text-secondary-foreground";
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case "product":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
+      case "marketing":
+        return "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400";
+      case "operations":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
+      case "finance":
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+      case "research":
+        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400";
+      default:
+        return "bg-secondary text-secondary-foreground";
+    }
+  };
+
+  const getProjectTasks = (projectId: string) => {
+    return allTasks.filter((t) => t.projectId === projectId);
+  };
+
+  const getProjectProgress = (projectId: string) => {
+    const tasks = getProjectTasks(projectId);
+    if (tasks.length === 0) return 0;
+    const doneTasks = tasks.filter((t) => t.status === "done").length;
+    return Math.round((doneTasks / tasks.length) * 100);
+  };
+
+  const handleCreateClick = (status: string) => {
+    setSelectedStatus(status);
+    setCreateModalOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-64 bg-muted animate-pulse rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto">
+        {STATUS_COLUMNS.map((column) => {
+          const columnProjects = projects.filter((p) => p.status === column.value);
+
+          return (
+            <div key={column.value} className="min-w-[280px]">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn("w-3 h-3 rounded-full", column.color)} />
+                    <h3 className="font-semibold text-sm">
+                      {column.label}
+                    </h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {columnProjects.length}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {columnProjects.map((project) => {
+                    const tasks = getProjectTasks(project.id);
+                    const progress = getProjectProgress(project.id);
+                    const doneTasks = tasks.filter((t) => t.status === "done").length;
+
+                    return (
+                      <Card
+                        key={project.id}
+                        className="cursor-pointer hover:shadow-md transition-shadow"
+                      >
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-medium line-clamp-2">
+                            {project.name}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex gap-1 flex-wrap">
+                            <Badge
+                              className={getPriorityColor(project.priority)}
+                              variant="secondary"
+                            >
+                              {project.priority}
+                            </Badge>
+                            <Badge
+                              className={getCategoryColor(project.category)}
+                              variant="secondary"
+                            >
+                              {project.category}
+                            </Badge>
+                          </div>
+
+                          {tasks.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Tasks</span>
+                                <span>
+                                  {doneTasks}/{tasks.length}
+                                </span>
+                              </div>
+                              <Progress value={progress} className="h-2" />
+                            </div>
+                          )}
+
+                          {project.targetEndDate && (
+                            <div className="text-xs text-muted-foreground">
+                              Target: {new Date(project.targetEndDate).toLocaleDateString()}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground hover:text-foreground"
+                    onClick={() => handleCreateClick(column.value)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Project
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {projects.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-[400px] text-center border-2 border-dashed rounded-lg">
+          <FolderKanban className="h-16 w-16 text-muted-foreground/20 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Create your first project to get started
+          </p>
+          <Button onClick={() => handleCreateClick("not_started")}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Project
+          </Button>
+        </div>
+      )}
+
+      <CreateProjectModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        ventureId={ventureId}
+        defaultStatus={selectedStatus}
+      />
+    </>
+  );
+}
