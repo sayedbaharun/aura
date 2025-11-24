@@ -218,6 +218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId: req.query.project_id as string,
         status: req.query.status as string,
         focusDate: req.query.focus_date as string,
+        focusDateGte: req.query.focus_date_gte as string,
+        focusDateLte: req.query.focus_date_lte as string,
         dueDate: req.query.due_date as string,
       };
 

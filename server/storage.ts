@@ -56,6 +56,8 @@ export interface IStorage {
     projectId?: string;
     status?: string;
     focusDate?: string;
+    focusDateGte?: string;
+    focusDateLte?: string;
     dueDate?: string;
   }): Promise<Task[]>;
   getTasksForToday(date: string): Promise<Task[]>;
@@ -239,6 +241,8 @@ export class DBStorage implements IStorage {
     projectId?: string;
     status?: string;
     focusDate?: string;
+    focusDateGte?: string;
+    focusDateLte?: string;
     dueDate?: string;
   }): Promise<Task[]> {
     const conditions = [];
@@ -250,10 +254,22 @@ export class DBStorage implements IStorage {
       conditions.push(eq(tasks.projectId, filters.projectId));
     }
     if (filters?.status) {
-      conditions.push(eq(tasks.status, filters.status as any));
+      // Handle comma-separated status values (e.g., "next,in_progress")
+      const statusValues = filters.status.split(',').map(s => s.trim());
+      if (statusValues.length === 1) {
+        conditions.push(eq(tasks.status, statusValues[0] as any));
+      } else {
+        conditions.push(inArray(tasks.status, statusValues as any));
+      }
     }
     if (filters?.focusDate) {
       conditions.push(eq(tasks.focusDate, filters.focusDate));
+    }
+    if (filters?.focusDateGte) {
+      conditions.push(gte(tasks.focusDate, filters.focusDateGte));
+    }
+    if (filters?.focusDateLte) {
+      conditions.push(lte(tasks.focusDate, filters.focusDateLte));
     }
     if (filters?.dueDate) {
       conditions.push(eq(tasks.dueDate, filters.dueDate));
