@@ -406,12 +406,16 @@ export const healthEntries = pgTable(
   ]
 );
 
-export const insertHealthEntrySchema = createInsertSchema(healthEntries).omit({
-  id: true,
-  dayId: true, // Backend auto-generates from date
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertHealthEntrySchema = createInsertSchema(healthEntries)
+  .omit({
+    id: true,
+    dayId: true, // Backend auto-generates from date
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    date: z.union([z.string(), z.date()]).pipe(z.coerce.date()),
+  });
 
 export type InsertHealthEntry = z.infer<typeof insertHealthEntrySchema>;
 export type HealthEntry = typeof healthEntries.$inferSelect;
@@ -443,12 +447,16 @@ export const nutritionEntries = pgTable(
   ]
 );
 
-export const insertNutritionEntrySchema = createInsertSchema(nutritionEntries).omit({
-  id: true,
-  dayId: true, // Backend auto-generates from datetime
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertNutritionEntrySchema = createInsertSchema(nutritionEntries)
+  .omit({
+    id: true,
+    dayId: true, // Backend auto-generates from datetime
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    datetime: z.union([z.string(), z.date()]).pipe(z.coerce.date()),
+  });
 
 export type InsertNutritionEntry = z.infer<typeof insertNutritionEntrySchema>;
 export type NutritionEntry = typeof nutritionEntries.$inferSelect;
