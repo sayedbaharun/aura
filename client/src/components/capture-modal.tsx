@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 interface CaptureFormData {
   title: string;
   type: 'idea' | 'task' | 'note' | 'link' | 'question';
-  source: 'brain' | 'whatsapp' | 'email' | 'meeting' | 'web';
+  source: 'brain' | 'chat' | 'email' | 'meeting' | 'web';
   domain: 'work' | 'health' | 'finance' | 'learning' | 'personal';
   ventureId: string | null;
   projectId: string | null;
@@ -191,7 +191,7 @@ export default function CaptureModal() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="brain">Brain</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="chat">Chat</SelectItem>
                 <SelectItem value="email">Email</SelectItem>
                 <SelectItem value="meeting">Meeting</SelectItem>
                 <SelectItem value="web">Web</SelectItem>
