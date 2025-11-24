@@ -1,4 +1,5 @@
-import { neon } from "@neondatabase/serverless";
+import pkg from "pg";
+const { Client } = pkg;
 
 // Emergency fix: Convert duration columns from TEXT to INTEGER
 // This runs automatically during deployment to fix production database
@@ -12,7 +13,19 @@ async function emergencyFix() {
     process.exit(1);
   }
 
-  const sql = neon(connectionString);
+  const client = new Client({
+    connectionString,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  });
+
+  await client.connect();
+
+  // Helper function to execute queries
+  const sql = async (strings: TemplateStringsArray, ...values: any[]) => {
+    const query = strings.reduce((acc, str, i) => acc + str + (values[i] || ""), "");
+    const result = await client.query(query);
+    return result.rows;
+  };
 
   try {
     console.log("🚨 EMERGENCY FIX: Converting duration columns to INTEGER\n");
@@ -103,6 +116,7 @@ async function emergencyFix() {
     console.log("\n✅ SUCCESS! Both columns converted to INTEGER");
     console.log("📝 Deployment can now continue...");
 
+    await client.end();
     process.exit(0);
 
   } catch (error: any) {
@@ -113,6 +127,7 @@ async function emergencyFix() {
       console.error("   Check your data manually in the database pane.");
     }
 
+    await client.end();
     process.exit(1);
   }
 }

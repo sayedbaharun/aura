@@ -1,4 +1,5 @@
-import { neon } from "@neondatabase/serverless";
+import pkg from "pg";
+const { Client } = pkg;
 import * as readline from "readline";
 
 // Standalone script to fix production database
@@ -12,7 +13,7 @@ async function fixProductionDatabase() {
 
   console.log("🔧 PRODUCTION DATABASE FIX TOOL\n");
   console.log("This will convert duration columns from TEXT to INTEGER in your production database.\n");
-  
+
   // Get the production DATABASE_URL
   const prodUrl = await new Promise<string>((resolve) => {
     rl.question("Enter your PRODUCTION DATABASE_URL (from Secrets): ", (answer) => {
@@ -26,7 +27,19 @@ async function fixProductionDatabase() {
     process.exit(1);
   }
 
-  const sql = neon(prodUrl);
+  const client = new Client({
+    connectionString: prodUrl,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  await client.connect();
+
+  // Helper function to execute queries
+  const sql = async (strings: TemplateStringsArray, ...values: any[]) => {
+    const query = strings.reduce((acc, str, i) => acc + str + (values[i] || ""), "");
+    const result = await client.query(query);
+    return result.rows;
+  };
 
   try {
     console.log("\n🔍 Checking current column types...\n");
@@ -110,14 +123,17 @@ async function fixProductionDatabase() {
     } else {
       console.log("\n⚠️ WARNING: Some columns are still TEXT");
       console.log("Please check the output above and try again");
+      await client.end();
       process.exit(1);
     }
 
+    await client.end();
     process.exit(0);
 
   } catch (error: any) {
     console.error("\n❌ ERROR:", error.message);
     console.error("\nFull error:", error);
+    await client.end();
     process.exit(1);
   }
 }
