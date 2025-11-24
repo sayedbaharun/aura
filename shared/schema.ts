@@ -90,11 +90,14 @@ export const domainEnum = pgEnum('domain', [
 ]);
 
 export const focusSlotEnum = pgEnum('focus_slot', [
-  'morning',
-  'midday',
-  'afternoon',
-  'evening',
-  'anytime'
+  'deep_work_1',      // 9-11am: Deep strategic/creative work
+  'deep_work_2',      // 2-4pm: Deep execution work
+  'admin_block_1',    // 11am-12pm: Email, admin, quick tasks
+  'admin_block_2',    // 4-5pm: Wrap up, admin
+  'meetings',         // Anytime: Meetings, calls
+  'buffer',           // Anytime: Flex time, unexpected
+  'morning_routine',  // 6-9am: Health, planning, breakfast
+  'evening_review'    // 5-6pm: Review, reflection, planning
 ]);
 
 export const captureTypeEnum = pgEnum('capture_type', [
@@ -157,6 +160,13 @@ export const docDomainEnum = pgEnum('doc_domain', [
 ]);
 
 export const docStatusEnum = pgEnum('doc_status', ['draft', 'active', 'archived']);
+
+export const milestoneStatusEnum = pgEnum('milestone_status', [
+  'not_started',
+  'in_progress',
+  'done',
+  'blocked'
+]);
 
 // ----------------------------------------------------------------------------
 // CORE TABLES (Keep from Aura)
@@ -239,6 +249,9 @@ export const projects = pgTable(
     actualEndDate: date("actual_end_date"),
     outcome: text("outcome"),
     notes: text("notes"),
+    budget: real("budget"), // Total budget allocated
+    budgetSpent: real("budget_spent").default(0), // Amount spent to date
+    revenueGenerated: real("revenue_generated").default(0), // Revenue from project
     externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -260,6 +273,36 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 
+// MILESTONES: Project phases and key deliverables
+export const milestones = pgTable(
+  "milestones",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
+    status: milestoneStatusEnum("status").default("not_started").notNull(),
+    order: integer("order").default(0), // For sequencing phases
+    targetDate: date("target_date"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_milestones_project_id").on(table.projectId),
+    index("idx_milestones_status").on(table.status),
+    index("idx_milestones_order").on(table.order),
+  ]
+);
+
+export const insertMilestoneSchema = createInsertSchema(milestones).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+export type Milestone = typeof milestones.$inferSelect;
+
 // TASKS: Atomic units of execution
 export const tasks = pgTable(
   "tasks",
@@ -272,6 +315,7 @@ export const tasks = pgTable(
     domain: domainEnum("domain"),
     ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    milestoneId: uuid("milestone_id").references(() => milestones.id, { onDelete: "set null" }),
     dayId: text("day_id").references(() => days.id, { onDelete: "set null" }),
     dueDate: date("due_date"),
     focusDate: date("focus_date"),
@@ -288,6 +332,7 @@ export const tasks = pgTable(
   (table) => [
     index("idx_tasks_venture_id").on(table.ventureId),
     index("idx_tasks_project_id").on(table.projectId),
+    index("idx_tasks_milestone_id").on(table.milestoneId),
     index("idx_tasks_day_id").on(table.dayId),
     index("idx_tasks_status").on(table.status),
     index("idx_tasks_priority").on(table.priority),
@@ -513,9 +558,18 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
     fields: [projects.ventureId],
     references: [ventures.id],
   }),
+  milestones: many(milestones),
   tasks: many(tasks),
   docs: many(docs),
   captureItems: many(captureItems),
+}));
+
+export const milestonesRelations = relations(milestones, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [milestones.projectId],
+    references: [projects.id],
+  }),
+  tasks: many(tasks),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
@@ -526,6 +580,10 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   project: one(projects, {
     fields: [tasks.projectId],
     references: [projects.id],
+  }),
+  milestone: one(milestones, {
+    fields: [tasks.milestoneId],
+    references: [milestones.id],
   }),
   day: one(days, {
     fields: [tasks.dayId],

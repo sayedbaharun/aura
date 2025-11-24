@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Aura** is a full-stack AI-powered personal assistant application that manages calendars and appointments through conversational interfaces (WhatsApp, Telegram) and a web dashboard. It integrates Google Calendar with multi-platform messaging via AI conversation handling.
+**Hikma-OS** (formerly Aura) is a full-stack personal operating system and productivity engine for managing multiple business ventures, projects, tasks, health, and knowledge. Built as a custom "second brain" to replace Notion, Todoist, and other fragmented productivity tools.
 
 ## Development Commands
 
@@ -21,7 +21,6 @@ npm run db:push  # Push database schema changes to PostgreSQL
 - Local development uses Vite dev middleware integrated into Express server
 - Production build creates `/dist/public` (client) and `/dist/index.js` (server)
 - Server serves static files from `/dist/public` in production
-- Replit deployment: external port 80 maps to local port 5000
 
 ## Architecture
 
@@ -34,76 +33,130 @@ npm run db:push  # Push database schema changes to PostgreSQL
 
 ### Technology Stack
 - **Frontend**: React 18, Wouter routing, TanStack Query, shadcn/ui, Tailwind CSS
-- **Backend**: Express, Drizzle ORM with Neon PostgreSQL, Passport.js auth
-- **AI**: OpenAI API via Replit AI Integrations
-- **Calendar**: Google Calendar API via Replit Connectors
-- **Messaging**: Telegraf (Telegram), Twilio/Meta/MessageBird (WhatsApp)
-- **Auth**: Replit OpenID Connect with PostgreSQL session store
+- **Backend**: Express, Drizzle ORM with Neon PostgreSQL
+- **Database**: PostgreSQL (Neon serverless)
+- **Auth**: Simple session-based auth (currently mock user for single-user system)
 
 ### Key Server Files
 
 #### `server/index.ts`
 Main entry point that:
 - Sets up Express app with Vite dev middleware (dev) or static serving (prod)
-- Initializes Telegram bot (webhook in production, polling in development)
-- Configures Replit Auth with session management
+- Configures session management with PostgreSQL storage
 - Registers API routes and error handlers
-
-#### `server/ai-assistant.ts`
-AI conversation handler:
-- Processes messages through OpenAI with conversation history
-- Implements tool-calling for calendar operations (query, book, reschedule, cancel)
-- Manages pending confirmations via `pendingConfirmations` Map
-- Builds context-aware prompts with assistant settings and working hours
 
 #### `server/storage.ts`
 Database abstraction layer (`DBStorage` class):
 - Implements `IStorage` interface for all database operations
 - Uses Drizzle ORM with Neon serverless PostgreSQL
-- Handles users, messages, appointments, and assistant settings
-
-#### `server/google-calendar.ts`
-Google Calendar integration:
-- CRUD operations on calendar events
-- Free/busy checking and availability queries
-- Attendee management with email invitations
-- Uses Replit Google Calendar connector credentials
-
-#### `server/telegram-bot.ts` / `server/twilio-whatsapp.ts`
-Platform-specific message handlers:
-- Telegram: Telegraf bot with webhook/polling modes
-- WhatsApp: Multi-provider webhook detection (Twilio, Meta, MessageBird)
-- Both delegate to AI assistant for message processing
+- Handles ventures, projects, tasks, milestones, captures, days, health, nutrition, docs
 
 #### `server/routes.ts`
 API route definitions for:
-- Authentication (`/api/login`, `/api/callback`, `/api/logout`, `/api/auth/user`)
-- Messages (`/api/messages`, `/api/messages/:phoneNumber`)
-- Appointments (`/api/appointments`, `/api/appointments/:id`)
-- Settings (`/api/settings`)
-- Webhooks (`/api/whatsapp-webhook`, `/api/telegram-webhook`)
+- **Ventures**: GET /api/ventures, POST, PATCH, DELETE
+- **Projects**: GET /api/projects (with filters), POST, PATCH, DELETE
+- **Milestones**: GET /api/milestones, POST, PATCH, DELETE
+- **Tasks**: GET /api/tasks (with filters), GET /api/tasks/today, POST, PATCH, DELETE
+- **Captures**: GET /api/captures, POST, PATCH, DELETE, POST /api/captures/:id/convert
+- **Days**: GET /api/days/today, GET /api/days/:date, POST, PATCH, DELETE
+- **Health**: GET /api/health, POST, PATCH, DELETE
+- **Nutrition**: GET /api/nutrition, POST, PATCH, DELETE
+- **Docs**: GET /api/docs, GET /api/docs/search, POST, PATCH, DELETE
+- **Auth**: GET /api/auth/user (mock)
 
 ### Key Client Files
 
 #### `client/src/App.tsx`
 Main router with authentication guards using Wouter and TanStack Query for user state.
 
-#### `client/src/pages/dashboard.tsx`
-Tab-based dashboard with Messages, Appointments, and Settings views.
+#### `client/src/pages/`
+Main application pages:
+- **command-center.tsx** - Daily overview with tasks, health, nutrition snapshots
+- **venture-hq.tsx** - Ventures grid and overview
+- **venture-detail.tsx** - Single venture with projects, tasks, docs
+- **health-hub.tsx** - Health metrics tracking and calendar
+- **nutrition-dashboard.tsx** - Meal logging and nutrition goals
+- **knowledge-hub.tsx** - Docs library with search and filters
+- **doc-detail.tsx** - Single document view/edit
+- **deep-work.tsx** - Weekly calendar and focus session planning
+- **notifications.tsx** - Notification history
 
 #### `client/src/components/ui/*`
 47 shadcn/ui components - prefer these over creating custom components.
 
 ### Database Schema (`/shared/schema.ts`)
 
-**Tables**:
-1. `users` - Replit Auth user information (id, email, firstName, lastName, profileImageUrl)
-2. `sessions` - Express session storage (sid, sess, expire)
-3. `whatsappMessages` - Message history for both WhatsApp and Telegram (platform column distinguishes)
-4. `appointments` - Calendar appointments with Google Calendar sync (googleEventId)
-5. `assistantSettings` - AI assistant configuration (name, timezone, working hours, preferences)
+**Core Entities**:
+
+1. **ventures** - Business/personal initiatives (top level)
+   - name, status, domain, oneLiner, primaryFocus
+   - color, icon, notes
+   - Hierarchy: Ventures contain projects
+
+2. **projects** - Concrete initiatives within ventures
+   - name, ventureId, status, category, priority
+   - startDate, targetEndDate, actualEndDate
+   - outcome, notes
+   - **budget, budgetSpent, revenueGenerated** (NEW)
+
+3. **milestones** - Project phases and key deliverables (NEW)
+   - name, projectId, status, order
+   - targetDate, notes
+
+4. **tasks** - Atomic units of execution
+   - title, status, priority, type, domain
+   - ventureId, projectId, milestoneId, dayId
+   - dueDate, focusDate, focusSlot
+   - estEffort, actualEffort (hours)
+   - notes, tags
+
+5. **captureItems** - Inbox for raw thoughts (GTD-style)
+   - title, type, source, domain
+   - ventureId, projectId, linkedTaskId
+   - clarified (boolean)
+
+6. **days** - Daily logs (central hub for each day)
+   - date, title, mood
+   - top3Outcomes, oneThingToShip
+   - reflectionAm, reflectionPm
+   - primaryVentureFocus
+
+7. **healthEntries** - Daily health metrics
+   - dayId, date
+   - sleepHours, sleepQuality, energyLevel, mood
+   - steps, weightKg, stressLevel
+   - workoutDone, workoutType, workoutDurationMin
+   - tags, notes
+
+8. **nutritionEntries** - Meal logs
+   - dayId, datetime, mealType
+   - description, calories
+   - proteinG, carbsG, fatsG
+   - context, tags, notes
+
+9. **docs** - SOPs, prompts, playbooks, specs, templates
+   - title, type, domain, status
+   - ventureId, projectId
+   - body (markdown), tags
+
+10. **users** - User profile (single-user system)
+    - email, firstName, lastName, timezone
+
+11. **sessions** - Express session storage
 
 All schemas defined with Zod for runtime validation. Use Drizzle ORM for queries.
+
+### Focus Slots (Time Blocking System)
+
+Tasks can be assigned to specific time blocks for scheduling:
+- **deep_work_1** (9-11am): Deep strategic/creative work
+- **deep_work_2** (2-4pm): Deep execution work
+- **admin_block_1** (11am-12pm): Email, admin, quick tasks
+- **admin_block_2** (4-5pm): Wrap up, admin
+- **morning_routine** (6-9am): Health, planning, breakfast
+- **evening_review** (5-6pm): Review, reflection, planning
+- **meetings**: Anytime: Meetings, calls
+- **buffer**: Anytime: Flex time, unexpected
 
 ## Code Patterns
 
@@ -113,48 +166,43 @@ All schemas defined with Zod for runtime validation. Use Drizzle ORM for queries
 - Zod schemas in `/shared/schema.ts` are source of truth for validation
 - Use `drizzle-zod` for database schema type inference
 
-### AI Assistant Pattern
-The AI assistant uses a confirmation workflow for booking appointments:
-1. User requests appointment → AI calls tools to check availability
-2. If slot found → Store pending confirmation in `pendingConfirmations` Map
-3. User confirms → Execute action (create Google Calendar event + database record)
-4. User cancels → Delete pending confirmation
+### Hierarchy & Relations
+```
+ventures (saas/media/realty/trading/personal)
+  └── projects (product/marketing/ops/etc)
+       └── milestones (Phase 1, Phase 2, etc)
+            └── tasks (atomic work items)
 
-When modifying AI behavior:
-- Update system prompt in `server/ai-assistant.ts:49`
-- Add new tools in the OpenAI function calling configuration
-- Tools must be implemented in the switch statement at the bottom of `processMessage()`
+days (daily logs)
+  └── tasks (scheduled for this day)
+  └── healthEntries
+  └── nutritionEntries
 
-### Multi-Platform Messaging
-WhatsApp webhooks support three providers with different payload formats:
-- **Twilio**: Returns TwiML XML, extracts `Body` and `From` parameters
-- **Meta/Facebook**: JSON payload with `entry[].changes[].value.messages[]`
-- **MessageBird**: JSON payload with `contacts[]` and `messages[]`
-
-Provider detection happens in `server/twilio-whatsapp.ts`. The `platform` column in `whatsappMessages` table stores 'whatsapp' or 'telegram'.
+captureItems (inbox)
+  └── can convert to tasks
+```
 
 ### API Communication
 - Frontend uses TanStack Query with `apiRequest` helper from `client/src/lib/utils.ts`
 - All API calls include credentials for session cookies
-- Query keys follow pattern: `["resource", id]` (e.g., `["user"]`, `["appointments"]`)
+- Query keys follow pattern: `["resource", id]` (e.g., `["ventures"]`, `["tasks"]`)
 
 ### Error Handling
 - Express global error handler catches all route errors
 - Zod validation errors return 400 with validation messages
-- AI errors logged but return friendly user-facing messages
-- Calendar API errors handled gracefully (e.g., event already deleted)
+- Database errors logged and return 500
 
 ## Environment Configuration
 
-Required environment variables (set via Replit Secrets or `.env`):
-- `DATABASE_URL` - Neon PostgreSQL connection string
+Required environment variables (set via `.env`):
+- `DATABASE_URL` - PostgreSQL connection string (Neon or other provider)
 - `SESSION_SECRET` - Express session encryption key
-- `AI_INTEGRATIONS_OPENAI_API_KEY` - OpenAI API key via Replit connector
-- `AI_INTEGRATIONS_OPENAI_BASE_URL` - OpenAI base URL via Replit connector
-- `TELEGRAM_BOT_TOKEN` - Telegram bot token
-- `WEBHOOK_URL` - Public URL for Telegram/WhatsApp webhooks (auto-set by Replit)
+- `PORT` - Server port (default: 5000)
+- `NODE_ENV` - Environment (development/production)
 
-Replit Connectors automatically populate Google Calendar credentials.
+Optional for future AI integration:
+- `OPENAI_API_KEY` - OpenAI API key
+- `TELEGRAM_BOT_TOKEN` - Telegram bot token
 
 ## Important Notes
 
@@ -164,19 +212,16 @@ Replit Connectors automatically populate Google Calendar credentials.
 - Migrations stored in `/migrations` directory
 - DO NOT manually edit migration files
 
-### Telegram Bot Modes
-- **Development**: Uses polling (`bot.launch()`) - no webhook setup required
-- **Production**: Uses webhook (`bot.telegram.setWebhook()`) - requires public URL
-
-### Replit Deployment
-- Only external port 80 is allowed (maps to internal port 5000)
-- Server must handle both API routes and static file serving
-- Graceful shutdown: Telegram bot cleanup on SIGINT/SIGTERM
-
 ### Session Management
 - Sessions stored in PostgreSQL via `connect-pg-simple`
 - Session cookie name: `connect.sid`
-- Auth protected routes check `req.user` (set by Passport.js)
+- Currently using mock auth (single-user system)
+
+### Single-User System
+This is a personal productivity system built for one user. Authentication is simplified:
+- No signup/login flow
+- Mock user returned from `/api/auth/user`
+- Future: Can add proper OAuth if needed
 
 ## Testing
 
@@ -193,12 +238,6 @@ No testing framework currently configured. To add tests:
 3. Update frontend API call in appropriate page component
 4. Use TanStack Query for data fetching/mutations
 
-### Adding a New AI Tool
-1. Define tool schema in `server/ai-assistant.ts` tools array
-2. Implement tool handler in `processMessage()` switch statement
-3. Update system prompt if tool requires context
-4. Test with both WhatsApp and Telegram
-
 ### Modifying Database Schema
 1. Update schema in `/shared/schema.ts`
 2. Run `npm run db:push` to apply changes
@@ -211,3 +250,43 @@ Components are already installed. To add new ones:
 npx shadcn-ui@latest add [component-name]
 ```
 Components appear in `client/src/components/ui/`.
+
+### Adding a New Page
+1. Create page component in `client/src/pages/`
+2. Add route in `client/src/App.tsx`
+3. Add navigation link if needed
+4. Use TanStack Query for data fetching
+
+## Future Roadmap
+
+### Phase 1: Complete Foundation (In Progress)
+- ✅ Core entities (ventures, projects, tasks, captures, docs)
+- ✅ Health & nutrition tracking
+- ✅ Daily planning hub (days table)
+- 🚧 Milestones for project phases
+- 🚧 Budget tracking for projects
+- 🚧 Focus slot scheduling system
+
+### Phase 2: Daily Operations
+- Build comprehensive daily dashboard
+- Morning planning + evening review workflow
+- Focus session timer
+- Task-to-slot assignment UI
+
+### Phase 3: AI Integration
+- Telegram bot for quick queries and task creation
+- GPT assistant for context-aware help
+- Natural language task creation
+- Meeting management and calendar sync
+
+## Project Philosophy
+
+Hikma-OS is designed around these principles:
+
+1. **Single Source of Truth**: All life data in one system
+2. **Hierarchy Matters**: Ventures → Projects → Tasks creates clarity
+3. **Time Blocking**: Assign work to specific time slots
+4. **Daily Rituals**: Morning planning, evening review
+5. **Health = Foundation**: Track wellness alongside work
+6. **Knowledge Base**: SOPs and playbooks for repeatability
+7. **Simple First**: Build what's needed, add complexity later
