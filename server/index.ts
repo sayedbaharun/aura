@@ -17,7 +17,7 @@ const app = express();
 // Security: HTTP headers protection with helmet
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP to prevent blocking static assets
-  crossOriginEmbedderPolicy: false, // Allow embedding for Replit preview
+  crossOriginEmbedderPolicy: false, // Allow embedding in iframes
 }));
 
 // Security: CORS configuration
