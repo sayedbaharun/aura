@@ -44,7 +44,6 @@ export default function EditMealModal({ open, onOpenChange, meal }: EditMealModa
 
   const [formData, setFormData] = useState({
     date: "",
-    time: "",
     mealType: "breakfast",
     description: "",
     calories: "",
@@ -61,7 +60,6 @@ export default function EditMealModal({ open, onOpenChange, meal }: EditMealModa
       const mealDate = new Date(meal.datetime);
       setFormData({
         date: format(mealDate, "yyyy-MM-dd"),
-        time: format(mealDate, "HH:mm"),
         mealType: meal.mealType || "breakfast",
         description: meal.description || "",
         calories: meal.calories?.toString() || "",
@@ -107,7 +105,8 @@ export default function EditMealModal({ open, onOpenChange, meal }: EditMealModa
       return;
     }
 
-    const datetime = new Date(`${formData.date}T${formData.time}`).toISOString();
+    // Use noon as default time since we're not tracking specific meal times
+    const datetime = new Date(`${formData.date}T12:00`).toISOString();
 
     const payload = {
       datetime,
@@ -142,26 +141,15 @@ export default function EditMealModal({ open, onOpenChange, meal }: EditMealModa
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Date and Time */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="time">Time</Label>
-              <Input
-                id="time"
-                type="time"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-              />
-            </div>
+          {/* Date */}
+          <div className="space-y-2">
+            <Label htmlFor="date">Date</Label>
+            <Input
+              id="date"
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            />
           </div>
 
           {/* Meal Type */}

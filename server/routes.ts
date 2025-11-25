@@ -989,6 +989,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // NUTRITION AI - Estimate macros from meal description
+  // ============================================================================
+
+  app.post("/api/nutrition/estimate-macros", async (req, res) => {
+    try {
+      const { description } = req.body;
+
+      if (!description || typeof description !== 'string') {
+        return res.status(400).json({ error: "Description is required" });
+      }
+
+      // Check if OpenAI API key is configured
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({
+          error: "AI service not configured",
+          message: "OpenAI API key is not set. Please configure OPENAI_API_KEY environment variable."
+        });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a nutrition expert. Given a meal description, estimate the nutritional macros.
+Return ONLY a JSON object with these exact fields:
+- calories: number (total kcal)
+- proteinG: number (grams of protein)
+- carbsG: number (grams of carbohydrates)
+- fatsG: number (grams of fat)
+- confidence: "low" | "medium" | "high" (how confident you are in the estimate)
+- notes: string (brief explanation or assumptions made)
+
+Base your estimates on typical portion sizes unless specified. Be conservative and realistic.
+Return ONLY valid JSON, no markdown or explanation outside the JSON.`
+          },
+          {
+            role: "user",
+            content: `Estimate the nutritional macros for: ${description}`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 300,
+      });
+
+      const responseText = completion.choices[0]?.message?.content || "";
+
+      // Parse JSON response
+      try {
+        // Clean the response - remove any markdown code blocks if present
+        const cleanedResponse = responseText
+          .replace(/```json\n?/g, '')
+          .replace(/```\n?/g, '')
+          .trim();
+
+        const macros = JSON.parse(cleanedResponse);
+
+        // Validate the response has required fields
+        if (typeof macros.calories !== 'number' ||
+            typeof macros.proteinG !== 'number' ||
+            typeof macros.carbsG !== 'number' ||
+            typeof macros.fatsG !== 'number') {
+          throw new Error("Invalid macro values");
+        }
+
+        res.json(macros);
+      } catch (parseError) {
+        logger.error({ parseError, responseText }, "Failed to parse AI macro response");
+        res.status(500).json({
+          error: "Failed to parse AI response",
+          message: "The AI returned an invalid response format"
+        });
+      }
+    } catch (error: any) {
+      logger.error({ error }, "Error estimating macros");
+
+      if (error?.status === 401) {
+        res.status(503).json({
+          error: "AI service authentication failed",
+          message: "Invalid OpenAI API key"
+        });
+      } else if (error?.status === 429) {
+        res.status(429).json({
+          error: "Rate limited",
+          message: "Too many requests. Please try again in a moment."
+        });
+      } else {
+        res.status(500).json({ error: "Failed to estimate macros" });
+      }
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

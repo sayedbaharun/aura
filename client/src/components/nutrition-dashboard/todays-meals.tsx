@@ -99,7 +99,6 @@ export default function TodaysMeals({ meals }: TodaysMealsProps) {
           {/* Meals List */}
           <div className="space-y-3">
             {meals.map((meal) => {
-              const mealTime = new Date(meal.datetime);
               const ContextIcon = meal.context ? CONTEXT_ICONS[meal.context as keyof typeof CONTEXT_ICONS] : null;
 
               return (
@@ -112,7 +111,6 @@ export default function TodaysMeals({ meals }: TodaysMealsProps) {
                       >
                         {meal.mealType}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">{format(mealTime, "h:mm a")}</span>
                       {meal.context && ContextIcon && (
                         <Badge variant="secondary" className="flex items-center gap-1">
                           <ContextIcon className="h-3 w-3" />
