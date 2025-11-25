@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,6 +121,22 @@ export default function MorningRitual() {
 
   const activeVentures = ventures.filter(v => v.status === "active" || v.status === "development");
 
+  // Fetch yesterday's day data for syncing priorities
+  const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
+  const { data: yesterdayData } = useQuery<Day & {
+    eveningRituals?: {
+      tomorrowPriorities?: string[];
+    } | null;
+  }>({
+    queryKey: ["/api/days", yesterday],
+    queryFn: async () => {
+      const res = await fetch(`/api/days/${yesterday}`, { credentials: "include" });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("Failed to fetch yesterday's day");
+      return await res.json();
+    },
+  });
+
   // Initialize rituals from habit config
   useEffect(() => {
     if (enabledHabits.length > 0 && Object.keys(rituals).length === 0) {
@@ -159,14 +175,36 @@ export default function MorningRitual() {
         setRituals(loaded);
       }
 
+      // Use existing top3Outcomes if available, otherwise sync from yesterday's evening priorities
+      let top3 = dayData.top3Outcomes || "";
+      if (!top3 && yesterdayData?.eveningRituals?.tomorrowPriorities) {
+        const priorities = yesterdayData.eveningRituals.tomorrowPriorities.filter(p => p.trim());
+        if (priorities.length > 0) {
+          top3 = priorities.map((p, i) => `${i + 1}. ${p}`).join("\n");
+        }
+      }
+
       setPlanning({
-        top3Outcomes: dayData.top3Outcomes || "",
+        top3Outcomes: top3,
         oneThingToShip: dayData.oneThingToShip || "",
         reflectionAm: dayData.reflectionAm || "",
         primaryVentureFocus: dayData.primaryVentureFocus || "",
       });
     }
-  }, [dayData, enabledHabits]);
+  }, [dayData, enabledHabits, yesterdayData]);
+
+  // If no day data exists yet, still try to sync from yesterday's priorities
+  useEffect(() => {
+    if (!dayData && yesterdayData?.eveningRituals?.tomorrowPriorities) {
+      const priorities = yesterdayData.eveningRituals.tomorrowPriorities.filter(p => p.trim());
+      if (priorities.length > 0 && !planning.top3Outcomes) {
+        setPlanning(prev => ({
+          ...prev,
+          top3Outcomes: priorities.map((p, i) => `${i + 1}. ${p}`).join("\n"),
+        }));
+      }
+    }
+  }, [dayData, yesterdayData]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -406,6 +444,13 @@ export default function MorningRitual() {
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Target className="h-5 w-5 text-blue-500" />
                 Top 3 Outcomes
+                {yesterdayData?.eveningRituals?.tomorrowPriorities &&
+                  yesterdayData.eveningRituals.tomorrowPriorities.filter(p => p.trim()).length > 0 &&
+                  !dayData?.top3Outcomes && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      Synced from last night
+                    </Badge>
+                  )}
               </CardTitle>
               <CardDescription>
                 What would make today a win?
@@ -480,7 +525,7 @@ export default function MorningRitual() {
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
         <Button variant="outline" asChild>
-          <Link href="/">
+          <Link href="/dashboard">
             <ChevronRight className="h-4 w-4 mr-2" />
             Go to Command Center
           </Link>

@@ -14,6 +14,8 @@ import {
   insertAttachmentSchema,
   insertUserPreferencesSchema,
   insertCustomCategorySchema,
+  insertShoppingItemSchema,
+  insertBookSchema,
 } from "@shared/schema";
 import { getAllIntegrationStatuses, getIntegrationStatus } from "./integrations";
 import { z } from "zod";
@@ -1887,6 +1889,175 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
     } catch (error) {
       logger.error({ error }, "Error getting knowledge base folder");
       res.status(500).json({ error: "Failed to get knowledge base folder" });
+    }
+  });
+
+  // ============================================================================
+  // SHOPPING ITEMS
+  // ============================================================================
+
+  // Get all shopping items (with optional filters)
+  app.get("/api/shopping", async (req, res) => {
+    try {
+      const filters = {
+        status: req.query.status as string,
+        priority: req.query.priority as string,
+        category: req.query.category as string,
+      };
+
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const items = await storage.getShoppingItems(cleanFilters);
+      res.json(items);
+    } catch (error) {
+      logger.error({ error }, "Error fetching shopping items");
+      res.status(500).json({ error: "Failed to fetch shopping items" });
+    }
+  });
+
+  // Get single shopping item
+  app.get("/api/shopping/:id", async (req, res) => {
+    try {
+      const item = await storage.getShoppingItem(req.params.id);
+      if (!item) {
+        return res.status(404).json({ error: "Shopping item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      logger.error({ error }, "Error fetching shopping item");
+      res.status(500).json({ error: "Failed to fetch shopping item" });
+    }
+  });
+
+  // Create shopping item
+  app.post("/api/shopping", async (req, res) => {
+    try {
+      const validatedData = insertShoppingItemSchema.parse(req.body);
+      const item = await storage.createShoppingItem(validatedData);
+      res.status(201).json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid shopping item data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating shopping item");
+        res.status(500).json({ error: "Failed to create shopping item" });
+      }
+    }
+  });
+
+  // Update shopping item
+  app.patch("/api/shopping/:id", async (req, res) => {
+    try {
+      const updates = insertShoppingItemSchema.partial().parse(req.body);
+      const item = await storage.updateShoppingItem(req.params.id, updates);
+      if (!item) {
+        return res.status(404).json({ error: "Shopping item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid shopping item data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating shopping item");
+        res.status(500).json({ error: "Failed to update shopping item" });
+      }
+    }
+  });
+
+  // Delete shopping item
+  app.delete("/api/shopping/:id", async (req, res) => {
+    try {
+      await storage.deleteShoppingItem(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting shopping item");
+      res.status(500).json({ error: "Failed to delete shopping item" });
+    }
+  });
+
+  // ============================================================================
+  // BOOKS
+  // ============================================================================
+
+  // Get all books (with optional filters)
+  app.get("/api/books", async (req, res) => {
+    try {
+      const filters = {
+        status: req.query.status as string,
+        platform: req.query.platform as string,
+      };
+
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const books = await storage.getBooks(cleanFilters);
+      res.json(books);
+    } catch (error) {
+      logger.error({ error }, "Error fetching books");
+      res.status(500).json({ error: "Failed to fetch books" });
+    }
+  });
+
+  // Get single book
+  app.get("/api/books/:id", async (req, res) => {
+    try {
+      const book = await storage.getBook(req.params.id);
+      if (!book) {
+        return res.status(404).json({ error: "Book not found" });
+      }
+      res.json(book);
+    } catch (error) {
+      logger.error({ error }, "Error fetching book");
+      res.status(500).json({ error: "Failed to fetch book" });
+    }
+  });
+
+  // Create book
+  app.post("/api/books", async (req, res) => {
+    try {
+      const validatedData = insertBookSchema.parse(req.body);
+      const book = await storage.createBook(validatedData);
+      res.status(201).json(book);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid book data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating book");
+        res.status(500).json({ error: "Failed to create book" });
+      }
+    }
+  });
+
+  // Update book
+  app.patch("/api/books/:id", async (req, res) => {
+    try {
+      const updates = insertBookSchema.partial().parse(req.body);
+      const book = await storage.updateBook(req.params.id, updates);
+      if (!book) {
+        return res.status(404).json({ error: "Book not found" });
+      }
+      res.json(book);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid book data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating book");
+        res.status(500).json({ error: "Failed to update book" });
+      }
+    }
+  });
+
+  // Delete book
+  app.delete("/api/books/:id", async (req, res) => {
+    try {
+      await storage.deleteBook(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting book");
+      res.status(500).json({ error: "Failed to delete book" });
     }
   });
 

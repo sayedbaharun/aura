@@ -25,6 +25,10 @@ import {
   type InsertUserPreferences,
   type CustomCategory,
   type InsertCustomCategory,
+  type ShoppingItem,
+  type InsertShoppingItem,
+  type Book,
+  type InsertBook,
   ventures,
   projects,
   milestones,
@@ -38,6 +42,8 @@ import {
   users,
   userPreferences,
   customCategories,
+  shoppingItems,
+  books,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like } from "drizzle-orm";
@@ -149,6 +155,20 @@ export interface IStorage {
   createCategory(data: InsertCustomCategory): Promise<CustomCategory>;
   updateCategory(id: string, data: Partial<InsertCustomCategory>): Promise<CustomCategory | undefined>;
   deleteCategory(id: string): Promise<void>;
+
+  // Shopping Items
+  getShoppingItems(filters?: { status?: string; priority?: string; category?: string }): Promise<ShoppingItem[]>;
+  getShoppingItem(id: string): Promise<ShoppingItem | undefined>;
+  createShoppingItem(data: InsertShoppingItem): Promise<ShoppingItem>;
+  updateShoppingItem(id: string, data: Partial<InsertShoppingItem>): Promise<ShoppingItem | undefined>;
+  deleteShoppingItem(id: string): Promise<void>;
+
+  // Books
+  getBooks(filters?: { status?: string; platform?: string }): Promise<Book[]>;
+  getBook(id: string): Promise<Book | undefined>;
+  createBook(data: InsertBook): Promise<Book>;
+  updateBook(id: string, data: Partial<InsertBook>): Promise<Book | undefined>;
+  deleteBook(id: string): Promise<void>;
 }
 
 // PostgreSQL Storage Implementation
@@ -965,6 +985,115 @@ export class DBStorage implements IStorage {
 
   async deleteCategory(id: string): Promise<void> {
     await this.db.delete(customCategories).where(eq(customCategories.id, id));
+  }
+
+  // ============================================================================
+  // SHOPPING ITEMS
+  // ============================================================================
+
+  async getShoppingItems(filters?: { status?: string; priority?: string; category?: string }): Promise<ShoppingItem[]> {
+    const conditions = [];
+
+    if (filters?.status) {
+      conditions.push(eq(shoppingItems.status, filters.status as any));
+    }
+    if (filters?.priority) {
+      conditions.push(eq(shoppingItems.priority, filters.priority as any));
+    }
+    if (filters?.category) {
+      conditions.push(eq(shoppingItems.category, filters.category as any));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(shoppingItems)
+      .where(whereClause)
+      .orderBy(shoppingItems.priority, desc(shoppingItems.createdAt));
+  }
+
+  async getShoppingItem(id: string): Promise<ShoppingItem | undefined> {
+    const [item] = await this.db
+      .select()
+      .from(shoppingItems)
+      .where(eq(shoppingItems.id, id))
+      .limit(1);
+    return item;
+  }
+
+  async createShoppingItem(data: InsertShoppingItem): Promise<ShoppingItem> {
+    const [item] = await this.db
+      .insert(shoppingItems)
+      .values(data)
+      .returning();
+    return item;
+  }
+
+  async updateShoppingItem(id: string, updates: Partial<InsertShoppingItem>): Promise<ShoppingItem | undefined> {
+    const [updated] = await this.db
+      .update(shoppingItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(shoppingItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteShoppingItem(id: string): Promise<void> {
+    await this.db.delete(shoppingItems).where(eq(shoppingItems.id, id));
+  }
+
+  // ============================================================================
+  // BOOKS
+  // ============================================================================
+
+  async getBooks(filters?: { status?: string; platform?: string }): Promise<Book[]> {
+    const conditions = [];
+
+    if (filters?.status) {
+      conditions.push(eq(books.status, filters.status as any));
+    }
+    if (filters?.platform) {
+      conditions.push(eq(books.platform, filters.platform as any));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(books)
+      .where(whereClause)
+      .orderBy(desc(books.createdAt));
+  }
+
+  async getBook(id: string): Promise<Book | undefined> {
+    const [book] = await this.db
+      .select()
+      .from(books)
+      .where(eq(books.id, id))
+      .limit(1);
+    return book;
+  }
+
+  async createBook(data: InsertBook): Promise<Book> {
+    const [book] = await this.db
+      .insert(books)
+      .values(data)
+      .returning();
+    return book;
+  }
+
+  async updateBook(id: string, updates: Partial<InsertBook>): Promise<Book | undefined> {
+    const [updated] = await this.db
+      .update(books)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(books.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBook(id: string): Promise<void> {
+    await this.db.delete(books).where(eq(books.id, id));
   }
 }
 

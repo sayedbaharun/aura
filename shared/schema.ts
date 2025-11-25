@@ -819,3 +819,75 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
     references: [docs.id],
   }),
 }));
+
+// ----------------------------------------------------------------------------
+// SHOPPING ITEMS
+// ----------------------------------------------------------------------------
+
+export const shoppingPriorityEnum = pgEnum('shopping_priority', ['P1', 'P2', 'P3']);
+export const shoppingStatusEnum = pgEnum('shopping_status', ['to_buy', 'purchased']);
+export const shoppingCategoryEnum = pgEnum('shopping_category', ['groceries', 'personal', 'household', 'business']);
+
+export const shoppingItems = pgTable(
+  "shopping_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    item: text("item").notNull(),
+    priority: shoppingPriorityEnum("priority").default("P2").notNull(),
+    status: shoppingStatusEnum("status").default("to_buy").notNull(),
+    category: shoppingCategoryEnum("category").default("personal"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_shopping_items_status").on(table.status),
+    index("idx_shopping_items_priority").on(table.priority),
+    index("idx_shopping_items_category").on(table.category),
+    index("idx_shopping_items_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertShoppingItemSchema = createInsertSchema(shoppingItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShoppingItem = z.infer<typeof insertShoppingItemSchema>;
+export type ShoppingItem = typeof shoppingItems.$inferSelect;
+
+// ----------------------------------------------------------------------------
+// BOOKS
+// ----------------------------------------------------------------------------
+
+export const bookPlatformEnum = pgEnum('book_platform', ['kindle', 'audible', 'physical']);
+export const bookStatusEnum = pgEnum('book_status', ['to_read', 'reading', 'finished']);
+
+export const books = pgTable(
+  "books",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    author: text("author"),
+    platform: bookPlatformEnum("platform").default("kindle"),
+    status: bookStatusEnum("status").default("to_read").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_books_status").on(table.status),
+    index("idx_books_platform").on(table.platform),
+    index("idx_books_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertBookSchema = createInsertSchema(books).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertBook = z.infer<typeof insertBookSchema>;
+export type Book = typeof books.$inferSelect;
