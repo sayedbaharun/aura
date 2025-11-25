@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { CheckCircle2, Circle, Trash2, Pencil } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Pencil, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTaskDetailModal } from "@/lib/task-detail-modal-store";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import CreateTaskModal from "@/components/create-task-modal";
 
 interface Task {
   id: string;
@@ -41,6 +42,7 @@ interface Project {
 export default function TasksForToday() {
   const { toast } = useToast();
   const { openTaskDetail } = useTaskDetailModal();
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks/today"],
@@ -187,9 +189,14 @@ export default function TasksForToday() {
 
   if (tasks.length === 0) {
     return (
+      <>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Tasks for Today</CardTitle>
+          <Button size="sm" onClick={() => setCreateModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Task
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center h-[300px] text-center">
@@ -198,16 +205,31 @@ export default function TasksForToday() {
             <p className="text-sm text-muted-foreground mt-1">
               Enjoy your free time or add some tasks to get started.
             </p>
+            <Button className="mt-4" onClick={() => setCreateModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Your First Task
+            </Button>
           </div>
         </CardContent>
       </Card>
+      <CreateTaskModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        defaultFocusDate={new Date().toISOString().split("T")[0]}
+      />
+      </>
     );
   }
 
   return (
+    <>
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Tasks for Today ({tasks.length})</CardTitle>
+        <Button size="sm" onClick={() => setCreateModalOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Task
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -278,5 +300,12 @@ export default function TasksForToday() {
         </div>
       </CardContent>
     </Card>
+
+    <CreateTaskModal
+      open={createModalOpen}
+      onOpenChange={setCreateModalOpen}
+      defaultFocusDate={new Date().toISOString().split("T")[0]}
+    />
+    </>
   );
 }

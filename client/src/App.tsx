@@ -18,6 +18,7 @@ import KnowledgeHub from "@/pages/knowledge-hub";
 import DocDetail from "@/pages/doc-detail";
 import DeepWork from "@/pages/deep-work";
 import NotificationsPage from "@/pages/notifications";
+import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { dailyRemindersService } from "@/lib/daily-reminders";
@@ -40,6 +41,7 @@ function Router() {
         <Route path="/knowledge/:id" component={DocDetail} />
         <Route path="/deep-work" component={DeepWork} />
         <Route path="/notifications" component={NotificationsPage} />
+        <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

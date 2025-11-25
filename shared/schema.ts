@@ -83,10 +83,15 @@ export const taskTypeEnum = pgEnum('task_type', [
 ]);
 
 export const domainEnum = pgEnum('domain', [
+  'home',
   'work',
   'health',
-  'personal',
-  'learning'
+  'finance',
+  'travel',
+  'learning',
+  'play',
+  'calls',
+  'personal'
 ]);
 
 export const focusSlotEnum = pgEnum('focus_slot', [

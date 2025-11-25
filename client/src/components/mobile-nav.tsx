@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus } from "lucide-react";
+import { Menu, LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus, Settings } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ const links = [
   { href: "/health", label: "Health", icon: Heart },
   { href: "/nutrition", label: "Nutrition", icon: Apple },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function MobileNav() {

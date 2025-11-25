@@ -5,10 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, CheckSquare } from "lucide-react";
+import { Trash2, CheckSquare, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import CreateTaskModal from "@/components/create-task-modal";
 
 interface Task {
   id: string;
@@ -36,6 +37,7 @@ interface TasksListProps {
 
 export default function TasksList({ ventureId }: TasksListProps) {
   const { toast } = useToast();
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -198,9 +200,14 @@ export default function TasksList({ ventureId }: TasksListProps) {
   }
 
   return (
+    <>
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Tasks ({filteredTasks.length})</CardTitle>
+        <Button size="sm" onClick={() => setCreateModalOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Task
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -322,5 +329,12 @@ export default function TasksList({ ventureId }: TasksListProps) {
         </div>
       </CardContent>
     </Card>
+
+    <CreateTaskModal
+      open={createModalOpen}
+      onOpenChange={setCreateModalOpen}
+      defaultVentureId={ventureId}
+    />
+    </>
   );
 }

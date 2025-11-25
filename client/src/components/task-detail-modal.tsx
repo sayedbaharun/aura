@@ -46,7 +46,7 @@ interface Task {
   status: 'idea' | 'next' | 'in_progress' | 'waiting' | 'done' | 'cancelled';
   priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
   type: 'business' | 'deep_work' | 'admin' | 'health' | 'learning' | 'personal' | null;
-  domain: 'work' | 'health' | 'personal' | 'learning' | null;
+  domain: 'home' | 'work' | 'health' | 'finance' | 'travel' | 'learning' | 'play' | 'calls' | 'personal' | null;
   ventureId: string | null;
   projectId: string | null;
   milestoneId: string | null;
@@ -705,10 +705,15 @@ export default function TaskDetailModal() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="home">Home</SelectItem>
                   <SelectItem value="work">Work</SelectItem>
                   <SelectItem value="health">Health</SelectItem>
-                  <SelectItem value="personal">Personal</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="travel">Travel</SelectItem>
                   <SelectItem value="learning">Learning</SelectItem>
+                  <SelectItem value="play">Play</SelectItem>
+                  <SelectItem value="calls">Calls</SelectItem>
+                  <SelectItem value="personal">Personal</SelectItem>
                 </SelectContent>
               </Select>
             </div>

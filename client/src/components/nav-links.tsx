@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus } from "lucide-react";
+import { LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus, Settings } from "lucide-react";
 
 const links = [
   { href: "/", label: "Command Center", icon: LayoutDashboard },
@@ -9,6 +9,7 @@ const links = [
   { href: "/health", label: "Health", icon: Heart },
   { href: "/nutrition", label: "Nutrition", icon: Apple },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function NavLinks() {
