@@ -74,6 +74,7 @@ export default function IntegrationsStatus() {
           <ul className="text-sm text-muted-foreground mt-3 space-y-1 list-disc list-inside">
             <li>OpenRouter: Set <code className="bg-muted px-1 py-0.5 rounded">OPENROUTER_API_KEY</code></li>
             <li>Google Calendar: Set <code className="bg-muted px-1 py-0.5 rounded">GOOGLE_CALENDAR_CLIENT_ID</code>, <code className="bg-muted px-1 py-0.5 rounded">CLIENT_SECRET</code>, <code className="bg-muted px-1 py-0.5 rounded">REFRESH_TOKEN</code></li>
+            <li>Google Drive: Uses Calendar credentials by default, or set separate <code className="bg-muted px-1 py-0.5 rounded">GOOGLE_DRIVE_*</code> credentials</li>
             <li>Gmail: Set <code className="bg-muted px-1 py-0.5 rounded">GMAIL_CLIENT_ID</code>, <code className="bg-muted px-1 py-0.5 rounded">CLIENT_SECRET</code>, <code className="bg-muted px-1 py-0.5 rounded">REFRESH_TOKEN</code></li>
             <li>Telegram: Set <code className="bg-muted px-1 py-0.5 rounded">TELEGRAM_BOT_TOKEN</code></li>
           </ul>

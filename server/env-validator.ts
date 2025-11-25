@@ -42,14 +42,29 @@ export function validateEnvironment(): ValidationResult {
   }
 
   // Google Calendar (required for core functionality)
-  if (!process.env.GOOGLE_CALENDAR_CLIENT_ID) {
-    warnings.push('GOOGLE_CALENDAR_CLIENT_ID not configured - Calendar integration disabled');
+  const hasGoogleCalendarCreds = process.env.GOOGLE_CALENDAR_CLIENT_ID &&
+    process.env.GOOGLE_CALENDAR_CLIENT_SECRET &&
+    process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
+
+  if (!hasGoogleCalendarCreds) {
+    if (!process.env.GOOGLE_CALENDAR_CLIENT_ID) {
+      warnings.push('GOOGLE_CALENDAR_CLIENT_ID not configured - Calendar integration disabled');
+    }
+    if (!process.env.GOOGLE_CALENDAR_CLIENT_SECRET) {
+      warnings.push('GOOGLE_CALENDAR_CLIENT_SECRET not configured - Calendar integration disabled');
+    }
+    if (!process.env.GOOGLE_CALENDAR_REFRESH_TOKEN) {
+      warnings.push('GOOGLE_CALENDAR_REFRESH_TOKEN not configured - Calendar integration disabled');
+    }
   }
-  if (!process.env.GOOGLE_CALENDAR_CLIENT_SECRET) {
-    warnings.push('GOOGLE_CALENDAR_CLIENT_SECRET not configured - Calendar integration disabled');
-  }
-  if (!process.env.GOOGLE_CALENDAR_REFRESH_TOKEN) {
-    warnings.push('GOOGLE_CALENDAR_REFRESH_TOKEN not configured - Calendar integration disabled');
+
+  // Google Drive (uses Calendar credentials if Drive-specific not set)
+  const hasDriveCreds = (process.env.GOOGLE_DRIVE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID) &&
+    (process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET) &&
+    (process.env.GOOGLE_DRIVE_REFRESH_TOKEN || process.env.GOOGLE_CALENDAR_REFRESH_TOKEN);
+
+  if (!hasDriveCreds) {
+    warnings.push('Google Drive not configured - Knowledge Base sync disabled (set GOOGLE_DRIVE_* or reuse GOOGLE_CALENDAR_* credentials with Drive scope)');
   }
 
   // Gmail (optional but recommended)

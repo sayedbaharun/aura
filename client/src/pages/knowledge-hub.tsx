@@ -4,8 +4,11 @@ import { KnowledgeHubHeader } from "@/components/knowledge-hub/knowledge-hub-hea
 import { FiltersSidebar, DocsFilters } from "@/components/knowledge-hub/filters-sidebar";
 import { DocsLibrary } from "@/components/knowledge-hub/docs-library";
 import { DocEditorModal } from "@/components/knowledge-hub/doc-editor-modal";
+import { DriveFilesBrowser } from "@/components/knowledge-hub/drive-files-browser";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, Cloud } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -170,23 +173,42 @@ export default function KnowledgeHub() {
         onViewModeChange={setViewMode}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <DocsLibrary
-            docs={displayedDocs}
-            viewMode={viewMode}
-            ventures={ventures}
-            projects={projects}
-            onEdit={handleEditDoc}
-            onDelete={handleDeleteDoc}
-            onDuplicate={handleDuplicateDoc}
-          />
-        </div>
+      <Tabs defaultValue="local" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="local" className="gap-2">
+            <BookOpen className="h-4 w-4" />
+            Local Docs
+          </TabsTrigger>
+          <TabsTrigger value="drive" className="gap-2">
+            <Cloud className="h-4 w-4" />
+            Google Drive
+          </TabsTrigger>
+        </TabsList>
 
-        <div>
-          <FiltersSidebar filters={filters} onFiltersChange={setFilters} />
-        </div>
-      </div>
+        <TabsContent value="local">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3">
+              <DocsLibrary
+                docs={displayedDocs}
+                viewMode={viewMode}
+                ventures={ventures}
+                projects={projects}
+                onEdit={handleEditDoc}
+                onDelete={handleDeleteDoc}
+                onDuplicate={handleDuplicateDoc}
+              />
+            </div>
+
+            <div>
+              <FiltersSidebar filters={filters} onFiltersChange={setFilters} />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="drive">
+          <DriveFilesBrowser />
+        </TabsContent>
+      </Tabs>
 
       {/* Editor Modal */}
       <DocEditorModal

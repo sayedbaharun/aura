@@ -180,6 +180,64 @@ async function checkGmail(): Promise<IntegrationInfo> {
 }
 
 /**
+ * Check Google Drive OAuth credentials (uses Calendar creds if not set)
+ */
+async function checkGoogleDrive(): Promise<IntegrationInfo> {
+  const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN || process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    return {
+      name: "Google Drive",
+      status: "not_configured",
+      description: "Knowledge Base sync and file storage",
+      lastChecked: new Date().toISOString(),
+    };
+  }
+
+  try {
+    // Try to refresh the access token to verify credentials
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+
+    if (response.ok) {
+      return {
+        name: "Google Drive",
+        status: "connected",
+        description: "Knowledge Base sync and file storage",
+        lastChecked: new Date().toISOString(),
+      };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        name: "Google Drive",
+        status: "error",
+        description: "Knowledge Base sync and file storage",
+        lastChecked: new Date().toISOString(),
+        errorMessage: errorData.error_description || `HTTP ${response.status}`,
+      };
+    }
+  } catch (error: any) {
+    return {
+      name: "Google Drive",
+      status: "error",
+      description: "Knowledge Base sync and file storage",
+      lastChecked: new Date().toISOString(),
+      errorMessage: error.message || "Connection failed",
+    };
+  }
+}
+
+/**
  * Check Telegram Bot connection
  */
 async function checkTelegram(): Promise<IntegrationInfo> {
@@ -235,6 +293,7 @@ export async function getAllIntegrationStatuses(): Promise<IntegrationInfo[]> {
   const results = await Promise.all([
     checkOpenRouter(),
     checkGoogleCalendar(),
+    checkGoogleDrive(),
     checkGmail(),
     checkTelegram(),
   ]);
@@ -249,6 +308,7 @@ export async function getIntegrationStatus(name: string): Promise<IntegrationInf
   const checks: Record<string, () => Promise<IntegrationInfo>> = {
     openrouter: checkOpenRouter,
     "google-calendar": checkGoogleCalendar,
+    "google-drive": checkGoogleDrive,
     gmail: checkGmail,
     telegram: checkTelegram,
   };
