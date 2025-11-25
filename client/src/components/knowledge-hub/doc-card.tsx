@@ -151,8 +151,8 @@ export function DocCard({
       <CardContent>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Badge className={domainColors[doc.domain as keyof typeof domainColors]}>
-              {doc.domain.replace("_", " ")}
+            <Badge className={domainColors[(doc.domain || "personal") as keyof typeof domainColors]}>
+              {(doc.domain || "general").replace("_", " ")}
             </Badge>
             <Badge className={statusColors[doc.status as keyof typeof statusColors]}>
               {doc.status}
