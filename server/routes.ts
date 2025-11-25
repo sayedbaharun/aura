@@ -12,7 +12,10 @@ import {
   insertNutritionEntrySchema,
   insertDocSchema,
   insertAttachmentSchema,
+  insertUserPreferencesSchema,
+  insertCustomCategorySchema,
 } from "@shared/schema";
+import { getAllIntegrationStatuses, getIntegrationStatus } from "./integrations";
 import { z } from "zod";
 import { logger } from "./logger";
 
@@ -1082,6 +1085,271 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
       } else {
         res.status(500).json({ error: "Failed to estimate macros" });
       }
+    }
+  });
+
+  // ============================================================================
+  // SETTINGS - USER PREFERENCES
+  // ============================================================================
+
+  // Get user preferences
+  app.get("/api/settings/preferences", async (req, res) => {
+    try {
+      const userId = "default-user"; // Mock user for single-user system
+      const prefs = await storage.getUserPreferences(userId);
+
+      // Return default preferences if none exist
+      if (!prefs) {
+        res.json({
+          userId,
+          theme: "system",
+          morningRitualConfig: null,
+          notificationSettings: null,
+        });
+        return;
+      }
+
+      res.json(prefs);
+    } catch (error) {
+      logger.error({ error }, "Error fetching user preferences");
+      res.status(500).json({ error: "Failed to fetch preferences" });
+    }
+  });
+
+  // Update user preferences
+  app.patch("/api/settings/preferences", async (req, res) => {
+    try {
+      const userId = "default-user";
+      const updates = insertUserPreferencesSchema.partial().parse(req.body);
+      const prefs = await storage.upsertUserPreferences(userId, updates);
+      res.json(prefs);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid preferences data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating user preferences");
+        res.status(500).json({ error: "Failed to update preferences" });
+      }
+    }
+  });
+
+  // ============================================================================
+  // SETTINGS - MORNING RITUAL CONFIG
+  // ============================================================================
+
+  // Get morning ritual config
+  app.get("/api/settings/morning-ritual", async (req, res) => {
+    try {
+      const userId = "default-user";
+      const prefs = await storage.getUserPreferences(userId);
+
+      // Return default config if none exists
+      if (!prefs?.morningRitualConfig) {
+        const defaultConfig = {
+          habits: [
+            { key: "press_ups", label: "Press-ups", icon: "Dumbbell", hasCount: true, countLabel: "reps", defaultCount: 50, enabled: true },
+            { key: "squats", label: "Squats", icon: "Dumbbell", hasCount: true, countLabel: "reps", defaultCount: 50, enabled: true },
+            { key: "supplements", label: "Supplements", icon: "Pill", hasCount: false, enabled: true },
+            { key: "reading", label: "Read 10 pages", icon: "BookOpen", hasCount: true, countLabel: "pages", defaultCount: 10, enabled: true },
+          ],
+        };
+        res.json(defaultConfig);
+        return;
+      }
+
+      res.json(prefs.morningRitualConfig);
+    } catch (error) {
+      logger.error({ error }, "Error fetching morning ritual config");
+      res.status(500).json({ error: "Failed to fetch morning ritual config" });
+    }
+  });
+
+  // Update morning ritual config
+  app.patch("/api/settings/morning-ritual", async (req, res) => {
+    try {
+      const userId = "default-user";
+      const morningRitualConfig = req.body;
+
+      const prefs = await storage.upsertUserPreferences(userId, { morningRitualConfig });
+      res.json(prefs.morningRitualConfig);
+    } catch (error) {
+      logger.error({ error }, "Error updating morning ritual config");
+      res.status(500).json({ error: "Failed to update morning ritual config" });
+    }
+  });
+
+  // ============================================================================
+  // SETTINGS - INTEGRATIONS STATUS
+  // ============================================================================
+
+  // Get all integration statuses
+  app.get("/api/settings/integrations", async (req, res) => {
+    try {
+      const statuses = await getAllIntegrationStatuses();
+      res.json(statuses);
+    } catch (error) {
+      logger.error({ error }, "Error fetching integration statuses");
+      res.status(500).json({ error: "Failed to fetch integration statuses" });
+    }
+  });
+
+  // Get specific integration status
+  app.get("/api/settings/integrations/:name", async (req, res) => {
+    try {
+      const status = await getIntegrationStatus(req.params.name);
+      if (!status) {
+        return res.status(404).json({ error: "Integration not found" });
+      }
+      res.json(status);
+    } catch (error) {
+      logger.error({ error }, "Error fetching integration status");
+      res.status(500).json({ error: "Failed to fetch integration status" });
+    }
+  });
+
+  // ============================================================================
+  // SETTINGS - CUSTOM CATEGORIES
+  // ============================================================================
+
+  // Get all categories (with optional type filter)
+  app.get("/api/settings/categories", async (req, res) => {
+    try {
+      const filters = {
+        type: req.query.type as string,
+        enabled: req.query.enabled === "true" ? true : req.query.enabled === "false" ? false : undefined,
+      };
+
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined)
+      );
+
+      const categories = await storage.getCategories(cleanFilters);
+      res.json(categories);
+    } catch (error) {
+      logger.error({ error }, "Error fetching categories");
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  // Get single category
+  app.get("/api/settings/categories/:id", async (req, res) => {
+    try {
+      const category = await storage.getCategory(req.params.id);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      logger.error({ error }, "Error fetching category");
+      res.status(500).json({ error: "Failed to fetch category" });
+    }
+  });
+
+  // Create category
+  app.post("/api/settings/categories", async (req, res) => {
+    try {
+      const validatedData = insertCustomCategorySchema.parse(req.body);
+      const category = await storage.createCategory(validatedData);
+      res.status(201).json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid category data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating category");
+        res.status(500).json({ error: "Failed to create category" });
+      }
+    }
+  });
+
+  // Update category
+  app.patch("/api/settings/categories/:id", async (req, res) => {
+    try {
+      const updates = insertCustomCategorySchema.partial().parse(req.body);
+      const category = await storage.updateCategory(req.params.id, updates);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid category data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating category");
+        res.status(500).json({ error: "Failed to update category" });
+      }
+    }
+  });
+
+  // Delete category
+  app.delete("/api/settings/categories/:id", async (req, res) => {
+    try {
+      // Check if it's a default category (prevent deletion)
+      const category = await storage.getCategory(req.params.id);
+      if (category?.metadata?.isDefault) {
+        return res.status(400).json({ error: "Cannot delete default categories" });
+      }
+
+      await storage.deleteCategory(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting category");
+      res.status(500).json({ error: "Failed to delete category" });
+    }
+  });
+
+  // ============================================================================
+  // SETTINGS - USER PROFILE
+  // ============================================================================
+
+  // Get user profile
+  app.get("/api/settings/profile", async (req, res) => {
+    try {
+      const userId = "default-user";
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        // Return default profile
+        res.json({
+          id: userId,
+          email: "sayed@hikmadigital.com",
+          firstName: "Sayed",
+          lastName: "Baharun",
+          timezone: "Asia/Dubai",
+          dateFormat: "yyyy-MM-dd",
+          timeFormat: "24h",
+          weekStartsOn: 0,
+        });
+        return;
+      }
+
+      res.json(user);
+    } catch (error) {
+      logger.error({ error }, "Error fetching user profile");
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  // Update user profile
+  app.patch("/api/settings/profile", async (req, res) => {
+    try {
+      const userId = "default-user";
+      const { firstName, lastName, timezone, dateFormat, timeFormat, weekStartsOn } = req.body;
+
+      const user = await storage.upsertUser({
+        id: userId,
+        email: "sayed@hikmadigital.com",
+        firstName,
+        lastName,
+        timezone,
+        dateFormat,
+        timeFormat,
+        weekStartsOn,
+      });
+
+      res.json(user);
+    } catch (error) {
+      logger.error({ error }, "Error updating user profile");
+      res.status(500).json({ error: "Failed to update profile" });
     }
   });
 

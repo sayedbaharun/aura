@@ -185,6 +185,14 @@ export const milestoneStatusEnum = pgEnum('milestone_status', [
   'blocked'
 ]);
 
+export const categoryTypeEnum = pgEnum('category_type', [
+  'domain',
+  'task_type',
+  'focus_slot'
+]);
+
+export const themeEnum = pgEnum('theme', ['light', 'dark', 'system']);
+
 // ----------------------------------------------------------------------------
 // CORE TABLES (Keep from Aura)
 // ----------------------------------------------------------------------------
@@ -208,12 +216,98 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   timezone: varchar("timezone").default("Asia/Dubai"),
+  dateFormat: varchar("date_format").default("yyyy-MM-dd"),
+  timeFormat: varchar("time_format").default("24h"),
+  weekStartsOn: integer("week_starts_on").default(0), // 0 = Sunday
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// User preferences - Theme, morning ritual config, notification settings
+export interface MorningHabitConfig {
+  key: string;
+  label: string;
+  icon: string;
+  hasCount: boolean;
+  countLabel?: string;
+  defaultCount?: number;
+  enabled: boolean;
+}
+
+export interface NotificationSettingsConfig {
+  browserNotifications?: boolean;
+  taskDueReminders?: boolean;
+  taskOverdueAlerts?: boolean;
+  healthReminders?: boolean;
+  weeklyPlanningReminders?: boolean;
+  dailyReflectionPrompts?: boolean;
+  healthReminderTime?: string;
+  weeklyPlanningDay?: number;
+  weeklyPlanningTime?: string;
+  dailyReflectionTime?: string;
+  doNotDisturb?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+}
+
+export const userPreferences = pgTable("user_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  theme: themeEnum("theme").default("system"),
+  morningRitualConfig: jsonb("morning_ritual_config").$type<{
+    habits: MorningHabitConfig[];
+  }>(),
+  notificationSettings: jsonb("notification_settings").$type<NotificationSettingsConfig>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+export type UserPreferences = typeof userPreferences.$inferSelect;
+
+// Custom categories - User-defined domains, task types, focus slots
+export const customCategories = pgTable(
+  "custom_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: categoryTypeEnum("type").notNull(),
+    value: varchar("value", { length: 50 }).notNull(),
+    label: varchar("label", { length: 100 }).notNull(),
+    description: text("description"),
+    color: varchar("color", { length: 7 }),
+    icon: varchar("icon", { length: 50 }),
+    metadata: jsonb("metadata").$type<{
+      time?: string;
+      isDefault?: boolean;
+    }>(),
+    sortOrder: integer("sort_order").default(0),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_custom_categories_type").on(table.type),
+    index("idx_custom_categories_enabled").on(table.enabled),
+  ]
+);
+
+export const insertCustomCategorySchema = createInsertSchema(customCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCustomCategory = z.infer<typeof insertCustomCategorySchema>;
+export type CustomCategory = typeof customCategories.$inferSelect;
 
 // ----------------------------------------------------------------------------
 // HIKMA-OS ENTITIES

@@ -21,6 +21,10 @@ import {
   type InsertAttachment,
   type User,
   type UpsertUser,
+  type UserPreferences,
+  type InsertUserPreferences,
+  type CustomCategory,
+  type InsertCustomCategory,
   ventures,
   projects,
   milestones,
@@ -32,6 +36,8 @@ import {
   docs,
   attachments,
   users,
+  userPreferences,
+  customCategories,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like } from "drizzle-orm";
@@ -132,6 +138,17 @@ export interface IStorage {
   getAttachment(id: string): Promise<Attachment | undefined>;
   createAttachment(data: InsertAttachment): Promise<Attachment>;
   deleteAttachment(id: string): Promise<void>;
+
+  // User Preferences
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  upsertUserPreferences(userId: string, data: Partial<InsertUserPreferences>): Promise<UserPreferences>;
+
+  // Custom Categories
+  getCategories(filters?: { type?: string; enabled?: boolean }): Promise<CustomCategory[]>;
+  getCategory(id: string): Promise<CustomCategory | undefined>;
+  createCategory(data: InsertCustomCategory): Promise<CustomCategory>;
+  updateCategory(id: string, data: Partial<InsertCustomCategory>): Promise<CustomCategory | undefined>;
+  deleteCategory(id: string): Promise<void>;
 }
 
 // PostgreSQL Storage Implementation
@@ -860,6 +877,94 @@ export class DBStorage implements IStorage {
 
   async deleteAttachment(id: string): Promise<void> {
     await this.db.delete(attachments).where(eq(attachments.id, id));
+  }
+
+  // ============================================================================
+  // USER PREFERENCES
+  // ============================================================================
+
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [prefs] = await this.db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId))
+      .limit(1);
+    return prefs;
+  }
+
+  async upsertUserPreferences(userId: string, data: Partial<InsertUserPreferences>): Promise<UserPreferences> {
+    // Check if preferences exist
+    const existing = await this.getUserPreferences(userId);
+
+    if (existing) {
+      // Update existing
+      const [updated] = await this.db
+        .update(userPreferences)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(userPreferences.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      // Create new
+      const [created] = await this.db
+        .insert(userPreferences)
+        .values({ ...data, userId } as InsertUserPreferences)
+        .returning();
+      return created;
+    }
+  }
+
+  // ============================================================================
+  // CUSTOM CATEGORIES
+  // ============================================================================
+
+  async getCategories(filters?: { type?: string; enabled?: boolean }): Promise<CustomCategory[]> {
+    const conditions = [];
+
+    if (filters?.type) {
+      conditions.push(eq(customCategories.type, filters.type as any));
+    }
+    if (filters?.enabled !== undefined) {
+      conditions.push(eq(customCategories.enabled, filters.enabled));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(customCategories)
+      .where(whereClause)
+      .orderBy(customCategories.sortOrder, customCategories.label);
+  }
+
+  async getCategory(id: string): Promise<CustomCategory | undefined> {
+    const [category] = await this.db
+      .select()
+      .from(customCategories)
+      .where(eq(customCategories.id, id))
+      .limit(1);
+    return category;
+  }
+
+  async createCategory(data: InsertCustomCategory): Promise<CustomCategory> {
+    const [category] = await this.db
+      .insert(customCategories)
+      .values(data)
+      .returning();
+    return category;
+  }
+
+  async updateCategory(id: string, updates: Partial<InsertCustomCategory>): Promise<CustomCategory | undefined> {
+    const [updated] = await this.db
+      .update(customCategories)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(customCategories.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    await this.db.delete(customCategories).where(eq(customCategories.id, id));
   }
 }
 

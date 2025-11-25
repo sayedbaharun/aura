@@ -127,6 +127,15 @@ app.use((req, res, next) => {
   }, async () => {
     log(`serving on port ${port}`);
 
+    // Seed default categories if needed
+    try {
+      const { seedCategories } = await import('./seed-categories');
+      await seedCategories();
+      log('✓ Categories seeding check complete');
+    } catch (error) {
+      log('Categories seeding skipped:', String(error));
+    }
+
     // Start cleanup job for expired confirmations (runs every 5 minutes)
     const cleanupInterval = setInterval(async () => {
       try {
