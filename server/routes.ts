@@ -1336,11 +1336,15 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   app.patch("/api/settings/profile", async (req, res) => {
     try {
       const userId = "default-user";
-      const { firstName, lastName, timezone, dateFormat, timeFormat, weekStartsOn } = req.body;
+      const { firstName, lastName, email, timezone, dateFormat, timeFormat, weekStartsOn } = req.body;
+
+      // Get existing user to preserve email if not provided
+      const existingUser = await storage.getUser(userId);
+      const userEmail = email || existingUser?.email || "user@sb-os.com";
 
       const user = await storage.upsertUser({
         id: userId,
-        email: "sayed@hikmadigital.com",
+        email: userEmail,
         firstName,
         lastName,
         timezone,

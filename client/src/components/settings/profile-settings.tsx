@@ -133,13 +133,11 @@ export default function ProfileSettings() {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              type="email"
               value={form.email || ""}
-              disabled
-              className="bg-muted"
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="your@email.com"
             />
-            <p className="text-xs text-muted-foreground">
-              Email cannot be changed in single-user mode
-            </p>
           </div>
         </CardContent>
       </Card>

@@ -9,6 +9,7 @@ import CaptureModal from "@/components/capture-modal";
 import CaptureButton from "@/components/capture-button";
 import TaskDetailModal from "@/components/task-detail-modal";
 import Layout from "@/components/layout";
+import Landing from "@/pages/landing";
 import CommandCenter from "@/pages/command-center";
 import VentureHQ from "@/pages/venture-hq";
 import VentureDetail from "@/pages/venture-detail";
@@ -32,23 +33,31 @@ function Router() {
   }, []);
 
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={CommandCenter} />
-        <Route path="/ventures" component={VentureHQ} />
-        <Route path="/ventures/:id" component={VentureDetail} />
-        <Route path="/health" component={HealthHub} />
-        <Route path="/nutrition" component={NutritionDashboard} />
-        <Route path="/knowledge" component={KnowledgeHub} />
-        <Route path="/knowledge/:id" component={DocDetail} />
-        <Route path="/deep-work" component={DeepWork} />
-        <Route path="/notifications" component={NotificationsPage} />
-        <Route path="/settings" component={SettingsPage} />
-        <Route path="/morning" component={MorningRitual} />
-        <Route path="/evening" component={EveningReview} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      {/* Landing page without layout */}
+      <Route path="/" component={Landing} />
+
+      {/* Main app with layout */}
+      <Route>
+        <Layout>
+          <Switch>
+            <Route path="/dashboard" component={CommandCenter} />
+            <Route path="/ventures" component={VentureHQ} />
+            <Route path="/ventures/:id" component={VentureDetail} />
+            <Route path="/health" component={HealthHub} />
+            <Route path="/nutrition" component={NutritionDashboard} />
+            <Route path="/knowledge" component={KnowledgeHub} />
+            <Route path="/knowledge/:id" component={DocDetail} />
+            <Route path="/deep-work" component={DeepWork} />
+            <Route path="/notifications" component={NotificationsPage} />
+            <Route path="/settings" component={SettingsPage} />
+            <Route path="/morning" component={MorningRitual} />
+            <Route path="/evening" component={EveningReview} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

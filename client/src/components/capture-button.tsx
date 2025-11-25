@@ -22,7 +22,7 @@ export default function CaptureButton() {
   return (
     <Button
       onClick={openCaptureModal}
-      className="fixed bottom-6 right-6 h-16 px-6 rounded-full shadow-2xl hover:shadow-xl hover:scale-105 transition-all z-50 gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold animate-pulse hover:animate-none"
+      className="fixed bottom-24 right-6 h-16 px-6 rounded-full shadow-2xl hover:shadow-xl hover:scale-105 transition-all z-50 gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold animate-pulse hover:animate-none"
       size="lg"
     >
       <Zap className="h-5 w-5" />
