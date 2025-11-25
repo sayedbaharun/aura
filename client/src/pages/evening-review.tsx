@@ -148,10 +148,14 @@ export default function EveningReview() {
   // Load existing data when day data arrives
   useEffect(() => {
     if (dayData) {
+      // Ensure gratitude and tomorrowPriorities are arrays
+      const gratitudeData = dayData.eveningRituals?.gratitude;
+      const prioritiesData = dayData.eveningRituals?.tomorrowPriorities;
+
       setReview({
         reflectionPm: dayData.reflectionPm || "",
-        gratitude: dayData.eveningRituals?.gratitude || ["", "", ""],
-        tomorrowPriorities: dayData.eveningRituals?.tomorrowPriorities || ["", "", ""],
+        gratitude: Array.isArray(gratitudeData) ? gratitudeData : ["", "", ""],
+        tomorrowPriorities: Array.isArray(prioritiesData) ? prioritiesData : ["", "", ""],
         reviewCompleted: dayData.eveningRituals?.reviewCompleted || false,
         windDown: {
           clearInbox: dayData.eveningRituals?.windDown?.clearInbox ?? false,

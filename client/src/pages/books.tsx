@@ -5,6 +5,7 @@ import { Plus, BookOpen, Trash2, Edit, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -30,7 +31,7 @@ interface Book {
   id: string;
   title: string;
   author: string | null;
-  platform: "kindle" | "audible" | "physical" | null;
+  platforms: string[] | null;
   status: "to_read" | "reading" | "finished";
   notes: string | null;
   createdAt: string;
@@ -49,6 +50,12 @@ const platformConfig = {
   physical: { label: "Physical", color: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" },
 };
 
+const platformOptions = [
+  { value: "kindle", label: "Kindle" },
+  { value: "audible", label: "Audible" },
+  { value: "physical", label: "Physical Copy" },
+];
+
 export default function Books() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -58,7 +65,7 @@ export default function Books() {
   const [formData, setFormData] = useState({
     title: "",
     author: "",
-    platform: "kindle" as "kindle" | "audible" | "physical",
+    platforms: [] as string[],
     status: "to_read" as "to_read" | "reading" | "finished",
     notes: "",
   });
@@ -106,11 +113,14 @@ export default function Books() {
     },
   });
 
-  const filteredBooks = books.filter((book) => {
+  const filteredBooks = Array.isArray(books) ? books.filter((book) => {
     if (statusFilter !== "all" && book.status !== statusFilter) return false;
-    if (platformFilter !== "all" && book.platform !== platformFilter) return false;
+    if (platformFilter !== "all") {
+      const bookPlatforms = Array.isArray(book.platforms) ? book.platforms : [];
+      if (!bookPlatforms.includes(platformFilter)) return false;
+    }
     return true;
-  });
+  }) : [];
 
   // Group books by status
   const groupedBooks = {
@@ -125,13 +135,13 @@ export default function Books() {
       setFormData({
         title: book.title,
         author: book.author || "",
-        platform: book.platform || "kindle",
+        platforms: Array.isArray(book.platforms) ? book.platforms : [],
         status: book.status,
         notes: book.notes || "",
       });
     } else {
       setEditingBook(null);
-      setFormData({ title: "", author: "", platform: "kindle", status: "to_read", notes: "" });
+      setFormData({ title: "", author: "", platforms: [], status: "to_read", notes: "" });
     }
     setIsModalOpen(true);
   };
@@ -139,7 +149,7 @@ export default function Books() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingBook(null);
-    setFormData({ title: "", author: "", platform: "kindle", status: "to_read", notes: "" });
+    setFormData({ title: "", author: "", platforms: [], status: "to_read", notes: "" });
   };
 
   const handleSubmit = () => {
@@ -164,6 +174,15 @@ export default function Books() {
     });
   };
 
+  const togglePlatform = (platform: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      platforms: prev.platforms.includes(platform)
+        ? prev.platforms.filter((p) => p !== platform)
+        : [...prev.platforms, platform],
+    }));
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -173,9 +192,10 @@ export default function Books() {
     );
   }
 
-  const toReadCount = books.filter((b) => b.status === "to_read").length;
-  const readingCount = books.filter((b) => b.status === "reading").length;
-  const finishedCount = books.filter((b) => b.status === "finished").length;
+  const booksArray = Array.isArray(books) ? books : [];
+  const toReadCount = booksArray.filter((b) => b.status === "to_read").length;
+  const readingCount = booksArray.filter((b) => b.status === "reading").length;
+  const finishedCount = booksArray.filter((b) => b.status === "finished").length;
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -242,64 +262,71 @@ export default function Books() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {statusBooks.map((book) => (
-                  <div
-                    key={book.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors"
-                  >
-                    <BookOpen className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">{book.title}</p>
-                      {book.author && (
-                        <p className="text-sm text-muted-foreground">by {book.author}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1">
-                        {book.platform && (
-                          <Badge variant="outline" className="text-xs">
-                            {platformConfig[book.platform]?.label || book.platform}
-                          </Badge>
+                {statusBooks.map((book) => {
+                  const bookPlatforms = Array.isArray(book.platforms) ? book.platforms : [];
+                  return (
+                    <div
+                      key={book.id}
+                      className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors"
+                    >
+                      <BookOpen className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{book.title}</p>
+                        {book.author && (
+                          <p className="text-sm text-muted-foreground">by {book.author}</p>
                         )}
-                        <span className="text-xs text-muted-foreground">
-                          Added {format(new Date(book.createdAt), "MMM d, yyyy")}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {bookPlatforms.map((platform) => (
+                            <Badge
+                              key={platform}
+                              variant="outline"
+                              className={`text-xs ${platformConfig[platform as keyof typeof platformConfig]?.color || ""}`}
+                            >
+                              {platformConfig[platform as keyof typeof platformConfig]?.label || platform}
+                            </Badge>
+                          ))}
+                          <span className="text-xs text-muted-foreground">
+                            Added {format(new Date(book.createdAt), "MMM d, yyyy")}
+                          </span>
+                        </div>
+                        {book.notes && (
+                          <p className="text-sm text-muted-foreground mt-1">{book.notes}</p>
+                        )}
                       </div>
-                      {book.notes && (
-                        <p className="text-sm text-muted-foreground mt-1">{book.notes}</p>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={book.status}
+                          onValueChange={(v) => updateStatus(book, v as typeof book.status)}
+                        >
+                          <SelectTrigger className="w-[120px] h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="to_read">To Read</SelectItem>
+                            <SelectItem value="reading">Reading</SelectItem>
+                            <SelectItem value="finished">Finished</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openModal(book)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteMutation.mutate(book.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={book.status}
-                        onValueChange={(v) => updateStatus(book, v as typeof book.status)}
-                      >
-                        <SelectTrigger className="w-[120px] h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="to_read">To Read</SelectItem>
-                          <SelectItem value="reading">Reading</SelectItem>
-                          <SelectItem value="finished">Finished</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openModal(book)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => deleteMutation.mutate(book.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -351,40 +378,43 @@ export default function Books() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="platform">Platform</Label>
-                <Select
-                  value={formData.platform}
-                  onValueChange={(v) => setFormData({ ...formData, platform: v as typeof formData.platform })}
-                >
-                  <SelectTrigger id="platform">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="kindle">Kindle</SelectItem>
-                    <SelectItem value="audible">Audible</SelectItem>
-                    <SelectItem value="physical">Physical</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="space-y-2">
+              <Label>Platforms</Label>
+              <p className="text-sm text-muted-foreground">Select all that apply</p>
+              <div className="flex flex-wrap gap-4 pt-2">
+                {platformOptions.map((option) => (
+                  <div key={option.value} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`platform-${option.value}`}
+                      checked={formData.platforms.includes(option.value)}
+                      onCheckedChange={() => togglePlatform(option.value)}
+                    />
+                    <Label
+                      htmlFor={`platform-${option.value}`}
+                      className="cursor-pointer font-normal"
+                    >
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v as typeof formData.status })}
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="to_read">To Read</SelectItem>
-                    <SelectItem value="reading">Reading</SelectItem>
-                    <SelectItem value="finished">Finished</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(v) => setFormData({ ...formData, status: v as typeof formData.status })}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="to_read">To Read</SelectItem>
+                  <SelectItem value="reading">Reading</SelectItem>
+                  <SelectItem value="finished">Finished</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

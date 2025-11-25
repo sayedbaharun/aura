@@ -164,7 +164,7 @@ export interface IStorage {
   deleteShoppingItem(id: string): Promise<void>;
 
   // Books
-  getBooks(filters?: { status?: string; platform?: string }): Promise<Book[]>;
+  getBooks(filters?: { status?: string }): Promise<Book[]>;
   getBook(id: string): Promise<Book | undefined>;
   createBook(data: InsertBook): Promise<Book>;
   updateBook(id: string, data: Partial<InsertBook>): Promise<Book | undefined>;
@@ -1047,14 +1047,11 @@ export class DBStorage implements IStorage {
   // BOOKS
   // ============================================================================
 
-  async getBooks(filters?: { status?: string; platform?: string }): Promise<Book[]> {
+  async getBooks(filters?: { status?: string }): Promise<Book[]> {
     const conditions = [];
 
     if (filters?.status) {
       conditions.push(eq(books.status, filters.status as any));
-    }
-    if (filters?.platform) {
-      conditions.push(eq(books.platform, filters.platform as any));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

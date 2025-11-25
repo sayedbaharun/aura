@@ -1986,7 +1986,6 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
     try {
       const filters = {
         status: req.query.status as string,
-        platform: req.query.platform as string,
       };
 
       const cleanFilters = Object.fromEntries(

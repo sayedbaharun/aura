@@ -861,7 +861,6 @@ export type ShoppingItem = typeof shoppingItems.$inferSelect;
 // BOOKS
 // ----------------------------------------------------------------------------
 
-export const bookPlatformEnum = pgEnum('book_platform', ['kindle', 'audible', 'physical']);
 export const bookStatusEnum = pgEnum('book_status', ['to_read', 'reading', 'finished']);
 
 export const books = pgTable(
@@ -870,7 +869,7 @@ export const books = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     title: text("title").notNull(),
     author: text("author"),
-    platform: bookPlatformEnum("platform").default("kindle"),
+    platforms: jsonb("platforms").$type<string[]>().default([]),
     status: bookStatusEnum("status").default("to_read").notNull(),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -878,12 +877,13 @@ export const books = pgTable(
   },
   (table) => [
     index("idx_books_status").on(table.status),
-    index("idx_books_platform").on(table.platform),
     index("idx_books_created_at").on(table.createdAt),
   ]
 );
 
-export const insertBookSchema = createInsertSchema(books).omit({
+export const insertBookSchema = createInsertSchema(books, {
+  platforms: z.array(z.string()).nullable().optional(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
