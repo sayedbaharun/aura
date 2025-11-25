@@ -230,8 +230,8 @@ export default function DocDetail() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Domain</p>
-              <Badge className={domainColors[doc.domain as keyof typeof domainColors]}>
-                {doc.domain.replace("_", " ")}
+              <Badge className={domainColors[(doc.domain || "personal") as keyof typeof domainColors]}>
+                {(doc.domain || "general").replace("_", " ")}
               </Badge>
             </div>
 
