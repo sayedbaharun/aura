@@ -1356,6 +1356,154 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
     }
   });
 
+  // ========================================
+  // GOOGLE CALENDAR ROUTES
+  // ========================================
+
+  // Check if Google Calendar is configured
+  const isCalendarConfigured = () => {
+    return !!(
+      process.env.GOOGLE_CALENDAR_CLIENT_ID &&
+      process.env.GOOGLE_CALENDAR_CLIENT_SECRET &&
+      process.env.GOOGLE_CALENDAR_REFRESH_TOKEN
+    );
+  };
+
+  // GET /api/calendar/events - List events for a date range
+  app.get("/api/calendar/events", async (req, res) => {
+    try {
+      if (!isCalendarConfigured()) {
+        return res.status(503).json({
+          error: "Google Calendar not configured",
+          message: "Please set up Google Calendar credentials in environment variables",
+        });
+      }
+
+      const { startDate, endDate, maxResults } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const { listEvents } = await import("./google-calendar");
+      const events = await listEvents(
+        new Date(startDate as string),
+        new Date(endDate as string),
+        maxResults ? parseInt(maxResults as string) : 50
+      );
+
+      res.json(events);
+    } catch (error) {
+      logger.error({ error }, "Error fetching calendar events");
+      res.status(500).json({ error: "Failed to fetch calendar events" });
+    }
+  });
+
+  // GET /api/calendar/week - Get events for a specific week
+  app.get("/api/calendar/week", async (req, res) => {
+    try {
+      if (!isCalendarConfigured()) {
+        return res.status(503).json({
+          error: "Google Calendar not configured",
+          configured: false,
+        });
+      }
+
+      const { weekStart } = req.query;
+      const startDate = weekStart ? new Date(weekStart as string) : new Date();
+
+      // Get Monday of the week
+      const day = startDate.getDay();
+      const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(startDate.setDate(diff));
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      const { listEvents } = await import("./google-calendar");
+      const events = await listEvents(monday, sunday, 100);
+
+      res.json({
+        configured: true,
+        weekStart: monday.toISOString(),
+        weekEnd: sunday.toISOString(),
+        events,
+      });
+    } catch (error) {
+      logger.error({ error }, "Error fetching week calendar events");
+      res.status(500).json({ error: "Failed to fetch week calendar events" });
+    }
+  });
+
+  // POST /api/calendar/focus-block - Create a focus time block
+  app.post("/api/calendar/focus-block", async (req, res) => {
+    try {
+      if (!isCalendarConfigured()) {
+        return res.status(503).json({
+          error: "Google Calendar not configured",
+          message: "Please set up Google Calendar credentials",
+        });
+      }
+
+      const { title, startTime, endTime, description } = req.body;
+
+      if (!startTime || !endTime) {
+        return res.status(400).json({ error: "startTime and endTime are required" });
+      }
+
+      const { createFocusTimeBlock } = await import("./google-calendar");
+      const event = await createFocusTimeBlock(
+        title || "Deep Work Session",
+        new Date(startTime),
+        new Date(endTime),
+        description
+      );
+
+      res.json(event);
+    } catch (error) {
+      logger.error({ error }, "Error creating focus block");
+      res.status(500).json({ error: "Failed to create focus block" });
+    }
+  });
+
+  // GET /api/calendar/status - Check calendar connection status
+  app.get("/api/calendar/status", async (req, res) => {
+    try {
+      const configured = isCalendarConfigured();
+
+      if (!configured) {
+        return res.json({
+          configured: false,
+          connected: false,
+          message: "Google Calendar credentials not set",
+        });
+      }
+
+      // Try to list a single event to verify connection
+      const { listEvents } = await import("./google-calendar");
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+      await listEvents(now, tomorrow, 1);
+
+      res.json({
+        configured: true,
+        connected: true,
+        message: "Google Calendar connected successfully",
+      });
+    } catch (error: any) {
+      logger.error({ error }, "Calendar connection check failed");
+      res.json({
+        configured: true,
+        connected: false,
+        error: error.message,
+        message: "Failed to connect to Google Calendar",
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

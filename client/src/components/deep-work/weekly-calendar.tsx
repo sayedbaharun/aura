@@ -7,8 +7,10 @@ import {
   isSameDay,
   isToday,
   isPast,
+  parseISO,
+  getHours,
 } from "date-fns";
-import { Plus } from "lucide-react";
+import { Plus, Calendar, Video } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -24,7 +26,7 @@ interface Task {
   ventureId: string | null;
   estEffort: number | null;
   focusDate: string | null;
-  focusSlot: "morning_routine" | "deep_work_1" | "admin_block_1" | "deep_work_2" | "admin_block_2" | "evening_review" | "meetings" | "buffer" | null;
+  focusSlot: "morning_routine" | "gym" | "admin" | "lunch" | "walk" | "deep_work" | "evening" | "meetings" | "buffer" | null;
 }
 
 interface Venture {
@@ -34,21 +36,57 @@ interface Venture {
   icon: string | null;
 }
 
+interface CalendarEvent {
+  id: string;
+  summary: string;
+  start: { dateTime?: string; date?: string };
+  end: { dateTime?: string; date?: string };
+  hangoutLink?: string;
+  attendees?: Array<{ email: string; responseStatus?: string }>;
+}
+
+interface CalendarWeekResponse {
+  configured: boolean;
+  events?: CalendarEvent[];
+  weekStart?: string;
+  weekEnd?: string;
+}
+
 interface WeeklyCalendarProps {
   selectedWeek: Date;
   onCellClick: (date: Date, slot: string) => void;
 }
 
 const FOCUS_SLOTS = [
-  { key: "morning_routine", label: "Morning Routine", time: "6:00-9:00 AM", capacity: 3, color: "bg-amber-100 dark:bg-amber-900/30" },
-  { key: "deep_work_1", label: "Deep Work", time: "9:00-11:00 AM", capacity: 2, color: "bg-purple-100 dark:bg-purple-900/30" },
-  { key: "admin_block_1", label: "Admin Block", time: "11:00 AM-12:00 PM", capacity: 1, color: "bg-gray-100 dark:bg-gray-800/50" },
-  { key: "deep_work_2", label: "Deep Work", time: "2:00-4:00 PM", capacity: 2, color: "bg-purple-100 dark:bg-purple-900/30" },
-  { key: "admin_block_2", label: "Admin Block", time: "4:00-5:00 PM", capacity: 1, color: "bg-gray-100 dark:bg-gray-800/50" },
-  { key: "evening_review", label: "Evening Review", time: "5:00-6:00 PM", capacity: 1, color: "bg-blue-100 dark:bg-blue-900/30" },
-  { key: "meetings", label: "Meetings", time: "Flexible", capacity: 4, color: "bg-green-100 dark:bg-green-900/30" },
-  { key: "buffer", label: "Buffer", time: "Flexible", capacity: 2, color: "bg-slate-100 dark:bg-slate-800/50" },
+  { key: "morning_routine", label: "Morning Routine", time: "7:00-10:00 AM", capacity: 3, color: "bg-amber-100 dark:bg-amber-900/30", startHour: 7, endHour: 10 },
+  { key: "gym", label: "Gym", time: "10:00 AM-12:00 PM", capacity: 2, color: "bg-red-100 dark:bg-red-900/30", startHour: 10, endHour: 12 },
+  { key: "admin", label: "Admin Block", time: "12:00-1:30 PM", capacity: 1.5, color: "bg-purple-100 dark:bg-purple-900/30", startHour: 12, endHour: 13.5 },
+  { key: "lunch", label: "Lunch", time: "1:30-3:00 PM", capacity: 1.5, color: "bg-green-100 dark:bg-green-900/30", startHour: 13.5, endHour: 15 },
+  { key: "walk", label: "Walk", time: "3:00-4:00 PM", capacity: 1, color: "bg-cyan-100 dark:bg-cyan-900/30", startHour: 15, endHour: 16 },
+  { key: "deep_work", label: "Deep Work ⭐", time: "4:00-8:00 PM", capacity: 4, color: "bg-blue-200 dark:bg-blue-900/40 border-2 border-blue-400", startHour: 16, endHour: 20 },
+  { key: "evening", label: "Evening", time: "8:00 PM-1:00 AM", capacity: 5, color: "bg-indigo-100 dark:bg-indigo-900/30", startHour: 20, endHour: 25 },
+  { key: "meetings", label: "Meetings", time: "Flexible", capacity: 4, color: "bg-emerald-100 dark:bg-emerald-900/30", startHour: 0, endHour: 24 },
+  { key: "buffer", label: "Buffer", time: "Flexible", capacity: 2, color: "bg-slate-100 dark:bg-slate-800/50", startHour: 0, endHour: 24 },
 ] as const;
+
+// Map event time to focus slot
+function getSlotForEvent(event: CalendarEvent): string {
+  if (!event.start.dateTime) return "meetings"; // All-day events go to meetings
+
+  const startTime = parseISO(event.start.dateTime);
+  const hour = getHours(startTime) + startTime.getMinutes() / 60;
+
+  // Find matching slot based on time
+  for (const slot of FOCUS_SLOTS) {
+    if (slot.key === "meetings" || slot.key === "buffer") continue;
+    if (hour >= slot.startHour && hour < slot.endHour) {
+      return slot.key;
+    }
+  }
+
+  // Default to meetings for events that don't fit other slots
+  return "meetings";
+}
 
 export default function WeeklyCalendar({
   selectedWeek,
@@ -83,6 +121,52 @@ export default function WeeklyCalendar({
   const { data: ventures = [] } = useQuery<Venture[]>({
     queryKey: ["/api/ventures"],
   });
+
+  // Fetch Google Calendar events for the week
+  const { data: calendarData } = useQuery<CalendarWeekResponse>({
+    queryKey: ["/api/calendar/week", format(weekStart, "yyyy-MM-dd")],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest(
+          "GET",
+          `/api/calendar/week?weekStart=${format(weekStart, "yyyy-MM-dd")}`
+        );
+        return await res.json();
+      } catch {
+        return { configured: false, events: [] };
+      }
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: false,
+  });
+
+  const calendarEvents = calendarData?.events || [];
+  const isCalendarConfigured = calendarData?.configured ?? false;
+
+  // Group calendar events by date and slot
+  const eventsByDateSlot = calendarEvents.reduce((acc, event) => {
+    const eventDate = event.start.dateTime
+      ? parseISO(event.start.dateTime)
+      : event.start.date
+      ? parseISO(event.start.date)
+      : null;
+
+    if (!eventDate) return acc;
+
+    const dateStr = format(eventDate, "yyyy-MM-dd");
+    const slot = getSlotForEvent(event);
+    const key = `${dateStr}_${slot}`;
+
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(event);
+    return acc;
+  }, {} as Record<string, CalendarEvent[]>);
+
+  const getEventsForCell = (date: Date, slot: string): CalendarEvent[] => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const key = `${dateStr}_${slot}`;
+    return eventsByDateSlot[key] || [];
+  };
 
   // Group tasks by date and slot
   const tasksByDateSlot = tasks.reduce((acc, task) => {
@@ -181,10 +265,12 @@ export default function WeeklyCalendar({
             {/* Day Cells */}
             {weekDays.map((day) => {
               const cellTasks = getTasksForCell(day, slot.key);
+              const cellEvents = getEventsForCell(day, slot.key);
               const usage = getSlotUsage(cellTasks);
               const capacity = getSlotCapacity(slot.key);
               const percentage = (usage / capacity) * 100;
               const isPastCell = isPast(day) && !isToday(day);
+              const hasContent = cellTasks.length > 0 || cellEvents.length > 0;
 
               return (
                 <div
@@ -196,40 +282,76 @@ export default function WeeklyCalendar({
                     isPastCell && "opacity-60 bg-muted/30"
                   )}
                 >
-                  {/* Tasks */}
+                  {/* Tasks and Calendar Events */}
                   <div className="space-y-1 mb-2">
-                    {cellTasks.length === 0 ? (
+                    {!hasContent ? (
                       <div className="flex items-center justify-center h-16 text-muted-foreground/50">
                         <Plus className="h-4 w-4" />
                       </div>
                     ) : (
-                      cellTasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className="text-xs p-1.5 rounded border bg-card hover:bg-accent/50 transition-colors"
-                          style={{
-                            borderLeftColor: getVentureColor(task.ventureId),
-                            borderLeftWidth: "3px",
-                          }}
-                        >
-                          <div className="flex items-start gap-1 mb-1">
-                            <div
-                              className={cn(
-                                "w-1.5 h-1.5 rounded-full mt-1",
-                                getPriorityColor(task.priority)
+                      <>
+                        {/* Calendar Events - shown first with calendar icon */}
+                        {cellEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className="text-xs p-1.5 rounded border-l-[3px] border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (event.hangoutLink) {
+                                window.open(event.hangoutLink, "_blank");
+                              }
+                            }}
+                          >
+                            <div className="flex items-start gap-1 mb-0.5">
+                              {event.hangoutLink ? (
+                                <Video className="h-3 w-3 text-emerald-600 mt-0.5 shrink-0" />
+                              ) : (
+                                <Calendar className="h-3 w-3 text-emerald-600 mt-0.5 shrink-0" />
                               )}
-                            />
-                            <div className="flex-1 truncate font-medium">
-                              {task.title}
+                              <div className="flex-1 truncate font-medium text-emerald-900 dark:text-emerald-100">
+                                {event.summary || "No title"}
+                              </div>
                             </div>
+                            {event.start.dateTime && (
+                              <div className="text-[10px] text-emerald-700 dark:text-emerald-300 ml-4">
+                                {format(parseISO(event.start.dateTime), "h:mm a")}
+                                {event.attendees && event.attendees.length > 0 && (
+                                  <span className="ml-1">• {event.attendees.length} attendees</span>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          {task.estEffort && (
-                            <div className="text-[10px] text-muted-foreground text-right">
-                              {task.estEffort}h
+                        ))}
+
+                        {/* Tasks */}
+                        {cellTasks.map((task) => (
+                          <div
+                            key={task.id}
+                            className="text-xs p-1.5 rounded border bg-card hover:bg-accent/50 transition-colors"
+                            style={{
+                              borderLeftColor: getVentureColor(task.ventureId),
+                              borderLeftWidth: "3px",
+                            }}
+                          >
+                            <div className="flex items-start gap-1 mb-1">
+                              <div
+                                className={cn(
+                                  "w-1.5 h-1.5 rounded-full mt-1",
+                                  getPriorityColor(task.priority)
+                                )}
+                              />
+                              <div className="flex-1 truncate font-medium">
+                                {task.title}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      ))
+                            {task.estEffort && (
+                              <div className="text-[10px] text-muted-foreground text-right">
+                                {task.estEffort}h
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </>
                     )}
                   </div>
 
