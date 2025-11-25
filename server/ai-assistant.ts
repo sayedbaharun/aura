@@ -9,9 +9,14 @@ import { retryOpenAI } from "./retry-utils";
 import * as modelManager from "./model-manager";
 import * as contextMemory from "./context-memory";
 
-// Initialize OpenAI with direct API key
+// Initialize OpenRouter with OpenAI-compatible API
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "HTTP-Referer": process.env.SITE_URL || "http://localhost:5000",
+    "X-Title": "Hikma-OS",
+  },
 });
 
 /**

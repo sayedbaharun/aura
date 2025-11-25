@@ -17,7 +17,7 @@ export default function IntegrationsStatus() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[1, 2, 3, 4, 5].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
         ))}
       </div>
@@ -72,11 +72,10 @@ export default function IntegrationsStatus() {
             For security reasons, API keys are never displayed in the UI.
           </p>
           <ul className="text-sm text-muted-foreground mt-3 space-y-1 list-disc list-inside">
-            <li>OpenAI: Set <code className="bg-muted px-1 py-0.5 rounded">OPENAI_API_KEY</code></li>
+            <li>OpenRouter: Set <code className="bg-muted px-1 py-0.5 rounded">OPENROUTER_API_KEY</code></li>
             <li>Google Calendar: Set <code className="bg-muted px-1 py-0.5 rounded">GOOGLE_CALENDAR_CLIENT_ID</code>, <code className="bg-muted px-1 py-0.5 rounded">CLIENT_SECRET</code>, <code className="bg-muted px-1 py-0.5 rounded">REFRESH_TOKEN</code></li>
             <li>Gmail: Set <code className="bg-muted px-1 py-0.5 rounded">GMAIL_CLIENT_ID</code>, <code className="bg-muted px-1 py-0.5 rounded">CLIENT_SECRET</code>, <code className="bg-muted px-1 py-0.5 rounded">REFRESH_TOKEN</code></li>
             <li>Telegram: Set <code className="bg-muted px-1 py-0.5 rounded">TELEGRAM_BOT_TOKEN</code></li>
-            <li>Notion: Set <code className="bg-muted px-1 py-0.5 rounded">NOTION_API_KEY</code></li>
           </ul>
         </CardContent>
       </Card>

@@ -1,8 +1,13 @@
 import OpenAI from "openai";
 
-// Initialize OpenAI with direct API key
+// Initialize OpenRouter with OpenAI-compatible API
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "HTTP-Referer": process.env.SITE_URL || "http://localhost:5000",
+    "X-Title": "Hikma-OS",
+  },
 });
 
 export interface PhotoOCRResult {
@@ -22,7 +27,7 @@ export async function extractTextFromPhoto(imageUrl: string): Promise<PhotoOCRRe
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "openai/gpt-4o",
       messages: [
         {
           role: "system",

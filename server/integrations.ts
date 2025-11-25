@@ -14,14 +14,14 @@ export interface IntegrationInfo {
 }
 
 /**
- * Check OpenAI API connection
+ * Check OpenRouter API connection
  */
-async function checkOpenAI(): Promise<IntegrationInfo> {
-  const apiKey = process.env.OPENAI_API_KEY;
+async function checkOpenRouter(): Promise<IntegrationInfo> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     return {
-      name: "OpenAI",
+      name: "OpenRouter",
       status: "not_configured",
       description: "AI-powered task analysis and suggestions",
       lastChecked: new Date().toISOString(),
@@ -29,7 +29,7 @@ async function checkOpenAI(): Promise<IntegrationInfo> {
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/models", {
+    const response = await fetch("https://openrouter.ai/api/v1/models", {
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
@@ -37,7 +37,7 @@ async function checkOpenAI(): Promise<IntegrationInfo> {
 
     if (response.ok) {
       return {
-        name: "OpenAI",
+        name: "OpenRouter",
         status: "connected",
         description: "AI-powered task analysis and suggestions",
         lastChecked: new Date().toISOString(),
@@ -45,7 +45,7 @@ async function checkOpenAI(): Promise<IntegrationInfo> {
     } else {
       const errorData = await response.json().catch(() => ({}));
       return {
-        name: "OpenAI",
+        name: "OpenRouter",
         status: "error",
         description: "AI-powered task analysis and suggestions",
         lastChecked: new Date().toISOString(),
@@ -54,7 +54,7 @@ async function checkOpenAI(): Promise<IntegrationInfo> {
     }
   } catch (error: any) {
     return {
-      name: "OpenAI",
+      name: "OpenRouter",
       status: "error",
       description: "AI-powered task analysis and suggestions",
       lastChecked: new Date().toISOString(),
@@ -229,66 +229,14 @@ async function checkTelegram(): Promise<IntegrationInfo> {
 }
 
 /**
- * Check Notion API connection
- */
-async function checkNotion(): Promise<IntegrationInfo> {
-  const apiKey = process.env.NOTION_API_KEY;
-
-  if (!apiKey) {
-    return {
-      name: "Notion",
-      status: "not_configured",
-      description: "Sync with Notion databases and pages",
-      lastChecked: new Date().toISOString(),
-    };
-  }
-
-  try {
-    const response = await fetch("https://api.notion.com/v1/users/me", {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Notion-Version": "2022-06-28",
-      },
-    });
-
-    if (response.ok) {
-      return {
-        name: "Notion",
-        status: "connected",
-        description: "Sync with Notion databases and pages",
-        lastChecked: new Date().toISOString(),
-      };
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      return {
-        name: "Notion",
-        status: "error",
-        description: "Sync with Notion databases and pages",
-        lastChecked: new Date().toISOString(),
-        errorMessage: errorData.message || `HTTP ${response.status}`,
-      };
-    }
-  } catch (error: any) {
-    return {
-      name: "Notion",
-      status: "error",
-      description: "Sync with Notion databases and pages",
-      lastChecked: new Date().toISOString(),
-      errorMessage: error.message || "Connection failed",
-    };
-  }
-}
-
-/**
  * Get status of all integrations
  */
 export async function getAllIntegrationStatuses(): Promise<IntegrationInfo[]> {
   const results = await Promise.all([
-    checkOpenAI(),
+    checkOpenRouter(),
     checkGoogleCalendar(),
     checkGmail(),
     checkTelegram(),
-    checkNotion(),
   ]);
 
   return results;
@@ -299,11 +247,10 @@ export async function getAllIntegrationStatuses(): Promise<IntegrationInfo[]> {
  */
 export async function getIntegrationStatus(name: string): Promise<IntegrationInfo | null> {
   const checks: Record<string, () => Promise<IntegrationInfo>> = {
-    openai: checkOpenAI,
+    openrouter: checkOpenRouter,
     "google-calendar": checkGoogleCalendar,
     gmail: checkGmail,
     telegram: checkTelegram,
-    notion: checkNotion,
   };
 
   const checkFn = checks[name.toLowerCase()];

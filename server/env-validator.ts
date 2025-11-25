@@ -34,11 +34,11 @@ export function validateEnvironment(): ValidationResult {
     errors.push('DATABASE_URL must be a valid PostgreSQL connection string (postgres:// or postgresql://...)');
   }
 
-  // OpenAI Integration
-  if (!process.env.OPENAI_API_KEY) {
-    errors.push('OPENAI_API_KEY is required for AI features');
-  } else if (!process.env.OPENAI_API_KEY.startsWith('sk-')) {
-    warnings.push('OPENAI_API_KEY may be invalid (should start with "sk-")');
+  // OpenRouter Integration
+  if (!process.env.OPENROUTER_API_KEY) {
+    errors.push('OPENROUTER_API_KEY is required for AI features');
+  } else if (!process.env.OPENROUTER_API_KEY.startsWith('sk-or-')) {
+    warnings.push('OPENROUTER_API_KEY may be invalid (should start with "sk-or-")');
   }
 
   // Google Calendar (required for core functionality)
@@ -84,11 +84,6 @@ export function validateEnvironment(): ValidationResult {
   // ========================================
   // OPTIONAL ENVIRONMENT VARIABLES (Warnings)
   // ========================================
-
-  // Notion (optional)
-  if (!process.env.NOTION_API_KEY) {
-    warnings.push('NOTION_API_KEY not configured - Notion integration disabled');
-  }
 
   // Twilio (WhatsApp integration - optional)
   if (!process.env.TWILIO_ACCOUNT_SID && !process.env.TWILIO_AUTH_TOKEN) {

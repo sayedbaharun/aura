@@ -200,8 +200,8 @@ Required environment variables (set via `.env`):
 - `PORT` - Server port (default: 5000)
 - `NODE_ENV` - Environment (development/production)
 
-Optional for future AI integration:
-- `OPENAI_API_KEY` - OpenAI API key
+Optional for AI integration:
+- `OPENROUTER_API_KEY` - OpenRouter API key (OpenAI-compatible, supports multiple providers)
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token
 
 ## Important Notes

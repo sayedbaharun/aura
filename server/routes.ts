@@ -1004,19 +1004,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Description is required" });
       }
 
-      // Check if OpenAI API key is configured
-      if (!process.env.OPENAI_API_KEY) {
+      // Check if OpenRouter API key is configured
+      if (!process.env.OPENROUTER_API_KEY) {
         return res.status(503).json({
           error: "AI service not configured",
-          message: "OpenAI API key is not set. Please configure OPENAI_API_KEY environment variable."
+          message: "OpenRouter API key is not set. Please configure OPENROUTER_API_KEY environment variable."
         });
       }
 
       const OpenAI = (await import("openai")).default;
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const openai = new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: "https://openrouter.ai/api/v1",
+      });
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "openai/gpt-4o-mini",
         messages: [
           {
             role: "system",

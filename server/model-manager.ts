@@ -1,16 +1,21 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
 
-// Initialize OpenAI with direct API key
+// Initialize OpenRouter with OpenAI-compatible API
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "HTTP-Referer": process.env.SITE_URL || "http://localhost:5000",
+    "X-Title": "Hikma-OS",
+  },
 });
 
-// Model configuration with fallback cascade
+// Model configuration with fallback cascade (OpenRouter model names)
 export const MODEL_CASCADE = [
-  { name: "gpt-4o", maxRetries: 2, description: "Primary - Best quality" },
-  { name: "gpt-4o-mini", maxRetries: 2, description: "Fallback 1 - Fast and efficient" },
-  { name: "gpt-4-turbo", maxRetries: 1, description: "Fallback 2 - Reliable alternative" },
+  { name: "openai/gpt-4o", maxRetries: 2, description: "Primary - Best quality" },
+  { name: "openai/gpt-4o-mini", maxRetries: 2, description: "Fallback 1 - Fast and efficient" },
+  { name: "anthropic/claude-3.5-sonnet", maxRetries: 1, description: "Fallback 2 - Reliable alternative" },
 ] as const;
 
 // Task complexity classification for smart model selection
@@ -42,15 +47,15 @@ export function selectModelForTask(complexity: TaskComplexity): string {
   switch (complexity) {
     case "simple":
       // Use faster, cheaper model for simple tasks (categorization, summaries)
-      return "gpt-4o-mini";
+      return "openai/gpt-4o-mini";
     case "moderate":
       // Use balanced model for typical tasks
-      return "gpt-4o-mini";
+      return "openai/gpt-4o-mini";
     case "complex":
       // Use most capable model for complex reasoning (multi-step planning, analysis)
-      return "gpt-4o";
+      return "openai/gpt-4o";
     default:
-      return "gpt-4o";
+      return "openai/gpt-4o";
   }
 }
 
