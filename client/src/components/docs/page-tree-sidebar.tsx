@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -17,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ChevronRight,
   ChevronDown,
@@ -34,6 +42,7 @@ import {
   ListChecks,
   FileCode,
   Search,
+  Menu,
 } from "lucide-react";
 
 interface Doc {
@@ -247,8 +256,10 @@ export default function PageTreeSidebar({
   onCreateDoc,
 }: PageTreeSidebarProps) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data: docs = [], isLoading } = useQuery<Doc[]>({
     queryKey: ["/api/docs/tree", ventureId],
@@ -329,20 +340,15 @@ export default function PageTreeSidebar({
     renameMutation.mutate({ docId: id, title });
   };
 
-  if (isLoading) {
-    return (
-      <div className="w-64 border-r bg-muted/30 p-4">
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-6 bg-muted animate-pulse rounded" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const handleSelectDoc = (docId: string) => {
+    onSelectDoc(docId);
+    if (isMobile) {
+      setSheetOpen(false);
+    }
+  };
 
-  return (
-    <div className="w-64 border-r bg-muted/30 flex flex-col h-full">
+  const sidebarContent = (
+    <>
       <div className="p-3 border-b">
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -357,7 +363,13 @@ export default function PageTreeSidebar({
 
       <ScrollArea className="flex-1">
         <div className="py-2">
-          {filteredTree.length === 0 ? (
+          {isLoading ? (
+            <div className="space-y-2 p-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-6 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          ) : filteredTree.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
               {searchQuery ? (
                 <p>No pages match your search</p>
@@ -376,7 +388,7 @@ export default function PageTreeSidebar({
                 node={node}
                 level={0}
                 selectedDocId={selectedDocId}
-                onSelectDoc={onSelectDoc}
+                onSelectDoc={handleSelectDoc}
                 onCreateDoc={onCreateDoc}
                 expandedNodes={expandedNodes}
                 toggleExpand={toggleExpand}
@@ -399,6 +411,34 @@ export default function PageTreeSidebar({
           New Page
         </Button>
       </div>
+    </>
+  );
+
+  // Mobile: Sheet drawer
+  if (isMobile) {
+    return (
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="icon" className="shrink-0">
+            <Menu className="h-4 w-4" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-[300px] p-0 flex flex-col">
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle>Pages</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 overflow-hidden">
+            {sidebarContent}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  // Desktop: Fixed sidebar
+  return (
+    <div className="w-64 border-r bg-muted/30 flex flex-col h-full">
+      {sidebarContent}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import ThisWeekPreview from "@/components/command-center/this-week-preview";
 export default function CommandCenter() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-4 md:p-6 space-y-6">
         <TodayHeader />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">

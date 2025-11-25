@@ -214,7 +214,7 @@ export default function TasksList({ ventureId }: TasksListProps) {
           {/* Filters */}
           <div className="flex gap-2 flex-wrap">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -227,7 +227,7 @@ export default function TasksList({ ventureId }: TasksListProps) {
             </Select>
 
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
@@ -240,7 +240,7 @@ export default function TasksList({ ventureId }: TasksListProps) {
             </Select>
 
             <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Project" />
               </SelectTrigger>
               <SelectContent>
@@ -254,7 +254,7 @@ export default function TasksList({ ventureId }: TasksListProps) {
             </Select>
 
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>

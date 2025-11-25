@@ -192,7 +192,7 @@ export default function EveningReview() {
 
   if (isDayLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 md:p-6">
         <div className="space-y-6">
           <div className="h-20 bg-muted animate-pulse rounded" />
           <div className="h-96 bg-muted animate-pulse rounded" />
@@ -202,7 +202,7 @@ export default function EveningReview() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="container mx-auto p-4 md:p-6 max-w-4xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

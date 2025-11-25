@@ -35,7 +35,7 @@ export default function VentureDetail() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 md:p-6">
         <div className="space-y-6">
           <div className="h-32 bg-muted animate-pulse rounded" />
           <div className="h-96 bg-muted animate-pulse rounded" />
@@ -46,7 +46,7 @@ export default function VentureDetail() {
 
   if (!venture) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 md:p-6">
         <div className="text-center py-12">
           <h1 className="text-2xl font-bold mb-2">Venture Not Found</h1>
           <p className="text-muted-foreground">
@@ -58,7 +58,7 @@ export default function VentureDetail() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
       <VentureDetailHeader venture={venture} />
 
       <Tabs defaultValue="projects" className="space-y-4">

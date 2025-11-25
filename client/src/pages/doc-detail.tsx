@@ -153,7 +153,7 @@ export default function DocDetail() {
 
   if (!doc) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 md:p-6">
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold mb-2">Document not found</h2>
           <p className="text-muted-foreground mb-4">
@@ -171,7 +171,7 @@ export default function DocDetail() {
   const Icon = typeIcons[doc.type as keyof typeof typeIcons] || FileText;
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="container mx-auto p-4 md:p-6 max-w-4xl">
       {/* Header */}
       <div className="mb-6">
         <Button variant="ghost" onClick={() => setLocation("/knowledge")} className="mb-4">

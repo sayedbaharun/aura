@@ -113,7 +113,7 @@ export default function HealthMetricsTable({
                       <SortIcon field="sleepHours" />
                     </button>
                   </TableHead>
-                  <TableHead>Sleep Quality</TableHead>
+                  <TableHead className="hidden md:table-cell">Sleep Quality</TableHead>
                   <TableHead>
                     <button
                       onClick={() => handleSort("energyLevel")}
@@ -123,9 +123,9 @@ export default function HealthMetricsTable({
                       <SortIcon field="energyLevel" />
                     </button>
                   </TableHead>
-                  <TableHead>Mood</TableHead>
-                  <TableHead>Workout</TableHead>
-                  <TableHead>
+                  <TableHead className="hidden md:table-cell">Mood</TableHead>
+                  <TableHead className="hidden md:table-cell">Workout</TableHead>
+                  <TableHead className="hidden lg:table-cell">
                     <button
                       onClick={() => handleSort("steps")}
                       className="flex items-center gap-1 font-medium"
@@ -134,7 +134,7 @@ export default function HealthMetricsTable({
                       <SortIcon field="steps" />
                     </button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="hidden lg:table-cell">
                     <button
                       onClick={() => handleSort("weightKg")}
                       className="flex items-center gap-1 font-medium"
@@ -143,7 +143,7 @@ export default function HealthMetricsTable({
                       <SortIcon field="weightKg" />
                     </button>
                   </TableHead>
-                  <TableHead>Stress</TableHead>
+                  <TableHead className="hidden md:table-cell">Stress</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -161,7 +161,7 @@ export default function HealthMetricsTable({
                         {format(new Date(entry.date), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell>{entry.sleepHours ? `${entry.sleepHours}h` : "—"}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <span className="capitalize">{entry.sleepQuality || "—"}</span>
                       </TableCell>
                       <TableCell>
@@ -176,10 +176,10 @@ export default function HealthMetricsTable({
                           {entry.energyLevel ? `${entry.energyLevel}/5` : "—"}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <span className="capitalize">{entry.mood || "—"}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {entry.workoutDone ? (
                           <span className="text-emerald-600 font-medium">
                             ✓ {entry.workoutType && entry.workoutType !== "none" ? entry.workoutType : ""}
@@ -189,9 +189,13 @@ export default function HealthMetricsTable({
                           <span className="text-muted-foreground">✗</span>
                         )}
                       </TableCell>
-                      <TableCell>{entry.steps ? entry.steps.toLocaleString() : "—"}</TableCell>
-                      <TableCell>{entry.weightKg ? `${entry.weightKg} kg` : "—"}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {entry.steps ? entry.steps.toLocaleString() : "—"}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {entry.weightKg ? `${entry.weightKg} kg` : "—"}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <span className="capitalize">{entry.stressLevel || "—"}</span>
                       </TableCell>
                       <TableCell className="text-right">

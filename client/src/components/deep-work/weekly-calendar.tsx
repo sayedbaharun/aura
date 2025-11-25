@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   format,
@@ -10,12 +11,14 @@ import {
   parseISO,
   getHours,
 } from "date-fns";
-import { Plus, Calendar, Video } from "lucide-react";
+import { Plus, Calendar, Video, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Task {
   id: string;
@@ -92,10 +95,30 @@ export default function WeeklyCalendar({
   selectedWeek,
   onCellClick,
 }: WeeklyCalendarProps) {
+  const isMobile = useIsMobile();
+  const [mobileStartIndex, setMobileStartIndex] = useState(0);
+
   const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 1 }); // Monday
   const weekEnd = endOfWeek(selectedWeek, { weekStartsOn: 1 }); // Sunday
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // On mobile, show only 2 days at a time
+  const MOBILE_DAYS_TO_SHOW = 2;
+  const visibleDays = isMobile
+    ? weekDays.slice(mobileStartIndex, mobileStartIndex + MOBILE_DAYS_TO_SHOW)
+    : weekDays;
+
+  const canGoBack = mobileStartIndex > 0;
+  const canGoForward = mobileStartIndex + MOBILE_DAYS_TO_SHOW < 7;
+
+  const handleMobileNavBack = () => {
+    if (canGoBack) setMobileStartIndex(mobileStartIndex - 1);
+  };
+
+  const handleMobileNavForward = () => {
+    if (canGoForward) setMobileStartIndex(mobileStartIndex + 1);
+  };
 
   // Fetch tasks for the week
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
@@ -232,13 +255,63 @@ export default function WeeklyCalendar({
     );
   }
 
+  // Dynamic grid columns based on visible days
+  const gridColsClass = isMobile
+    ? "grid-cols-[80px_1fr_1fr]" // Slot label + 2 days on mobile
+    : "grid-cols-8"; // Slot label + 7 days on desktop
+
   return (
-    <Card className="p-4 overflow-x-auto">
-      <div className="min-w-[1000px]">
+    <Card className="p-4 md:overflow-x-auto">
+      <div className={cn(!isMobile && "min-w-[1000px]")}>
+        {/* Mobile Navigation */}
+        {isMobile && (
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMobileNavBack}
+              disabled={!canGoBack}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-sm font-medium text-muted-foreground">
+              {format(visibleDays[0], "MMM d")} - {format(visibleDays[visibleDays.length - 1], "MMM d")}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMobileNavForward}
+              disabled={!canGoForward}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Day Selector Pills (Mobile) */}
+        {isMobile && (
+          <div className="flex gap-1 mb-4 overflow-x-auto pb-2">
+            {weekDays.map((day, index) => (
+              <Button
+                key={day.toISOString()}
+                variant={index >= mobileStartIndex && index < mobileStartIndex + MOBILE_DAYS_TO_SHOW ? "default" : "outline"}
+                size="sm"
+                className={cn(
+                  "shrink-0",
+                  isToday(day) && "ring-2 ring-primary ring-offset-2"
+                )}
+                onClick={() => setMobileStartIndex(Math.min(index, 7 - MOBILE_DAYS_TO_SHOW))}
+              >
+                {format(day, "EEE")}
+              </Button>
+            ))}
+          </div>
+        )}
+
         {/* Header Row */}
-        <div className="grid grid-cols-8 gap-2 mb-2">
+        <div className={cn("grid gap-2 mb-2", gridColsClass)}>
           <div className="font-semibold text-sm text-muted-foreground"></div>
-          {weekDays.map((day) => (
+          {visibleDays.map((day) => (
             <div
               key={day.toISOString()}
               className={cn(
@@ -254,16 +327,16 @@ export default function WeeklyCalendar({
 
         {/* Calendar Grid */}
         {FOCUS_SLOTS.map((slot) => (
-          <div key={slot.key} className="grid grid-cols-8 gap-2 mb-2">
+          <div key={slot.key} className={cn("grid gap-2 mb-2", gridColsClass)}>
             {/* Slot Label */}
             <div className={cn("flex flex-col justify-center p-2 text-sm rounded-lg", slot.color)}>
-              <div className="font-semibold">{slot.label}</div>
-              <div className="text-xs text-muted-foreground">{slot.time}</div>
-              <div className="text-[10px] text-muted-foreground mt-0.5">{slot.capacity}h capacity</div>
+              <div className="font-semibold text-xs md:text-sm">{slot.label}</div>
+              <div className="text-[10px] md:text-xs text-muted-foreground hidden sm:block">{slot.time}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5 hidden md:block">{slot.capacity}h capacity</div>
             </div>
 
             {/* Day Cells */}
-            {weekDays.map((day) => {
+            {visibleDays.map((day) => {
               const cellTasks = getTasksForCell(day, slot.key);
               const cellEvents = getEventsForCell(day, slot.key);
               const usage = getSlotUsage(cellTasks);

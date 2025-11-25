@@ -165,7 +165,7 @@ export default function KnowledgeHub() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
       <KnowledgeHubHeader
         onNewDoc={handleNewDoc}
         onSearch={setSearchQuery}
@@ -187,6 +187,11 @@ export default function KnowledgeHub() {
 
         <TabsContent value="local">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Mobile: Filters button above content */}
+            <div className="lg:hidden">
+              <FiltersSidebar filters={filters} onFiltersChange={setFilters} />
+            </div>
+
             <div className="lg:col-span-3">
               <DocsLibrary
                 docs={displayedDocs}
@@ -199,7 +204,8 @@ export default function KnowledgeHub() {
               />
             </div>
 
-            <div>
+            {/* Desktop: Sidebar */}
+            <div className="hidden lg:block">
               <FiltersSidebar filters={filters} onFiltersChange={setFilters} />
             </div>
           </div>
