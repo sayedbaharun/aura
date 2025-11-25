@@ -1,9 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus, Settings } from "lucide-react";
+import { LayoutDashboard, Briefcase, Heart, Apple, BookOpen, Focus, Settings, Sun, Moon } from "lucide-react";
 
 const links = [
   { href: "/", label: "Command Center", icon: LayoutDashboard },
+  { href: "/morning", label: "Morning", icon: Sun },
+  { href: "/evening", label: "Evening", icon: Moon },
   { href: "/ventures", label: "Ventures", icon: Briefcase },
   { href: "/deep-work", label: "Deep Work", icon: Focus },
   { href: "/health", label: "Health", icon: Heart },

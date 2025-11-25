@@ -1,0 +1,420 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import {
+  Moon,
+  CheckCircle2,
+  Circle,
+  Target,
+  Rocket,
+  Heart,
+  ListTodo,
+  ChevronRight,
+  Trophy,
+  TrendingUp,
+  AlertCircle
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Link } from "wouter";
+
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  focusDate: string | null;
+  completedAt: string | null;
+}
+
+interface Day {
+  id: string;
+  date: string;
+  title: string | null;
+  top3Outcomes: string | null;
+  oneThingToShip: string | null;
+  reflectionAm: string | null;
+  reflectionPm: string | null;
+  mood: string | null;
+  morningRituals: {
+    pressUps?: { done: boolean; reps?: number };
+    squats?: { done: boolean; reps?: number };
+    supplements?: { done: boolean };
+    reading?: { done: boolean; pages?: number };
+    completedAt?: string;
+  } | null;
+  eveningRituals: {
+    reviewCompleted?: boolean;
+    journalEntry?: string;
+    gratitude?: string[];
+    tomorrowPriorities?: string[];
+    completedAt?: string;
+  } | null;
+}
+
+interface HealthEntry {
+  id: string;
+  date: string;
+  sleepHours: number | null;
+  workoutDone: boolean;
+  steps: number | null;
+  mood: string | null;
+}
+
+export default function EveningReview() {
+  const { toast } = useToast();
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const [review, setReview] = useState({
+    reflectionPm: "",
+    gratitude: ["", "", ""],
+    tomorrowPriorities: ["", "", ""],
+    reviewCompleted: false,
+  });
+
+  // Fetch today's day data
+  const { data: dayData, isLoading: isDayLoading } = useQuery<Day>({
+    queryKey: ["/api/days", today],
+    queryFn: async () => {
+      const res = await fetch(`/api/days/${today}`, { credentials: "include" });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error("Failed to fetch day");
+      return await res.json();
+    },
+  });
+
+  // Fetch today's tasks
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks/today"],
+  });
+
+  // Fetch today's health entry
+  const { data: healthEntries = [] } = useQuery<HealthEntry[]>({
+    queryKey: ["/api/health", { startDate: today, endDate: today }],
+    queryFn: async () => {
+      const res = await fetch(`/api/health?startDate=${today}&endDate=${today}`, {
+        credentials: "include",
+      });
+      return await res.json();
+    },
+  });
+
+  const todayHealth = healthEntries[0];
+
+  // Load existing data when day data arrives
+  useEffect(() => {
+    if (dayData) {
+      setReview({
+        reflectionPm: dayData.reflectionPm || "",
+        gratitude: dayData.eveningRituals?.gratitude || ["", "", ""],
+        tomorrowPriorities: dayData.eveningRituals?.tomorrowPriorities || ["", "", ""],
+        reviewCompleted: dayData.eveningRituals?.reviewCompleted || false,
+      });
+    }
+  }, [dayData]);
+
+  // Calculate day stats
+  const completedTasks = tasks.filter(t => t.status === "done").length;
+  const totalTasks = tasks.length;
+  const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const morningRitualsComplete = dayData?.morningRituals
+    ? Object.values(dayData.morningRituals)
+        .filter(v => typeof v === "object" && v !== null)
+        .every((v: any) => v.done)
+    : false;
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const eveningRituals = {
+        reviewCompleted: true,
+        journalEntry: review.reflectionPm,
+        gratitude: review.gratitude.filter(g => g.trim()),
+        tomorrowPriorities: review.tomorrowPriorities.filter(p => p.trim()),
+        completedAt: new Date().toISOString(),
+      };
+
+      const payload = {
+        id: `day_${today}`,
+        date: today,
+        reflectionPm: review.reflectionPm || null,
+        eveningRituals,
+      };
+
+      // Try PATCH first, then POST if day doesn't exist
+      try {
+        const res = await apiRequest("PATCH", `/api/days/${today}`, payload);
+        return await res.json();
+      } catch (e) {
+        const res = await apiRequest("POST", "/api/days", payload);
+        return await res.json();
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/days"] });
+      toast({
+        title: "Evening review saved!",
+        description: "Great job completing your daily review.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save review. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    saveMutation.mutate();
+  };
+
+  const updateGratitude = (index: number, value: string) => {
+    const newGratitude = [...review.gratitude];
+    newGratitude[index] = value;
+    setReview({ ...review, gratitude: newGratitude });
+  };
+
+  const updatePriority = (index: number, value: string) => {
+    const newPriorities = [...review.tomorrowPriorities];
+    newPriorities[index] = value;
+    setReview({ ...review, tomorrowPriorities: newPriorities });
+  };
+
+  if (isDayLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="space-y-6">
+          <div className="h-20 bg-muted animate-pulse rounded" />
+          <div className="h-96 bg-muted animate-pulse rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-full">
+            <Moon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Evening Review</h1>
+            <p className="text-muted-foreground">
+              {format(new Date(), "EEEE, MMMM d, yyyy")}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {review.reviewCompleted && (
+            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Complete
+            </Badge>
+          )}
+          <Button onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? "Saving..." : "Complete Review"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Day Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-amber-500" />
+            Today's Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Tasks Completed */}
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-3xl font-bold text-blue-600">{completedTasks}/{totalTasks}</div>
+              <div className="text-sm text-muted-foreground">Tasks Done</div>
+              <Progress value={taskCompletionRate} className="h-2 mt-2" />
+            </div>
+
+            {/* Morning Rituals */}
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-3xl font-bold">
+                {morningRitualsComplete ? (
+                  <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto" />
+                ) : (
+                  <Circle className="h-8 w-8 text-gray-300 mx-auto" />
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Morning Rituals</div>
+            </div>
+
+            {/* Workout */}
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-3xl font-bold">
+                {todayHealth?.workoutDone ? (
+                  <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto" />
+                ) : (
+                  <Circle className="h-8 w-8 text-gray-300 mx-auto" />
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">Workout</div>
+            </div>
+
+            {/* Steps */}
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-3xl font-bold text-orange-600">
+                {todayHealth?.steps ? todayHealth.steps.toLocaleString() : "—"}
+              </div>
+              <div className="text-sm text-muted-foreground">Steps</div>
+            </div>
+          </div>
+
+          {/* One Thing to Ship Status */}
+          {dayData?.oneThingToShip && (
+            <div className="mt-4 p-4 border rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Rocket className="h-4 w-4 text-purple-500" />
+                <span className="font-medium text-sm">One Thing to Ship</span>
+              </div>
+              <p className="text-muted-foreground">{dayData.oneThingToShip}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Evening Reflection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-blue-500" />
+              Evening Reflection
+            </CardTitle>
+            <CardDescription>
+              What went well? What could be improved?
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder="Today I accomplished... I learned... Tomorrow I will..."
+              value={review.reflectionPm}
+              onChange={(e) => setReview({ ...review, reflectionPm: e.target.value })}
+              rows={6}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Gratitude */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-5 w-5 text-rose-500" />
+              Three Things I'm Grateful For
+            </CardTitle>
+            <CardDescription>
+              End the day with gratitude
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="flex items-center gap-3">
+                <span className="text-muted-foreground font-medium w-6">{index + 1}.</span>
+                <input
+                  type="text"
+                  placeholder={`I'm grateful for...`}
+                  value={review.gratitude[index] || ""}
+                  onChange={(e) => updateGratitude(index, e.target.value)}
+                  className="flex-1 bg-transparent border-b border-muted-foreground/20 focus:border-primary outline-none py-2"
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tomorrow's Priorities */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ListTodo className="h-5 w-5 text-emerald-500" />
+            Tomorrow's Top 3 Priorities
+          </CardTitle>
+          <CardDescription>
+            Set yourself up for success tomorrow
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                index === 0 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                index === 1 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+              }`}>
+                P{index + 1}
+              </div>
+              <input
+                type="text"
+                placeholder={index === 0 ? "Most important task..." : "Priority task..."}
+                value={review.tomorrowPriorities[index] || ""}
+                onChange={(e) => updatePriority(index, e.target.value)}
+                className="flex-1 bg-transparent border-b border-muted-foreground/20 focus:border-primary outline-none py-2 text-lg"
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Incomplete Tasks Warning */}
+      {totalTasks > 0 && completedTasks < totalTasks && (
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  {totalTasks - completedTasks} task{totalTasks - completedTasks > 1 ? "s" : ""} incomplete
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  Consider rescheduling incomplete tasks or adding them to tomorrow's priorities.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-3">
+        <Button variant="outline" asChild>
+          <Link href="/">
+            <ChevronRight className="h-4 w-4 mr-2" />
+            Command Center
+          </Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/morning">
+            <ChevronRight className="h-4 w-4 mr-2" />
+            Morning Ritual
+          </Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/health">
+            <ChevronRight className="h-4 w-4 mr-2" />
+            Log Health
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+}

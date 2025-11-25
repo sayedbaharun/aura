@@ -19,6 +19,8 @@ import DocDetail from "@/pages/doc-detail";
 import DeepWork from "@/pages/deep-work";
 import NotificationsPage from "@/pages/notifications";
 import SettingsPage from "@/pages/settings";
+import MorningRitual from "@/pages/morning-ritual";
+import EveningReview from "@/pages/evening-review";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { dailyRemindersService } from "@/lib/daily-reminders";
@@ -42,6 +44,8 @@ function Router() {
         <Route path="/deep-work" component={DeepWork} />
         <Route path="/notifications" component={NotificationsPage} />
         <Route path="/settings" component={SettingsPage} />
+        <Route path="/morning" component={MorningRitual} />
+        <Route path="/evening" component={EveningReview} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

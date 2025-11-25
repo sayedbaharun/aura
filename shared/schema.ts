@@ -418,6 +418,22 @@ export const days = pgTable(
     primaryVentureFocus: uuid("primary_venture_focus").references(() => ventures.id, {
       onDelete: "set null"
     }),
+    // Morning ritual tracking
+    morningRituals: jsonb("morning_rituals").$type<{
+      pressUps?: { done: boolean; reps?: number };
+      squats?: { done: boolean; reps?: number };
+      supplements?: { done: boolean };
+      reading?: { done: boolean; pages?: number };
+      completedAt?: string;
+    }>(),
+    // Evening ritual tracking
+    eveningRituals: jsonb("evening_rituals").$type<{
+      reviewCompleted?: boolean;
+      journalEntry?: string;
+      gratitude?: string[];
+      tomorrowPriorities?: string[];
+      completedAt?: string;
+    }>(),
     externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
