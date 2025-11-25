@@ -34,9 +34,9 @@ export function validateEnvironment(): ValidationResult {
     errors.push('DATABASE_URL must be a valid PostgreSQL connection string (postgres:// or postgresql://...)');
   }
 
-  // OpenRouter Integration
+  // OpenRouter Integration (optional - AI features disabled without it)
   if (!process.env.OPENROUTER_API_KEY) {
-    errors.push('OPENROUTER_API_KEY is required for AI features');
+    warnings.push('OPENROUTER_API_KEY not configured - AI features disabled');
   } else if (!process.env.OPENROUTER_API_KEY.startsWith('sk-or-')) {
     warnings.push('OPENROUTER_API_KEY may be invalid (should start with "sk-or-")');
   }
