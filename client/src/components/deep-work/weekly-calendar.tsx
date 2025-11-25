@@ -24,7 +24,7 @@ interface Task {
   ventureId: string | null;
   estEffort: number | null;
   focusDate: string | null;
-  focusSlot: "morning" | "midday" | "afternoon" | "evening" | "anytime" | null;
+  focusSlot: "morning_routine" | "deep_work_1" | "admin_block_1" | "deep_work_2" | "admin_block_2" | "evening_review" | "meetings" | "buffer" | null;
 }
 
 interface Venture {
@@ -40,10 +40,14 @@ interface WeeklyCalendarProps {
 }
 
 const FOCUS_SLOTS = [
-  { key: "morning", label: "Morning", time: "6:00-9:00 AM", capacity: 3 },
-  { key: "midday", label: "Midday", time: "9:00 AM-1:00 PM", capacity: 4 },
-  { key: "afternoon", label: "Afternoon", time: "1:00-5:00 PM", capacity: 4 },
-  { key: "evening", label: "Evening", time: "5:00-9:00 PM", capacity: 4 },
+  { key: "morning_routine", label: "Morning Routine", time: "6:00-9:00 AM", capacity: 3, color: "bg-amber-100 dark:bg-amber-900/30" },
+  { key: "deep_work_1", label: "Deep Work", time: "9:00-11:00 AM", capacity: 2, color: "bg-purple-100 dark:bg-purple-900/30" },
+  { key: "admin_block_1", label: "Admin Block", time: "11:00 AM-12:00 PM", capacity: 1, color: "bg-gray-100 dark:bg-gray-800/50" },
+  { key: "deep_work_2", label: "Deep Work", time: "2:00-4:00 PM", capacity: 2, color: "bg-purple-100 dark:bg-purple-900/30" },
+  { key: "admin_block_2", label: "Admin Block", time: "4:00-5:00 PM", capacity: 1, color: "bg-gray-100 dark:bg-gray-800/50" },
+  { key: "evening_review", label: "Evening Review", time: "5:00-6:00 PM", capacity: 1, color: "bg-blue-100 dark:bg-blue-900/30" },
+  { key: "meetings", label: "Meetings", time: "Flexible", capacity: 4, color: "bg-green-100 dark:bg-green-900/30" },
+  { key: "buffer", label: "Buffer", time: "Flexible", capacity: 2, color: "bg-slate-100 dark:bg-slate-800/50" },
 ] as const;
 
 export default function WeeklyCalendar({
@@ -168,9 +172,10 @@ export default function WeeklyCalendar({
         {FOCUS_SLOTS.map((slot) => (
           <div key={slot.key} className="grid grid-cols-8 gap-2 mb-2">
             {/* Slot Label */}
-            <div className="flex flex-col justify-center p-2 text-sm">
+            <div className={cn("flex flex-col justify-center p-2 text-sm rounded-lg", slot.color)}>
               <div className="font-semibold">{slot.label}</div>
               <div className="text-xs text-muted-foreground">{slot.time}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{slot.capacity}h capacity</div>
             </div>
 
             {/* Day Cells */}

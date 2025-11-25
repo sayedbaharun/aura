@@ -3,6 +3,8 @@ import {
   type InsertVenture,
   type Project,
   type InsertProject,
+  type Milestone,
+  type InsertMilestone,
   type Task,
   type InsertTask,
   type CaptureItem,
@@ -15,16 +17,20 @@ import {
   type InsertNutritionEntry,
   type Doc,
   type InsertDoc,
+  type Attachment,
+  type InsertAttachment,
   type User,
   type UpsertUser,
   ventures,
   projects,
+  milestones,
   tasks,
   captureItems,
   days,
   healthEntries,
   nutritionEntries,
   docs,
+  attachments,
   users,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -49,6 +55,13 @@ export interface IStorage {
   createProject(data: InsertProject): Promise<Project>;
   updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string): Promise<void>;
+
+  // Milestones
+  getMilestones(filters?: { projectId?: string }): Promise<Milestone[]>;
+  getMilestone(id: string): Promise<Milestone | undefined>;
+  createMilestone(data: InsertMilestone): Promise<Milestone>;
+  updateMilestone(id: string, data: Partial<InsertMilestone>): Promise<Milestone | undefined>;
+  deleteMilestone(id: string): Promise<void>;
 
   // Tasks
   getTasks(filters?: {
@@ -102,12 +115,23 @@ export interface IStorage {
     type?: string;
     domain?: string;
     status?: string;
+    parentId?: string | null;
   }): Promise<Doc[]>;
   getDoc(id: string): Promise<Doc | undefined>;
+  getDocChildren(parentId: string | null, ventureId?: string): Promise<Doc[]>;
+  getDocTree(ventureId: string): Promise<Doc[]>;
   createDoc(data: InsertDoc): Promise<Doc>;
   updateDoc(id: string, data: Partial<InsertDoc>): Promise<Doc | undefined>;
   deleteDoc(id: string): Promise<void>;
+  deleteDocRecursive(id: string): Promise<void>;
+  reorderDocs(docIds: string[], parentId: string | null): Promise<void>;
   searchDocs(query: string): Promise<Doc[]>;
+
+  // Attachments
+  getAttachments(docId: string): Promise<Attachment[]>;
+  getAttachment(id: string): Promise<Attachment | undefined>;
+  createAttachment(data: InsertAttachment): Promise<Attachment>;
+  deleteAttachment(id: string): Promise<void>;
 }
 
 // PostgreSQL Storage Implementation
@@ -230,6 +254,54 @@ export class DBStorage implements IStorage {
 
   async deleteProject(id: string): Promise<void> {
     await this.db.delete(projects).where(eq(projects.id, id));
+  }
+
+  // ============================================================================
+  // MILESTONES
+  // ============================================================================
+
+  async getMilestones(filters?: { projectId?: string }): Promise<Milestone[]> {
+    if (filters?.projectId) {
+      return await this.db
+        .select()
+        .from(milestones)
+        .where(eq(milestones.projectId, filters.projectId))
+        .orderBy(milestones.order);
+    }
+
+    return await this.db
+      .select()
+      .from(milestones)
+      .orderBy(milestones.order);
+  }
+
+  async getMilestone(id: string): Promise<Milestone | undefined> {
+    const [milestone] = await this.db
+      .select()
+      .from(milestones)
+      .where(eq(milestones.id, id));
+    return milestone;
+  }
+
+  async createMilestone(insertMilestone: InsertMilestone): Promise<Milestone> {
+    const [milestone] = await this.db
+      .insert(milestones)
+      .values(insertMilestone)
+      .returning();
+    return milestone;
+  }
+
+  async updateMilestone(id: string, updates: Partial<InsertMilestone>): Promise<Milestone | undefined> {
+    const [updated] = await this.db
+      .update(milestones)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(milestones.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMilestone(id: string): Promise<void> {
+    await this.db.delete(milestones).where(eq(milestones.id, id));
   }
 
   // ============================================================================
@@ -606,6 +678,7 @@ export class DBStorage implements IStorage {
     type?: string;
     domain?: string;
     status?: string;
+    parentId?: string | null;
   }): Promise<Doc[]> {
     const conditions = [];
 
@@ -624,6 +697,15 @@ export class DBStorage implements IStorage {
     if (filters?.status) {
       conditions.push(eq(docs.status, filters.status as any));
     }
+    // Handle parentId filter - null means root level docs
+    if (filters?.parentId !== undefined) {
+      if (filters.parentId === null) {
+        // Use SQL IS NULL check for root level docs
+        conditions.push(eq(docs.parentId, null as any));
+      } else {
+        conditions.push(eq(docs.parentId, filters.parentId));
+      }
+    }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -631,7 +713,7 @@ export class DBStorage implements IStorage {
       .select()
       .from(docs)
       .where(whereClause)
-      .orderBy(desc(docs.updatedAt));
+      .orderBy(docs.order, desc(docs.updatedAt));
   }
 
   async getDoc(id: string): Promise<Doc | undefined> {
@@ -646,7 +728,7 @@ export class DBStorage implements IStorage {
   async createDoc(insertDoc: InsertDoc): Promise<Doc> {
     const [doc] = await this.db
       .insert(docs)
-      .values(insertDoc)
+      .values(insertDoc as any)
       .returning();
     return doc;
   }
@@ -654,7 +736,7 @@ export class DBStorage implements IStorage {
   async updateDoc(id: string, updates: Partial<InsertDoc>): Promise<Doc | undefined> {
     const [updated] = await this.db
       .update(docs)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as any)
       .where(eq(docs.id, id))
       .returning();
     return updated;
@@ -676,6 +758,108 @@ export class DBStorage implements IStorage {
         )
       )
       .orderBy(desc(docs.updatedAt));
+  }
+
+  async getDocChildren(parentId: string | null, ventureId?: string): Promise<Doc[]> {
+    const conditions = [];
+
+    if (parentId === null) {
+      // Root level docs - parentId IS NULL
+      conditions.push(eq(docs.parentId, null as any));
+    } else {
+      conditions.push(eq(docs.parentId, parentId));
+    }
+
+    if (ventureId) {
+      conditions.push(eq(docs.ventureId, ventureId));
+    }
+
+    return await this.db
+      .select()
+      .from(docs)
+      .where(and(...conditions))
+      .orderBy(docs.order, docs.title);
+  }
+
+  async getDocTree(ventureId: string): Promise<Doc[]> {
+    // Get all docs for a venture - the tree structure is built client-side
+    return await this.db
+      .select()
+      .from(docs)
+      .where(eq(docs.ventureId, ventureId))
+      .orderBy(docs.order, docs.title);
+  }
+
+  async deleteDocRecursive(id: string): Promise<void> {
+    // First get all children recursively
+    const getAllDescendants = async (docId: string): Promise<string[]> => {
+      const children = await this.db
+        .select({ id: docs.id })
+        .from(docs)
+        .where(eq(docs.parentId, docId));
+
+      let descendantIds: string[] = [];
+      for (const child of children) {
+        descendantIds.push(child.id);
+        const childDescendants = await getAllDescendants(child.id);
+        descendantIds = descendantIds.concat(childDescendants);
+      }
+      return descendantIds;
+    };
+
+    const descendantIds = await getAllDescendants(id);
+    const allIds = [id, ...descendantIds];
+
+    // Delete all attachments for these docs
+    if (allIds.length > 0) {
+      await this.db.delete(attachments).where(inArray(attachments.docId, allIds));
+    }
+
+    // Delete all docs
+    await this.db.delete(docs).where(inArray(docs.id, allIds));
+  }
+
+  async reorderDocs(docIds: string[], parentId: string | null): Promise<void> {
+    // Update order for each doc
+    for (let i = 0; i < docIds.length; i++) {
+      await this.db
+        .update(docs)
+        .set({ order: i, parentId: parentId, updatedAt: new Date() })
+        .where(eq(docs.id, docIds[i]));
+    }
+  }
+
+  // ============================================================================
+  // ATTACHMENTS
+  // ============================================================================
+
+  async getAttachments(docId: string): Promise<Attachment[]> {
+    return await this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.docId, docId))
+      .orderBy(attachments.createdAt);
+  }
+
+  async getAttachment(id: string): Promise<Attachment | undefined> {
+    const [attachment] = await this.db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.id, id))
+      .limit(1);
+    return attachment;
+  }
+
+  async createAttachment(insertAttachment: InsertAttachment): Promise<Attachment> {
+    const [attachment] = await this.db
+      .insert(attachments)
+      .values(insertAttachment)
+      .returning();
+    return attachment;
+  }
+
+  async deleteAttachment(id: string): Promise<void> {
+    await this.db.delete(attachments).where(eq(attachments.id, id));
   }
 }
 

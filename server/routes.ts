@@ -4,12 +4,14 @@ import { storage } from "./storage";
 import {
   insertVentureSchema,
   insertProjectSchema,
+  insertMilestoneSchema,
   insertTaskSchema,
   insertCaptureItemSchema,
   insertDaySchema,
   insertHealthEntrySchema,
   insertNutritionEntrySchema,
   insertDocSchema,
+  insertAttachmentSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { logger } from "./logger";
@@ -203,6 +205,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logger.error({ error }, "Error deleting project");
       res.status(500).json({ error: "Failed to delete project" });
+    }
+  });
+
+  // ============================================================================
+  // MILESTONES
+  // ============================================================================
+
+  // Get all milestones (optionally filter by project)
+  app.get("/api/milestones", async (req, res) => {
+    try {
+      const projectId = req.query.project_id as string;
+      const milestones = await storage.getMilestones(projectId ? { projectId } : undefined);
+      res.json(milestones);
+    } catch (error) {
+      logger.error({ error }, "Error fetching milestones");
+      res.status(500).json({ error: "Failed to fetch milestones" });
+    }
+  });
+
+  // Get single milestone
+  app.get("/api/milestones/:id", async (req, res) => {
+    try {
+      const milestone = await storage.getMilestone(req.params.id);
+      if (!milestone) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      res.json(milestone);
+    } catch (error) {
+      logger.error({ error }, "Error fetching milestone");
+      res.status(500).json({ error: "Failed to fetch milestone" });
+    }
+  });
+
+  // Create milestone
+  app.post("/api/milestones", async (req, res) => {
+    try {
+      const validatedData = insertMilestoneSchema.parse(req.body);
+      const milestone = await storage.createMilestone(validatedData);
+      res.status(201).json(milestone);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid milestone data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating milestone");
+        res.status(500).json({ error: "Failed to create milestone" });
+      }
+    }
+  });
+
+  // Update milestone
+  app.patch("/api/milestones/:id", async (req, res) => {
+    try {
+      const updates = insertMilestoneSchema.partial().parse(req.body);
+      const milestone = await storage.updateMilestone(req.params.id, updates);
+      if (!milestone) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      res.json(milestone);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid milestone data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating milestone");
+        res.status(500).json({ error: "Failed to update milestone" });
+      }
+    }
+  });
+
+  // Delete milestone
+  app.delete("/api/milestones/:id", async (req, res) => {
+    try {
+      await storage.deleteMilestone(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting milestone");
+      res.status(500).json({ error: "Failed to delete milestone" });
     }
   });
 
@@ -705,7 +783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all docs (with filters)
   app.get("/api/docs", async (req, res) => {
     try {
-      const filters = {
+      const filters: Record<string, any> = {
         ventureId: req.query.venture_id as string,
         projectId: req.query.project_id as string,
         type: req.query.type as string,
@@ -713,8 +791,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: req.query.status as string,
       };
 
+      // Handle parentId - can be 'null' string for root level docs
+      if (req.query.parent_id !== undefined) {
+        filters.parentId = req.query.parent_id === 'null' ? null : req.query.parent_id as string;
+      }
+
       const cleanFilters = Object.fromEntries(
-        Object.entries(filters).filter(([_, value]) => value !== undefined)
+        Object.entries(filters).filter(([key, value]) => value !== undefined || key === 'parentId')
       );
 
       const docs = await storage.getDocs(cleanFilters);
@@ -797,6 +880,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logger.error({ error }, "Error deleting doc");
       res.status(500).json({ error: "Failed to delete doc" });
+    }
+  });
+
+  // Delete doc recursively (with all children)
+  app.delete("/api/docs/:id/recursive", async (req, res) => {
+    try {
+      await storage.deleteDocRecursive(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting doc recursively");
+      res.status(500).json({ error: "Failed to delete doc" });
+    }
+  });
+
+  // Get doc tree for a venture (all docs, build tree client-side)
+  app.get("/api/docs/tree/:ventureId", async (req, res) => {
+    try {
+      const docs = await storage.getDocTree(req.params.ventureId);
+      res.json(docs);
+    } catch (error) {
+      logger.error({ error }, "Error fetching doc tree");
+      res.status(500).json({ error: "Failed to fetch doc tree" });
+    }
+  });
+
+  // Get direct children of a doc (or root level if parentId is null)
+  app.get("/api/docs/children/:parentId", async (req, res) => {
+    try {
+      const parentId = req.params.parentId === 'null' ? null : req.params.parentId;
+      const ventureId = req.query.venture_id as string | undefined;
+      const docs = await storage.getDocChildren(parentId, ventureId);
+      res.json(docs);
+    } catch (error) {
+      logger.error({ error }, "Error fetching doc children");
+      res.status(500).json({ error: "Failed to fetch doc children" });
+    }
+  });
+
+  // Reorder docs (for drag and drop)
+  app.post("/api/docs/reorder", async (req, res) => {
+    try {
+      const { docIds, parentId } = req.body;
+      if (!Array.isArray(docIds)) {
+        return res.status(400).json({ error: "docIds must be an array" });
+      }
+      await storage.reorderDocs(docIds, parentId ?? null);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error reordering docs");
+      res.status(500).json({ error: "Failed to reorder docs" });
+    }
+  });
+
+  // ============================================================================
+  // ATTACHMENTS
+  // ============================================================================
+
+  // Get attachments for a doc
+  app.get("/api/docs/:docId/attachments", async (req, res) => {
+    try {
+      const attachments = await storage.getAttachments(req.params.docId);
+      res.json(attachments);
+    } catch (error) {
+      logger.error({ error }, "Error fetching attachments");
+      res.status(500).json({ error: "Failed to fetch attachments" });
+    }
+  });
+
+  // Get single attachment
+  app.get("/api/attachments/:id", async (req, res) => {
+    try {
+      const attachment = await storage.getAttachment(req.params.id);
+      if (!attachment) {
+        return res.status(404).json({ error: "Attachment not found" });
+      }
+      res.json(attachment);
+    } catch (error) {
+      logger.error({ error }, "Error fetching attachment");
+      res.status(500).json({ error: "Failed to fetch attachment" });
+    }
+  });
+
+  // Create attachment
+  app.post("/api/attachments", async (req, res) => {
+    try {
+      const validatedData = insertAttachmentSchema.parse(req.body);
+      const attachment = await storage.createAttachment(validatedData);
+      res.status(201).json(attachment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid attachment data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating attachment");
+        res.status(500).json({ error: "Failed to create attachment" });
+      }
+    }
+  });
+
+  // Delete attachment
+  app.delete("/api/attachments/:id", async (req, res) => {
+    try {
+      await storage.deleteAttachment(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting attachment");
+      res.status(500).json({ error: "Failed to delete attachment" });
     }
   });
 

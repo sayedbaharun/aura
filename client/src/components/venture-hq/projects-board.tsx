@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, FolderKanban } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import CreateProjectModal from "./create-project-modal";
+import ProjectDetailModal from "./project-detail-modal";
 import { cn } from "@/lib/utils";
 
 interface Project {
@@ -40,7 +41,21 @@ const STATUS_COLUMNS = [
 
 export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
+
+  const handleProjectClick = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setDetailModalOpen(true);
+  };
+
+  const handleEditProject = (project: Project) => {
+    setDetailModalOpen(false);
+    setEditingProject(project);
+    setCreateModalOpen(true);
+  };
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects", ventureId],
@@ -145,6 +160,7 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
                       <Card
                         key={project.id}
                         className="cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => handleProjectClick(project.id)}
                       >
                         <CardHeader className="pb-3">
                           <CardTitle className="text-sm font-medium line-clamp-2">
@@ -220,9 +236,20 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
 
       <CreateProjectModal
         open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
+        onOpenChange={(open) => {
+          setCreateModalOpen(open);
+          if (!open) setEditingProject(null);
+        }}
         ventureId={ventureId}
         defaultStatus={selectedStatus}
+        project={editingProject}
+      />
+
+      <ProjectDetailModal
+        open={detailModalOpen}
+        onOpenChange={setDetailModalOpen}
+        projectId={selectedProjectId}
+        onEdit={handleEditProject}
       />
     </>
   );

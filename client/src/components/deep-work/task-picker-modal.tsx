@@ -50,10 +50,14 @@ interface TaskPickerModalProps {
 }
 
 const SLOT_INFO = {
-  morning: { label: "Morning", time: "6:00-9:00 AM" },
-  midday: { label: "Midday", time: "9:00 AM-1:00 PM" },
-  afternoon: { label: "Afternoon", time: "1:00-5:00 PM" },
-  evening: { label: "Evening", time: "5:00-9:00 PM" },
+  morning_routine: { label: "Morning Routine", time: "6:00-9:00 AM", capacity: 3 },
+  deep_work_1: { label: "Deep Work", time: "9:00-11:00 AM", capacity: 2 },
+  admin_block_1: { label: "Admin Block", time: "11:00 AM-12:00 PM", capacity: 1 },
+  deep_work_2: { label: "Deep Work", time: "2:00-4:00 PM", capacity: 2 },
+  admin_block_2: { label: "Admin Block", time: "4:00-5:00 PM", capacity: 1 },
+  evening_review: { label: "Evening Review", time: "5:00-6:00 PM", capacity: 1 },
+  meetings: { label: "Meetings", time: "Flexible", capacity: 4 },
+  buffer: { label: "Buffer", time: "Flexible", capacity: 2 },
 } as const;
 
 export default function TaskPickerModal({

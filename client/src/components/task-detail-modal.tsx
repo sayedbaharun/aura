@@ -49,10 +49,11 @@ interface Task {
   domain: 'work' | 'health' | 'personal' | 'learning' | null;
   ventureId: string | null;
   projectId: string | null;
+  milestoneId: string | null;
   dayId: string | null;
   dueDate: string | null;
   focusDate: string | null;
-  focusSlot: 'morning' | 'midday' | 'afternoon' | 'evening' | 'anytime' | null;
+  focusSlot: 'morning_routine' | 'deep_work_1' | 'admin_block_1' | 'deep_work_2' | 'admin_block_2' | 'evening_review' | 'meetings' | 'buffer' | null;
   estEffort: number | null;
   actualEffort: number | null;
   notes: string | null;
@@ -74,6 +75,13 @@ interface Project {
   id: string;
   name: string;
   ventureId: string;
+}
+
+interface Milestone {
+  id: string;
+  name: string;
+  projectId: string;
+  status: string;
 }
 
 export default function TaskDetailModal() {
@@ -109,6 +117,17 @@ export default function TaskDetailModal() {
       return response.json();
     },
     enabled: !!formData.ventureId && isOpen && mode === 'edit',
+  });
+
+  // Fetch milestones (filtered by project if selected)
+  const { data: milestones = [] } = useQuery<Milestone[]>({
+    queryKey: ['/api/milestones', formData.projectId],
+    queryFn: async () => {
+      if (!formData.projectId) return [];
+      const response = await apiRequest('GET', `/api/milestones?project_id=${formData.projectId}`);
+      return response.json();
+    },
+    enabled: !!formData.projectId && isOpen && mode === 'edit',
   });
 
   // Update task mutation
@@ -186,12 +205,19 @@ export default function TaskDetailModal() {
     }
   }, [isOpen]);
 
-  // Reset venture when changing venture in edit mode
+  // Reset project when changing venture in edit mode
   useEffect(() => {
     if (mode === 'edit' && !formData.ventureId) {
-      setFormData((prev) => ({ ...prev, projectId: null }));
+      setFormData((prev) => ({ ...prev, projectId: null, milestoneId: null }));
     }
   }, [formData.ventureId, mode]);
+
+  // Reset milestone when changing project in edit mode
+  useEffect(() => {
+    if (mode === 'edit' && !formData.projectId) {
+      setFormData((prev) => ({ ...prev, milestoneId: null }));
+    }
+  }, [formData.projectId, mode]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -321,6 +347,27 @@ export default function TaskDetailModal() {
     return project?.name || null;
   };
 
+  const getMilestoneName = (milestoneId: string | null) => {
+    if (!milestoneId) return null;
+    const milestone = milestones.find((m) => m.id === milestoneId);
+    return milestone?.name || null;
+  };
+
+  const formatFocusSlot = (slot: string | null) => {
+    if (!slot) return null;
+    const slotLabels: Record<string, string> = {
+      morning_routine: 'Morning Routine (6-9am)',
+      deep_work_1: 'Deep Work (9-11am)',
+      admin_block_1: 'Admin Block (11am-12pm)',
+      deep_work_2: 'Deep Work (2-4pm)',
+      admin_block_2: 'Admin Block (4-5pm)',
+      evening_review: 'Evening Review (5-6pm)',
+      meetings: 'Meetings (Flexible)',
+      buffer: 'Buffer (Flexible)',
+    };
+    return slotLabels[slot] || slot;
+  };
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
     try {
@@ -416,6 +463,12 @@ export default function TaskDetailModal() {
                   <p className="font-medium">{getProjectName(task.projectId)}</p>
                 </div>
               )}
+              {getMilestoneName(task.milestoneId) && (
+                <div>
+                  <Label className="text-muted-foreground">Milestone</Label>
+                  <p className="font-medium">{getMilestoneName(task.milestoneId)}</p>
+                </div>
+              )}
               {task.dueDate && (
                 <div>
                   <Label className="text-muted-foreground">Due Date</Label>
@@ -431,7 +484,7 @@ export default function TaskDetailModal() {
               {task.focusSlot && (
                 <div>
                   <Label className="text-muted-foreground">Focus Slot</Label>
-                  <p className="font-medium capitalize">{task.focusSlot}</p>
+                  <p className="font-medium">{formatFocusSlot(task.focusSlot)}</p>
                 </div>
               )}
               {task.estEffort !== null && (
@@ -711,6 +764,31 @@ export default function TaskDetailModal() {
               </div>
             </div>
 
+            {/* Milestone */}
+            {formData.projectId && (
+              <div className="space-y-2">
+                <Label htmlFor="milestone">Milestone</Label>
+                <Select
+                  value={formData.milestoneId || 'none'}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, milestoneId: value === 'none' ? null : value })
+                  }
+                >
+                  <SelectTrigger id="milestone">
+                    <SelectValue placeholder="Select milestone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {milestones.map((milestone) => (
+                      <SelectItem key={milestone.id} value={milestone.id}>
+                        {milestone.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Due Date and Focus Date */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Due Date */}
@@ -792,11 +870,14 @@ export default function TaskDetailModal() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="morning">Morning</SelectItem>
-                  <SelectItem value="midday">Midday</SelectItem>
-                  <SelectItem value="afternoon">Afternoon</SelectItem>
-                  <SelectItem value="evening">Evening</SelectItem>
-                  <SelectItem value="anytime">Anytime</SelectItem>
+                  <SelectItem value="morning_routine">Morning Routine (6-9am)</SelectItem>
+                  <SelectItem value="deep_work_1">Deep Work (9-11am)</SelectItem>
+                  <SelectItem value="admin_block_1">Admin Block (11am-12pm)</SelectItem>
+                  <SelectItem value="deep_work_2">Deep Work (2-4pm)</SelectItem>
+                  <SelectItem value="admin_block_2">Admin Block (4-5pm)</SelectItem>
+                  <SelectItem value="evening_review">Evening Review (5-6pm)</SelectItem>
+                  <SelectItem value="meetings">Meetings (Flexible)</SelectItem>
+                  <SelectItem value="buffer">Buffer (Flexible)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

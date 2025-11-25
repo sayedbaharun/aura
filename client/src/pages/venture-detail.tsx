@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VentureDetailHeader from "@/components/venture-hq/venture-detail-header";
 import ProjectsBoard from "@/components/venture-hq/projects-board";
 import TasksList from "@/components/venture-hq/tasks-list";
-import DocsList from "@/components/venture-hq/docs-list";
+import VentureDocs from "@/components/docs/venture-docs";
 
 interface Venture {
   id: string;
@@ -65,7 +65,7 @@ export default function VentureDetail() {
         <TabsList>
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="docs">Docs & SOPs</TabsTrigger>
+          <TabsTrigger value="docs">Knowledge Base</TabsTrigger>
         </TabsList>
 
         <TabsContent value="projects">
@@ -77,7 +77,7 @@ export default function VentureDetail() {
         </TabsContent>
 
         <TabsContent value="docs">
-          <DocsList ventureId={venture.id} />
+          <VentureDocs ventureId={venture.id} />
         </TabsContent>
       </Tabs>
     </div>

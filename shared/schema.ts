@@ -144,19 +144,31 @@ export const mealTypeEnum = pgEnum('meal_type', [
 ]);
 
 export const docTypeEnum = pgEnum('doc_type', [
-  'sop',
-  'prompt',
-  'spec',
-  'template',
-  'playbook'
+  'page',           // General page/note
+  'sop',            // Standard Operating Procedure
+  'prompt',         // AI/LLM prompts
+  'spec',           // Technical specifications
+  'template',       // Reusable templates
+  'playbook',       // Step-by-step guides
+  'strategy',       // Business/trading strategies
+  'tech_doc',       // Technical documentation
+  'process',        // Process documentation
+  'reference',      // Reference material
+  'meeting_notes',  // Meeting notes
+  'research'        // Research notes
 ]);
 
 export const docDomainEnum = pgEnum('doc_domain', [
-  'venture_ops',
-  'marketing',
-  'product',
-  'sales',
-  'personal'
+  'venture_ops',    // Venture operations
+  'marketing',      // Marketing
+  'product',        // Product development
+  'sales',          // Sales
+  'tech',           // Technology/Engineering
+  'trading',        // Trading strategies
+  'finance',        // Finance/Accounting
+  'legal',          // Legal/Compliance
+  'hr',             // Human Resources
+  'personal'        // Personal notes
 ]);
 
 export const docStatusEnum = pgEnum('doc_status', ['draft', 'active', 'archived']);
@@ -506,19 +518,25 @@ export const insertNutritionEntrySchema = createInsertSchema(nutritionEntries)
 export type InsertNutritionEntry = z.infer<typeof insertNutritionEntrySchema>;
 export type NutritionEntry = typeof nutritionEntries.$inferSelect;
 
-// DOCS: SOPs, prompts, playbooks, specs
+// DOCS: Pages, SOPs, prompts, playbooks, specs, strategies
 export const docs = pgTable(
   "docs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     title: text("title").notNull(),
-    type: docTypeEnum("type"),
+    type: docTypeEnum("type").default("page"),
     domain: docDomainEnum("domain"),
     ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    parentId: uuid("parent_id"), // Self-reference for hierarchy (added via migration)
     status: docStatusEnum("status").default("draft").notNull(),
-    body: text("body"),
+    icon: text("icon"), // Emoji or icon identifier
+    coverImage: text("cover_image"), // URL to cover image
+    body: text("body"), // Markdown content
+    order: integer("order").default(0), // Sort order within parent
+    isFolder: boolean("is_folder").default(false), // True for folder-type pages
     tags: jsonb("tags").$type<string[]>().default([]),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(), // Flexible metadata storage
     externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -526,11 +544,41 @@ export const docs = pgTable(
   (table) => [
     index("idx_docs_venture_id").on(table.ventureId),
     index("idx_docs_project_id").on(table.projectId),
+    index("idx_docs_parent_id").on(table.parentId),
     index("idx_docs_type").on(table.type),
     index("idx_docs_status").on(table.status),
     index("idx_docs_domain").on(table.domain),
   ]
 );
+
+// ATTACHMENTS: Files and images for docs
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    docId: uuid("doc_id").references(() => docs.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    type: text("type").notNull(), // MIME type
+    size: integer("size"), // File size in bytes
+    url: text("url"), // External URL (Google Drive, S3, etc.)
+    storageType: text("storage_type").default("url"), // 'url', 'base64', 'local'
+    data: text("data"), // Base64 encoded data for small files
+    thumbnailUrl: text("thumbnail_url"), // Thumbnail for images
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_attachments_doc_id").on(table.docId),
+  ]
+);
+
+export const insertAttachmentSchema = createInsertSchema(attachments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
+export type Attachment = typeof attachments.$inferSelect;
 
 export const insertDocSchema = createInsertSchema(docs).omit({
   id: true,
@@ -630,7 +678,7 @@ export const nutritionEntriesRelations = relations(nutritionEntries, ({ one }) =
   }),
 }));
 
-export const docsRelations = relations(docs, ({ one }) => ({
+export const docsRelations = relations(docs, ({ one, many }) => ({
   venture: one(ventures, {
     fields: [docs.ventureId],
     references: [ventures.id],
@@ -638,5 +686,21 @@ export const docsRelations = relations(docs, ({ one }) => ({
   project: one(projects, {
     fields: [docs.projectId],
     references: [projects.id],
+  }),
+  parent: one(docs, {
+    fields: [docs.parentId],
+    references: [docs.id],
+    relationName: "docHierarchy",
+  }),
+  children: many(docs, {
+    relationName: "docHierarchy",
+  }),
+  attachments: many(attachments),
+}));
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  doc: one(docs, {
+    fields: [attachments.docId],
+    references: [docs.id],
   }),
 }));
