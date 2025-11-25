@@ -47,16 +47,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // Default user UUID (consistent across the app for single-user system)
+  const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001";
+
   // AUTHENTICATION (Mock for single-user)
   // ============================================================================
 
   app.get('/api/auth/user', async (req: any, res) => {
     // Mock user for Railway deployment (no auth)
     res.json({
-      id: 'default-user',
-      email: 'sayed@hikmadigital.com',
-      firstName: 'Sayed',
-      lastName: 'Baharun',
+      id: DEFAULT_USER_ID,
+      email: 'user@sb-os.com',
+      firstName: '',
+      lastName: '',
     });
   });
 
@@ -1098,13 +1101,12 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Get user preferences
   app.get("/api/settings/preferences", async (req, res) => {
     try {
-      const userId = "default-user"; // Mock user for single-user system
-      const prefs = await storage.getUserPreferences(userId);
+      const prefs = await storage.getUserPreferences(DEFAULT_USER_ID);
 
       // Return default preferences if none exist
       if (!prefs) {
         res.json({
-          userId,
+          userId: DEFAULT_USER_ID,
           theme: "system",
           morningRitualConfig: null,
           notificationSettings: null,
@@ -1122,9 +1124,8 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Update user preferences
   app.patch("/api/settings/preferences", async (req, res) => {
     try {
-      const userId = "default-user";
       const updates = insertUserPreferencesSchema.partial().parse(req.body);
-      const prefs = await storage.upsertUserPreferences(userId, updates);
+      const prefs = await storage.upsertUserPreferences(DEFAULT_USER_ID, updates);
       res.json(prefs);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1143,8 +1144,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Get morning ritual config
   app.get("/api/settings/morning-ritual", async (req, res) => {
     try {
-      const userId = "default-user";
-      const prefs = await storage.getUserPreferences(userId);
+      const prefs = await storage.getUserPreferences(DEFAULT_USER_ID);
 
       // Return default config if none exists
       if (!prefs?.morningRitualConfig) {
@@ -1170,10 +1170,9 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Update morning ritual config
   app.patch("/api/settings/morning-ritual", async (req, res) => {
     try {
-      const userId = "default-user";
       const morningRitualConfig = req.body;
 
-      const prefs = await storage.upsertUserPreferences(userId, { morningRitualConfig });
+      const prefs = await storage.upsertUserPreferences(DEFAULT_USER_ID, { morningRitualConfig });
       res.json(prefs.morningRitualConfig);
     } catch (error) {
       logger.error({ error }, "Error updating morning ritual config");
@@ -1307,16 +1306,15 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Get user profile
   app.get("/api/settings/profile", async (req, res) => {
     try {
-      const userId = "default-user";
-      const user = await storage.getUser(userId);
+      const user = await storage.getUser(DEFAULT_USER_ID);
 
       if (!user) {
-        // Return default profile
+        // Return default profile (will be created on first save)
         res.json({
-          id: userId,
-          email: "sayed@hikmadigital.com",
-          firstName: "Sayed",
-          lastName: "Baharun",
+          id: DEFAULT_USER_ID,
+          email: "user@sb-os.com",
+          firstName: "",
+          lastName: "",
           timezone: "Asia/Dubai",
           dateFormat: "yyyy-MM-dd",
           timeFormat: "24h",
@@ -1335,15 +1333,14 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Update user profile
   app.patch("/api/settings/profile", async (req, res) => {
     try {
-      const userId = "default-user";
       const { firstName, lastName, email, timezone, dateFormat, timeFormat, weekStartsOn } = req.body;
 
       // Get existing user to preserve email if not provided
-      const existingUser = await storage.getUser(userId);
+      const existingUser = await storage.getUser(DEFAULT_USER_ID);
       const userEmail = email || existingUser?.email || "user@sb-os.com";
 
       const user = await storage.upsertUser({
-        id: userId,
+        id: DEFAULT_USER_ID,
         email: userEmail,
         firstName,
         lastName,

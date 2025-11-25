@@ -111,7 +111,7 @@ export function DocsLibrary({
                     {doc.type}
                   </Badge>
                   <Badge variant="outline" className="text-xs">
-                    {doc.domain.replace("_", " ")}
+                    {(doc.domain || "general").replace("_", " ")}
                   </Badge>
                   <Badge variant="outline" className="text-xs">
                     {doc.status}
@@ -139,7 +139,7 @@ export function DocsLibrary({
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/knowledge/${doc.id}`);
+                      setLocation(`/knowledge/${doc.id}`);
                     }}
                   >
                     View
@@ -210,7 +210,7 @@ export function DocsLibrary({
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="text-xs capitalize">
-                  {doc.domain.replace("_", " ")}
+                  {(doc.domain || "general").replace("_", " ")}
                 </Badge>
               </TableCell>
               <TableCell>
@@ -238,7 +238,7 @@ export function DocsLibrary({
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/knowledge/${doc.id}`);
+                        setLocation(`/knowledge/${doc.id}`);
                       }}
                     >
                       View
