@@ -92,7 +92,7 @@ export default function MorningRitual() {
     queryKey: ["/api/settings/morning-ritual"],
   });
 
-  const enabledHabits = habitConfig?.habits.filter(h => h.enabled) || [];
+  const enabledHabits = Array.isArray(habitConfig?.habits) ? habitConfig.habits.filter(h => h.enabled) : [];
 
   const [rituals, setRituals] = useState<Record<string, { done: boolean; count?: number }>>({});
 
@@ -177,8 +177,9 @@ export default function MorningRitual() {
 
       // Use existing top3Outcomes if available, otherwise sync from yesterday's evening priorities
       let top3 = dayData.top3Outcomes || "";
-      if (!top3 && yesterdayData?.eveningRituals?.tomorrowPriorities) {
-        const priorities = yesterdayData.eveningRituals.tomorrowPriorities.filter(p => p.trim());
+      const tomorrowPriorities = yesterdayData?.eveningRituals?.tomorrowPriorities;
+      if (!top3 && Array.isArray(tomorrowPriorities)) {
+        const priorities = tomorrowPriorities.filter(p => p.trim());
         if (priorities.length > 0) {
           top3 = priorities.map((p, i) => `${i + 1}. ${p}`).join("\n");
         }
@@ -195,8 +196,9 @@ export default function MorningRitual() {
 
   // If no day data exists yet, still try to sync from yesterday's priorities
   useEffect(() => {
-    if (!dayData && yesterdayData?.eveningRituals?.tomorrowPriorities) {
-      const priorities = yesterdayData.eveningRituals.tomorrowPriorities.filter(p => p.trim());
+    const tomorrowPriorities = yesterdayData?.eveningRituals?.tomorrowPriorities;
+    if (!dayData && Array.isArray(tomorrowPriorities)) {
+      const priorities = tomorrowPriorities.filter(p => p.trim());
       if (priorities.length > 0 && !planning.top3Outcomes) {
         setPlanning(prev => ({
           ...prev,
@@ -444,7 +446,7 @@ export default function MorningRitual() {
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Target className="h-5 w-5 text-blue-500" />
                 Top 3 Outcomes
-                {yesterdayData?.eveningRituals?.tomorrowPriorities &&
+                {Array.isArray(yesterdayData?.eveningRituals?.tomorrowPriorities) &&
                   yesterdayData.eveningRituals.tomorrowPriorities.filter(p => p.trim()).length > 0 &&
                   !dayData?.top3Outcomes && (
                     <Badge variant="secondary" className="ml-auto text-xs">
