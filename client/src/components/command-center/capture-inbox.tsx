@@ -184,9 +184,9 @@ export default function CaptureInbox() {
     }
   };
 
-  const availableProjects = projects.filter(
-    (p) => !convertFormData.ventureId || p.ventureId === convertFormData.ventureId
-  );
+  const availableProjects = Array.isArray(projects)
+    ? projects.filter((p) => !convertFormData.ventureId || p.ventureId === convertFormData.ventureId)
+    : [];
 
   if (isLoading) {
     return (

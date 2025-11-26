@@ -119,7 +119,7 @@ export default function MorningRitual() {
     queryKey: ["/api/ventures"],
   });
 
-  const activeVentures = ventures.filter(v => v.status === "active" || v.status === "development");
+  const activeVentures = Array.isArray(ventures) ? ventures.filter(v => v.status === "active" || v.status === "development") : [];
 
   // Fetch yesterday's day data for syncing priorities
   const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");

@@ -138,12 +138,12 @@ export default function EveningReview() {
 
   // Group tasks by priority for dropdowns
   const tasksByPriority = {
-    P1: allTasks.filter(t => t.priority === "P1"),
-    P2: allTasks.filter(t => t.priority === "P2"),
-    P3: allTasks.filter(t => t.priority === "P3"),
+    P1: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P1") : [],
+    P2: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P2") : [],
+    P3: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P3") : [],
   };
 
-  const todayHealth = healthEntries[0];
+  const todayHealth = Array.isArray(healthEntries) ? healthEntries[0] : null;
 
   // Load existing data when day data arrives
   useEffect(() => {
@@ -168,8 +168,8 @@ export default function EveningReview() {
   }, [dayData]);
 
   // Calculate day stats
-  const completedTasks = tasks.filter(t => t.status === "done").length;
-  const totalTasks = tasks.length;
+  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === "done").length : 0;
+  const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
   const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const morningRitualsComplete = dayData?.morningRituals
