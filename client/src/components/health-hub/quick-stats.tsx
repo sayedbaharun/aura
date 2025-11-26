@@ -25,29 +25,32 @@ interface Stat {
 }
 
 export default function QuickStats({ healthEntries }: QuickStatsProps) {
+  // Ensure healthEntries is an array
+  const entries = Array.isArray(healthEntries) ? healthEntries : [];
+
   // Calculate stats
-  const entriesWithSleep = healthEntries.filter((e) => e.sleepHours !== null);
+  const entriesWithSleep = entries.filter((e) => e.sleepHours !== null);
   const avgSleep = entriesWithSleep.length > 0
     ? (entriesWithSleep.reduce((sum, e) => sum + (e.sleepHours || 0), 0) / entriesWithSleep.length).toFixed(1)
     : "—";
 
-  const entriesWithEnergy = healthEntries.filter((e) => e.energyLevel !== null);
+  const entriesWithEnergy = entries.filter((e) => e.energyLevel !== null);
   const avgEnergy = entriesWithEnergy.length > 0
     ? (entriesWithEnergy.reduce((sum, e) => sum + (e.energyLevel || 0), 0) / entriesWithEnergy.length).toFixed(1)
     : "—";
 
-  const workoutDays = healthEntries.filter((e) => e.workoutDone).length;
-  const workoutFrequency = healthEntries.length > 0
-    ? Math.round((workoutDays / healthEntries.length) * 100)
+  const workoutDays = entries.filter((e) => e.workoutDone).length;
+  const workoutFrequency = entries.length > 0
+    ? Math.round((workoutDays / entries.length) * 100)
     : 0;
 
-  const entriesWithSteps = healthEntries.filter((e) => e.steps !== null);
+  const entriesWithSteps = entries.filter((e) => e.steps !== null);
   const totalSteps = entriesWithSteps.reduce((sum, e) => sum + (e.steps || 0), 0);
   const avgSteps = entriesWithSteps.length > 0
     ? Math.round(totalSteps / entriesWithSteps.length)
     : 0;
 
-  const entriesWithWeight = healthEntries.filter((e) => e.weightKg !== null);
+  const entriesWithWeight = entries.filter((e) => e.weightKg !== null);
   const weightTrend = entriesWithWeight.length >= 2
     ? entriesWithWeight[entriesWithWeight.length - 1].weightKg! - entriesWithWeight[0].weightKg!
     : 0;

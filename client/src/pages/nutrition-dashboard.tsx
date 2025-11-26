@@ -35,12 +35,15 @@ export default function NutritionDashboard() {
     queryKey: ["/api/nutrition"],
   });
 
+  // Ensure allMeals is an array
+  const mealsArray = Array.isArray(allMeals) ? allMeals : [];
+
   // Filter meals based on date filter
   const today = format(new Date(), "yyyy-MM-dd");
   const weekAgo = format(subDays(new Date(), 6), "yyyy-MM-dd");
   const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
 
-  const filteredMeals = allMeals.filter((meal) => {
+  const filteredMeals = mealsArray.filter((meal) => {
     const mealDate = format(new Date(meal.datetime), "yyyy-MM-dd");
 
     switch (dateFilter) {
@@ -55,12 +58,12 @@ export default function NutritionDashboard() {
     }
   });
 
-  const todaysMeals = allMeals.filter((meal) => {
+  const todaysMeals = mealsArray.filter((meal) => {
     const mealDate = format(new Date(meal.datetime), "yyyy-MM-dd");
     return mealDate === today;
   });
 
-  const weekMeals = allMeals.filter((meal) => {
+  const weekMeals = mealsArray.filter((meal) => {
     const mealDate = format(new Date(meal.datetime), "yyyy-MM-dd");
     return mealDate >= weekAgo && mealDate <= today;
   });

@@ -107,14 +107,17 @@ export default function NotificationsPage() {
     }
   };
 
+  // Ensure notifications is an array
+  const notificationsArray = Array.isArray(notifications) ? notifications : [];
+
   // Filter notifications
-  const filteredNotifications = notifications.filter((notification) => {
+  const filteredNotifications = notificationsArray.filter((notification) => {
     if (filter === 'all') return true;
     if (filter === 'unread') return !notification.read;
     return notification.type === filter;
   });
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notificationsArray.filter((n) => !n.read).length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">

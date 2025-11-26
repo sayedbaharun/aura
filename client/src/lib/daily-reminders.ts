@@ -36,7 +36,8 @@ async function checkDueTasks(): Promise<void> {
   try {
     const today = new Date().toISOString().split('T')[0];
     const response = await apiRequest('GET', `/api/tasks?due_date=${today}&status=next,in_progress`);
-    const tasks = await response.json() as Task[];
+    const tasksData = await response.json();
+    const tasks = Array.isArray(tasksData) ? tasksData as Task[] : [];
 
     tasks.forEach((task) => {
       // Add to notification center
@@ -71,7 +72,8 @@ async function checkOverdueTasks(): Promise<void> {
   try {
     const today = new Date();
     const response = await apiRequest('GET', '/api/tasks?status=next,in_progress');
-    const tasks = await response.json() as Task[];
+    const tasksData = await response.json();
+    const tasks = Array.isArray(tasksData) ? tasksData as Task[] : [];
 
     const overdueTasks = tasks.filter((task) => {
       if (!task.due_date) return false;

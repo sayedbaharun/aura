@@ -39,7 +39,8 @@ export default function HealthSnapshot() {
     queryKey: ["/api/health"],
   });
 
-  const todayEntry = healthEntries.find((entry) => entry.date === today);
+  const entriesArray = Array.isArray(healthEntries) ? healthEntries : [];
+  const todayEntry = entriesArray.find((entry) => entry.date === today);
 
   const [formData, setFormData] = useState({
     sleepHours: "",

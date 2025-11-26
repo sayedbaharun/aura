@@ -115,8 +115,9 @@ export default function CategoriesManager() {
     setEditModal({ open: true, category, type: category.type });
   };
 
+  const categoriesArray = Array.isArray(categories) ? categories : [];
   const filterByType = (type: CategoryType) =>
-    categories.filter((c) => c.type === type).sort((a, b) => a.sortOrder - b.sortOrder);
+    categoriesArray.filter((c) => c.type === type).sort((a, b) => a.sortOrder - b.sortOrder);
 
   const getTypeIcon = (type: CategoryType) => {
     switch (type) {

@@ -16,8 +16,11 @@ interface PerformanceInsightsProps {
 }
 
 export default function PerformanceInsights({ healthEntries }: PerformanceInsightsProps) {
+  // Ensure healthEntries is an array
+  const entries = Array.isArray(healthEntries) ? healthEntries : [];
+
   // Prepare data for charts - sort by date
-  const sortedEntries = [...healthEntries].sort((a, b) =>
+  const sortedEntries = [...entries].sort((a, b) =>
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 

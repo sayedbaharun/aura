@@ -51,7 +51,7 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
       );
       const allTasks = await res.json();
       // Filter out tasks that already have focus_date
-      return allTasks.filter((task: Task) => !task.focusDate);
+      return Array.isArray(allTasks) ? allTasks.filter((task: Task) => !task.focusDate) : [];
     },
   });
 

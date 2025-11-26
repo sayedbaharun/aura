@@ -103,14 +103,18 @@ export default function Dashboard() {
     }
   };
 
-  // Filter messages and appointments by platform
-  const filteredMessages = platformFilter === "all" 
-    ? messages 
-    : messages.filter(msg => msg.platform === platformFilter);
+  // Ensure arrays are valid
+  const messagesArray = Array.isArray(messages) ? messages : [];
+  const appointmentsArray = Array.isArray(appointments) ? appointments : [];
 
-  const filteredAppointments = platformFilter === "all" 
-    ? appointments 
-    : appointments.filter(apt => apt.platform === platformFilter);
+  // Filter messages and appointments by platform
+  const filteredMessages = platformFilter === "all"
+    ? messagesArray
+    : messagesArray.filter(msg => msg.platform === platformFilter);
+
+  const filteredAppointments = platformFilter === "all"
+    ? appointmentsArray
+    : appointmentsArray.filter(apt => apt.platform === platformFilter);
 
   const selectedDateAppointments = filteredAppointments.filter(apt => {
     if (!apt.appointmentDate || !selectedDate) return false;
@@ -123,10 +127,10 @@ export default function Dashboard() {
     .map(apt => new Date(apt.appointmentDate!).toDateString());
 
   // Count by platform
-  const telegramCount = messages.filter(m => m.platform === 'telegram').length;
-  const whatsappCount = messages.filter(m => m.platform === 'whatsapp' || !m.platform).length;
-  const telegramAppointmentsCount = appointments.filter(a => a.platform === 'telegram').length;
-  const whatsappAppointmentsCount = appointments.filter(a => a.platform === 'whatsapp' || !a.platform).length;
+  const telegramCount = messagesArray.filter(m => m.platform === 'telegram').length;
+  const whatsappCount = messagesArray.filter(m => m.platform === 'whatsapp' || !m.platform).length;
+  const telegramAppointmentsCount = appointmentsArray.filter(a => a.platform === 'telegram').length;
+  const whatsappAppointmentsCount = appointmentsArray.filter(a => a.platform === 'whatsapp' || !a.platform).length;
 
   return (
     <div className="min-h-screen bg-background">

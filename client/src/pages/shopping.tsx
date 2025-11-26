@@ -107,7 +107,8 @@ export default function Shopping() {
     },
   });
 
-  const filteredItems = items.filter((item) => {
+  const itemsArray = Array.isArray(items) ? items : [];
+  const filteredItems = itemsArray.filter((item) => {
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
     return true;
@@ -173,8 +174,8 @@ export default function Shopping() {
     );
   }
 
-  const toBuyCount = items.filter((i) => i.status === "to_buy").length;
-  const purchasedCount = items.filter((i) => i.status === "purchased").length;
+  const toBuyCount = itemsArray.filter((i) => i.status === "to_buy").length;
+  const purchasedCount = itemsArray.filter((i) => i.status === "purchased").length;
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">

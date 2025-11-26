@@ -88,7 +88,7 @@ export default function TaskPickerModal({
       );
       const tasks = await res.json();
       // Filter out tasks that already have focus_date
-      return tasks.filter((task: Task) => !task.focusDate);
+      return Array.isArray(tasks) ? tasks.filter((task: Task) => !task.focusDate) : [];
     },
     enabled: isOpen,
   });

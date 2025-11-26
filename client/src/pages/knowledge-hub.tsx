@@ -92,7 +92,10 @@ export default function KnowledgeHub() {
 
   // Filter and search logic
   const displayedDocs = useMemo(() => {
-    let docs = searchQuery.length > 0 ? searchResults : allDocs;
+    // Ensure arrays are valid
+    const docsArray = Array.isArray(allDocs) ? allDocs : [];
+    const resultsArray = Array.isArray(searchResults) ? searchResults : [];
+    let docs = searchQuery.length > 0 ? resultsArray : docsArray;
 
     // Apply filters
     if (filters.types.length > 0) {

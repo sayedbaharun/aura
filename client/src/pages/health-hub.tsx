@@ -59,15 +59,18 @@ export default function HealthHub() {
     queryKey: ["/api/health"],
   });
 
+  // Ensure healthEntries is an array
+  const entriesArray = Array.isArray(healthEntries) ? healthEntries : [];
+
   // Filter entries by date range
-  const filteredEntries = healthEntries.filter((entry) => {
+  const filteredEntries = entriesArray.filter((entry) => {
     const entryDate = new Date(entry.date);
     return entryDate >= startDate && entryDate <= endDate;
   });
 
   // Get entry for selected date
   const selectedEntry = selectedDate
-    ? healthEntries.find((e) => e.date === selectedDate)
+    ? entriesArray.find((e) => e.date === selectedDate)
     : null;
 
   const handleDayClick = (date: string) => {
