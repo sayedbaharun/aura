@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
+import { Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import VentureDetailHeader from "@/components/venture-hq/venture-detail-header";
 import ProjectsBoard from "@/components/venture-hq/projects-board";
 import TasksList from "@/components/venture-hq/tasks-list";
 import VentureDocs from "@/components/docs/venture-docs";
+import CreateProjectModal from "@/components/venture-hq/create-project-modal";
+import AiAgentConfig from "@/components/venture-hq/ai-agent-config";
 
 interface Venture {
   id: string;
@@ -20,6 +25,8 @@ interface Venture {
 export default function VentureDetail() {
   const [, params] = useRoute("/ventures/:id");
   const ventureId = params?.id;
+  const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("projects");
 
   const { data: venture, isLoading } = useQuery<Venture>({
     queryKey: ["/api/ventures", ventureId],
@@ -61,12 +68,22 @@ export default function VentureDetail() {
     <div className="container mx-auto p-4 md:p-6 space-y-6">
       <VentureDetailHeader venture={venture} />
 
-      <Tabs defaultValue="projects" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="projects">Projects</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="docs">Knowledge Base</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="tasks">Tasks</TabsTrigger>
+            <TabsTrigger value="docs">Knowledge Base</TabsTrigger>
+            <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
+          </TabsList>
+
+          {activeTab === "projects" && (
+            <Button onClick={() => setCreateProjectModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+          )}
+        </div>
 
         <TabsContent value="projects">
           <ProjectsBoard ventureId={venture.id} />
@@ -79,7 +96,17 @@ export default function VentureDetail() {
         <TabsContent value="docs">
           <VentureDocs ventureId={venture.id} />
         </TabsContent>
+
+        <TabsContent value="ai-agent">
+          <AiAgentConfig ventureId={venture.id} />
+        </TabsContent>
       </Tabs>
+
+      <CreateProjectModal
+        open={createProjectModalOpen}
+        onOpenChange={setCreateProjectModalOpen}
+        ventureId={venture.id}
+      />
     </div>
   );
 }

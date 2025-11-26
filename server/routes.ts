@@ -16,6 +16,7 @@ import {
   insertCustomCategorySchema,
   insertShoppingItemSchema,
   insertBookSchema,
+  insertAiAgentPromptSchema,
 } from "@shared/schema";
 import { getAllIntegrationStatuses, getIntegrationStatus } from "./integrations";
 import { z } from "zod";
@@ -2057,6 +2058,70 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
     } catch (error) {
       logger.error({ error }, "Error deleting book");
       res.status(500).json({ error: "Failed to delete book" });
+    }
+  });
+
+  // ============================================================================
+  // AI AGENT PROMPTS
+  // ============================================================================
+
+  // Get AI agent prompt for a venture
+  app.get("/api/ai-agent-prompts/venture/:ventureId", async (req, res) => {
+    try {
+      const prompt = await storage.getAiAgentPromptByVenture(req.params.ventureId);
+      if (!prompt) {
+        return res.status(404).json({ error: "AI agent prompt not found" });
+      }
+      res.json(prompt);
+    } catch (error) {
+      logger.error({ error }, "Error fetching AI agent prompt");
+      res.status(500).json({ error: "Failed to fetch AI agent prompt" });
+    }
+  });
+
+  // Create AI agent prompt
+  app.post("/api/ai-agent-prompts", async (req, res) => {
+    try {
+      const validatedData = insertAiAgentPromptSchema.parse(req.body);
+      const prompt = await storage.createAiAgentPrompt(validatedData);
+      res.status(201).json(prompt);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid AI agent prompt data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error creating AI agent prompt");
+        res.status(500).json({ error: "Failed to create AI agent prompt" });
+      }
+    }
+  });
+
+  // Update AI agent prompt
+  app.patch("/api/ai-agent-prompts/:id", async (req, res) => {
+    try {
+      const updates = insertAiAgentPromptSchema.partial().parse(req.body);
+      const prompt = await storage.updateAiAgentPrompt(req.params.id, updates);
+      if (!prompt) {
+        return res.status(404).json({ error: "AI agent prompt not found" });
+      }
+      res.json(prompt);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid AI agent prompt data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating AI agent prompt");
+        res.status(500).json({ error: "Failed to update AI agent prompt" });
+      }
+    }
+  });
+
+  // Delete AI agent prompt
+  app.delete("/api/ai-agent-prompts/:id", async (req, res) => {
+    try {
+      await storage.deleteAiAgentPrompt(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error deleting AI agent prompt");
+      res.status(500).json({ error: "Failed to delete AI agent prompt" });
     }
   });
 
