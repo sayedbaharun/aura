@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar, Plus } from "lucide-react";
+import { Calendar, Plus, ExternalLink } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Link } from "wouter";
 import ModeController, {
   useModeController,
 } from "@/components/command-center/mode-controller";
@@ -106,11 +107,29 @@ function MorningMode({ day }: { day: Day | null }) {
 
         {/* Morning Ritual Tab */}
         <TabsContent value="ritual">
-          <iframe
-            src="/morning-ritual"
-            className="w-full h-[calc(100vh-250px)] border-0 rounded-lg"
-            title="Morning Ritual"
-          />
+          <Card>
+            <CardHeader>
+              <CardTitle>Morning Ritual</CardTitle>
+              <CardDescription>Complete your daily habits and set intentions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  Track your morning habits, set your top 3 priorities, and plan your day
+                </p>
+                <Button asChild size="lg">
+                  <Link href="/morning-ritual">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Full Morning Ritual
+                  </Link>
+                </Button>
+              </div>
+              <div className="pt-4 border-t">
+                <h4 className="text-sm font-medium mb-3">Quick Habits Check</h4>
+                <MorningHabitsMini day={day} />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Workout Tab */}
