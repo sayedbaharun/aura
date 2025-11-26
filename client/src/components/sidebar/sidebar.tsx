@@ -16,6 +16,7 @@ import {
   ChevronRight,
   User,
   X,
+  Zap,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
 import NavItem from "./nav-item";
@@ -81,6 +82,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
         href: "/dashboard",
         icon: LayoutDashboard,
         label: "Command Center",
+      },
+      {
+        href: "/capture",
+        icon: Zap,
+        label: "Capture",
       },
       {
         href: "/morning",

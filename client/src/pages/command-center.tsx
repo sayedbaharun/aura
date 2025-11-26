@@ -12,7 +12,6 @@ import TodayHeader from "@/components/command-center/today-header";
 import TasksForToday from "@/components/command-center/tasks-for-today";
 import HealthSnapshot from "@/components/command-center/health-snapshot";
 import NutritionSnapshot from "@/components/command-center/nutrition-snapshot";
-import CaptureInbox from "@/components/command-center/capture-inbox";
 import ThisWeekPreview from "@/components/command-center/this-week-preview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -155,17 +154,6 @@ function ExecutionMode({ day }: { day: Day | null }) {
         </div>
       </div>
 
-      {/* Capture Inbox - Collapsed */}
-      <Collapsible>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground">
-            📥 Capture Inbox
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CaptureInbox />
-        </CollapsibleContent>
-      </Collapsible>
     </div>
   );
 }
@@ -195,9 +183,6 @@ function EveningMode({ day }: { day: Day | null }) {
 
       {/* Evening Reflection */}
       <TodayHeader showReflection />
-
-      {/* Capture Inbox - Process Remaining */}
-      <CaptureInbox />
 
       {/* Week Preview */}
       <ThisWeekPreview />

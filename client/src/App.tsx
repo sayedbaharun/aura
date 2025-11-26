@@ -24,6 +24,7 @@ import MorningRitual from "@/pages/morning-ritual";
 import EveningReview from "@/pages/evening-review";
 import Shopping from "@/pages/shopping";
 import Books from "@/pages/books";
+import CapturePage from "@/pages/capture";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { dailyRemindersService } from "@/lib/daily-reminders";
@@ -57,6 +58,7 @@ function Router() {
             <Route path="/evening" component={EveningReview} />
             <Route path="/shopping" component={Shopping} />
             <Route path="/books" component={Books} />
+            <Route path="/capture" component={CapturePage} />
             <Route component={NotFound} />
           </Switch>
         </Layout>
