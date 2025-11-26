@@ -17,6 +17,7 @@ import {
   User,
   X,
   Zap,
+  TrendingUp,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
 import NavItem from "./nav-item";
@@ -107,6 +108,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
         href: "/ventures",
         icon: Briefcase,
         label: "Ventures",
+      },
+      {
+        href: "/trading",
+        icon: TrendingUp,
+        label: "Trading",
       },
       {
         href: "/deep-work",
