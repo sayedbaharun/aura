@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,7 @@ import { Notification } from '@/lib/notification-types';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function NotificationCenter() {
+  const [, navigate] = useLocation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -63,7 +65,7 @@ export default function NotificationCenter() {
       markAsRead(notification.id);
     }
     if (notification.link) {
-      window.location.href = notification.link;
+      navigate(notification.link);
     }
     setIsOpen(false);
   };
@@ -228,7 +230,7 @@ export default function NotificationCenter() {
             <DropdownMenuItem
               className="justify-center text-xs cursor-pointer"
               onClick={() => {
-                window.location.href = '/notifications';
+                navigate('/notifications');
                 setIsOpen(false);
               }}
             >
