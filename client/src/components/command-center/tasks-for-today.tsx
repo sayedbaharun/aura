@@ -39,15 +39,24 @@ interface Project {
   ventureId: string;
 }
 
-export default function TasksForToday() {
+interface TasksForTodayProps {
+  showOnlyIncomplete?: boolean;
+}
+
+export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTodayProps) {
   const { toast } = useToast();
   const { openTaskDetail } = useTaskDetailModal();
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
+  const { data: rawTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks/today"],
     refetchInterval: 5000,
   });
+
+  // Filter tasks based on showOnlyIncomplete prop
+  const tasks = showOnlyIncomplete
+    ? (Array.isArray(rawTasks) ? rawTasks : []).filter((t) => t.status !== "done" && t.status !== "cancelled")
+    : (Array.isArray(rawTasks) ? rawTasks : []);
 
   const { data: ventures = [] } = useQuery<Venture[]>({
     queryKey: ["/api/ventures"],

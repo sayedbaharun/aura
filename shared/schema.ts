@@ -528,6 +528,18 @@ export const days = pgTable(
       tomorrowPriorities?: string[];
       completedAt?: string;
     }>(),
+    // Trading journal for the day
+    tradingJournal: jsonb("trading_journal").$type<{
+      sessions: {
+        id: string;
+        timestamp: string;
+        sessionName: string;
+        pnl: number;
+        notes: string;
+        lessons: string;
+        emotionalState: 'calm' | 'anxious' | 'confident' | 'frustrated';
+      }[];
+    }>().default({ sessions: [] }),
     externalId: text("external_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

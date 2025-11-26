@@ -19,19 +19,34 @@ interface Day {
   reflectionPm: string | null;
   mood: string | null;
   primaryVentureFocus: string | null;
+  eveningRituals?: {
+    reviewCompleted?: boolean;
+    journalEntry?: string;
+    gratitude?: string[];
+    tomorrowPriorities?: string[];
+    completedAt?: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export default function TodayHeader() {
+interface TodayHeaderProps {
+  showReflection?: boolean;
+}
+
+export default function TodayHeader({ showReflection = false }: TodayHeaderProps) {
   const { toast } = useToast();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingTop3, setIsEditingTop3] = useState(false);
   const [isEditingOneThingToShip, setIsEditingOneThingToShip] = useState(false);
+  const [isEditingReflection, setIsEditingReflection] = useState(false);
+  const [isEditingGratitude, setIsEditingGratitude] = useState(false);
 
   const [titleValue, setTitleValue] = useState("");
   const [top3Value, setTop3Value] = useState("");
   const [oneThingValue, setOneThingValue] = useState("");
+  const [reflectionValue, setReflectionValue] = useState("");
+  const [gratitudeValue, setGratitudeValue] = useState("");
 
   const { data: day, isLoading } = useQuery<Day>({
     queryKey: ["/api/days/today"],
@@ -73,6 +88,22 @@ export default function TodayHeader() {
     setIsEditingOneThingToShip(false);
   };
 
+  const handleSaveReflection = () => {
+    updateDayMutation.mutate({ reflectionPm: reflectionValue });
+    setIsEditingReflection(false);
+  };
+
+  const handleSaveGratitude = () => {
+    const gratitudeArray = gratitudeValue.split("\n").filter(g => g.trim());
+    updateDayMutation.mutate({
+      eveningRituals: {
+        ...(day?.eveningRituals || {}),
+        gratitude: gratitudeArray,
+      }
+    });
+    setIsEditingGratitude(false);
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -94,23 +125,126 @@ export default function TodayHeader() {
 
   const formattedDate = format(new Date(day.date), "EEEE, MMMM d, yyyy");
 
+  // Evening Reflection Mode
+  if (showReflection) {
+    const gratitude = day.eveningRituals?.gratitude || [];
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Evening Reflection</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Gratitude */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium">3 Things I'm Grateful For</label>
+              {!isEditingGratitude ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setGratitudeValue(gratitude.join("\n"));
+                    setIsEditingGratitude(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSaveGratitude}
+                  disabled={updateDayMutation.isPending}
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {isEditingGratitude ? (
+              <Textarea
+                value={gratitudeValue}
+                onChange={(e) => setGratitudeValue(e.target.value)}
+                placeholder="1. Something I'm grateful for...&#10;2. Another thing...&#10;3. And one more..."
+                rows={3}
+                onBlur={handleSaveGratitude}
+                autoFocus
+              />
+            ) : (
+              <div className="space-y-1">
+                {gratitude.length > 0 ? (
+                  gratitude.map((item: string, i: number) => (
+                    <p key={i} className="text-sm text-muted-foreground">
+                      {i + 1}. {item}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No gratitude logged</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Evening Reflection */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium">How Did Today Go?</label>
+              {!isEditingReflection ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setReflectionValue(day.reflectionPm || "");
+                    setIsEditingReflection(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSaveReflection}
+                  disabled={updateDayMutation.isPending}
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {isEditingReflection ? (
+              <Textarea
+                value={reflectionValue}
+                onChange={(e) => setReflectionValue(e.target.value)}
+                placeholder="What went well? What could be better? What did I learn?"
+                rows={4}
+                onBlur={handleSaveReflection}
+                autoFocus
+              />
+            ) : (
+              <div className="whitespace-pre-wrap text-sm text-muted-foreground">
+                {day.reflectionPm || "No reflection yet"}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Morning/Planning Mode (default)
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-2xl">{formattedDate}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Title */}
-        <div>
+      <CardContent className="pt-6 space-y-6">
+        {/* One Thing to Ship - Hero */}
+        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium">Day Title</label>
-            {!isEditingTitle ? (
+            <label className="text-sm font-medium text-primary">🎯 One Thing to Ship Today</label>
+            {!isEditingOneThingToShip ? (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setTitleValue(day.title || "");
-                  setIsEditingTitle(true);
+                  setOneThingValue(day.oneThingToShip || "");
+                  setIsEditingOneThingToShip(true);
                 }}
               >
                 <Pencil className="h-4 w-4" />
@@ -119,24 +253,25 @@ export default function TodayHeader() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleSaveTitle}
+                onClick={handleSaveOneThingToShip}
                 disabled={updateDayMutation.isPending}
               >
                 <Save className="h-4 w-4" />
               </Button>
             )}
           </div>
-          {isEditingTitle ? (
+          {isEditingOneThingToShip ? (
             <Input
-              value={titleValue}
-              onChange={(e) => setTitleValue(e.target.value)}
-              placeholder="Enter day title..."
-              onBlur={handleSaveTitle}
+              value={oneThingValue}
+              onChange={(e) => setOneThingValue(e.target.value)}
+              placeholder="What's the one thing that would make today a success?"
+              onBlur={handleSaveOneThingToShip}
               autoFocus
+              className="text-lg font-semibold"
             />
           ) : (
             <p className="text-lg font-semibold">
-              {day.title || "Untitled Day"}
+              {day.oneThingToShip || "Not set - what will you ship?"}
             </p>
           )}
         </div>
@@ -180,47 +315,6 @@ export default function TodayHeader() {
             <div className="whitespace-pre-wrap text-sm text-muted-foreground">
               {day.top3Outcomes || "No outcomes set"}
             </div>
-          )}
-        </div>
-
-        {/* One Thing to Ship */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium">One Thing to Ship</label>
-            {!isEditingOneThingToShip ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setOneThingValue(day.oneThingToShip || "");
-                  setIsEditingOneThingToShip(true);
-                }}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSaveOneThingToShip}
-                disabled={updateDayMutation.isPending}
-              >
-                <Save className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          {isEditingOneThingToShip ? (
-            <Input
-              value={oneThingValue}
-              onChange={(e) => setOneThingValue(e.target.value)}
-              placeholder="What's the one thing you want to ship today?"
-              onBlur={handleSaveOneThingToShip}
-              autoFocus
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {day.oneThingToShip || "Not set"}
-            </p>
           )}
         </div>
       </CardContent>
