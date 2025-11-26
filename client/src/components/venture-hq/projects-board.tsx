@@ -51,7 +51,6 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
   const [openSections, setOpenSections] = useState<string[]>(["in_progress", "planning"]);
 
   const handleProjectClick = (projectId: string) => {
@@ -120,11 +119,6 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
     if (tasks.length === 0) return 0;
     const doneTasks = tasks.filter((t) => t.status === "done").length;
     return Math.round((doneTasks / tasks.length) * 100);
-  };
-
-  const handleCreateClick = (status: string) => {
-    setSelectedStatus(status);
-    setCreateModalOpen(true);
   };
 
   if (isLoading) {
@@ -236,14 +230,6 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-2 space-y-2">
                   {columnProjects.map(renderProjectCard)}
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-muted-foreground hover:text-foreground"
-                    onClick={() => handleCreateClick(column.value)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Project
-                  </Button>
                 </CollapsibleContent>
               </Collapsible>
             );
@@ -272,14 +258,6 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
 
                   <div className="space-y-2">
                     {columnProjects.map(renderProjectCard)}
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-muted-foreground hover:text-foreground"
-                      onClick={() => handleCreateClick(column.value)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Project
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -295,7 +273,7 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
           <p className="text-sm text-muted-foreground mb-4">
             Create your first project to get started
           </p>
-          <Button onClick={() => handleCreateClick("not_started")}>
+          <Button onClick={() => setCreateModalOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Project
           </Button>
@@ -309,7 +287,6 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
           if (!open) setEditingProject(null);
         }}
         ventureId={ventureId}
-        defaultStatus={selectedStatus}
         project={editingProject}
       />
 

@@ -29,6 +29,8 @@ import {
   type InsertShoppingItem,
   type Book,
   type InsertBook,
+  type AiAgentPrompt,
+  type InsertAiAgentPrompt,
   ventures,
   projects,
   milestones,
@@ -44,6 +46,7 @@ import {
   customCategories,
   shoppingItems,
   books,
+  aiAgentPrompts,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like } from "drizzle-orm";
@@ -1091,6 +1094,49 @@ export class DBStorage implements IStorage {
 
   async deleteBook(id: string): Promise<void> {
     await this.db.delete(books).where(eq(books.id, id));
+  }
+
+  // ============================================================================
+  // AI AGENT PROMPTS
+  // ============================================================================
+
+  async getAiAgentPromptByVenture(ventureId: string): Promise<AiAgentPrompt | undefined> {
+    const results = await this.db
+      .select()
+      .from(aiAgentPrompts)
+      .where(eq(aiAgentPrompts.ventureId, ventureId))
+      .limit(1);
+    return results[0];
+  }
+
+  async getAiAgentPrompt(id: string): Promise<AiAgentPrompt | undefined> {
+    const results = await this.db
+      .select()
+      .from(aiAgentPrompts)
+      .where(eq(aiAgentPrompts.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createAiAgentPrompt(data: InsertAiAgentPrompt): Promise<AiAgentPrompt> {
+    const results = await this.db.insert(aiAgentPrompts).values(data).returning();
+    return results[0];
+  }
+
+  async updateAiAgentPrompt(
+    id: string,
+    updates: Partial<InsertAiAgentPrompt>
+  ): Promise<AiAgentPrompt | undefined> {
+    const results = await this.db
+      .update(aiAgentPrompts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(aiAgentPrompts.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteAiAgentPrompt(id: string): Promise<void> {
+    await this.db.delete(aiAgentPrompts).where(eq(aiAgentPrompts.id, id));
   }
 }
 

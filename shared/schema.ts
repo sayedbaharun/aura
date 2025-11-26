@@ -903,3 +903,39 @@ export const insertBookSchema = createInsertSchema(books, {
 
 export type InsertBook = z.infer<typeof insertBookSchema>;
 export type Book = typeof books.$inferSelect;
+
+// ----------------------------------------------------------------------------
+// AI AGENT PROMPTS
+// ----------------------------------------------------------------------------
+
+// AI Agent Prompts: Venture-specific AI assistant configuration
+export const aiAgentPrompts = pgTable(
+  "ai_agent_prompts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "cascade" }).notNull().unique(),
+    systemPrompt: text("system_prompt"),
+    context: text("context"),
+    capabilities: jsonb("capabilities").$type<string[]>().default([]),
+    quickActions: jsonb("quick_actions").$type<{
+      label: string;
+      prompt: string;
+    }[]>().default([]),
+    enabled: boolean("enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_ai_agent_prompts_venture_id").on(table.ventureId),
+    index("idx_ai_agent_prompts_enabled").on(table.enabled),
+  ]
+);
+
+export const insertAiAgentPromptSchema = createInsertSchema(aiAgentPrompts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAiAgentPrompt = z.infer<typeof insertAiAgentPromptSchema>;
+export type AiAgentPrompt = typeof aiAgentPrompts.$inferSelect;
