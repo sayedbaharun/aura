@@ -1101,12 +1101,18 @@ export class DBStorage implements IStorage {
   // ============================================================================
 
   async getAiAgentPromptByVenture(ventureId: string): Promise<AiAgentPrompt | undefined> {
-    const results = await this.db
-      .select()
-      .from(aiAgentPrompts)
-      .where(eq(aiAgentPrompts.ventureId, ventureId))
-      .limit(1);
-    return results[0];
+    try {
+      const results = await this.db
+        .select()
+        .from(aiAgentPrompts)
+        .where(eq(aiAgentPrompts.ventureId, ventureId))
+        .limit(1);
+      return results[0];
+    } catch (error) {
+      // Table might not exist yet if migration hasn't been run
+      console.error("Error fetching AI agent prompt:", error);
+      return undefined;
+    }
   }
 
   async getAiAgentPrompt(id: string): Promise<AiAgentPrompt | undefined> {
