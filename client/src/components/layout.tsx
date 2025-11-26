@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Sidebar } from "./sidebar";
 import TopBar from "./top-bar";
+import AuraChatButton from "./aura/aura-chat-button";
 import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,9 @@ export default function Layout({ children }: LayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Aura AI Assistant - Floating Chat Button */}
+      <AuraChatButton />
     </div>
   );
 }

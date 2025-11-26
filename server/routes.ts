@@ -2060,6 +2060,117 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
     }
   });
 
+  // ============================================================================
+  // AURA AI ASSISTANT
+  // ============================================================================
+
+  const { chatWithAura, streamChatWithAura, getSuggestedQuestions } = await import('./aura/chat');
+  const { indexAllData, indexEntity, deleteFromIndex } = await import('./aura/indexer');
+  const { initializePineconeIndex } = await import('./aura/pinecone');
+
+  // Chat with Aura (non-streaming)
+  app.post("/api/aura/chat", async (req, res) => {
+    try {
+      const { message, history = [] } = req.body;
+
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      const response = await chatWithAura(message, history);
+
+      res.json({ response });
+    } catch (error) {
+      logger.error({ error }, "Error in Aura chat");
+      res.status(500).json({ error: "Failed to chat with Aura" });
+    }
+  });
+
+  // Stream chat with Aura (real-time streaming)
+  app.post("/api/aura/stream", async (req, res) => {
+    try {
+      const { message, history = [] } = req.body;
+
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      // Set up SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const stream = await streamChatWithAura(message, history);
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+    } catch (error) {
+      logger.error({ error }, "Error in Aura stream");
+      res.status(500).json({ error: "Failed to stream chat with Aura" });
+    }
+  });
+
+  // Initialize Pinecone index
+  app.post("/api/aura/init", async (req, res) => {
+    try {
+      await initializePineconeIndex();
+      res.json({ success: true, message: "Pinecone index initialized" });
+    } catch (error) {
+      logger.error({ error }, "Error initializing Pinecone");
+      res.status(500).json({ error: "Failed to initialize Pinecone" });
+    }
+  });
+
+  // Index all data
+  app.post("/api/aura/index", async (req, res) => {
+    try {
+      // Run indexing in background
+      indexAllData().catch((error) => {
+        logger.error({ error }, "Error in background indexing");
+      });
+
+      res.json({ success: true, message: "Indexing started in background" });
+    } catch (error) {
+      logger.error({ error }, "Error starting indexing");
+      res.status(500).json({ error: "Failed to start indexing" });
+    }
+  });
+
+  // Index a single entity (for real-time updates)
+  app.post("/api/aura/index/:entityType/:entityId", async (req, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+
+      await indexEntity(entityType as any, entityId);
+
+      res.json({ success: true, message: `Indexed ${entityType}: ${entityId}` });
+    } catch (error) {
+      logger.error({ error }, "Error indexing entity");
+      res.status(500).json({ error: "Failed to index entity" });
+    }
+  });
+
+  // Delete entity from index
+  app.delete("/api/aura/index/:entityType/:entityId", async (req, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+
+      await deleteFromIndex(entityType as any, entityId);
+
+      res.json({ success: true, message: `Deleted ${entityType}: ${entityId} from index` });
+    } catch (error) {
+      logger.error({ error }, "Error deleting from index");
+      res.status(500).json({ error: "Failed to delete from index" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
