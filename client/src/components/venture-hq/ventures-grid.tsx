@@ -80,12 +80,12 @@ export default function VenturesGrid({ viewMode }: VenturesGridProps) {
   };
 
   const getVentureStats = (ventureId: string) => {
-    const ventureProjects = projects.filter((p) => p.ventureId === ventureId);
+    const ventureProjects = Array.isArray(projects) ? projects.filter((p) => p.ventureId === ventureId) : [];
     const activeProjects = ventureProjects.filter((p) =>
       p.status === "active" || p.status === "not_started" || p.status === "planning" || p.status === "in_progress"
     ).length;
 
-    const ventureTasks = tasks.filter((t) => t.ventureId === ventureId);
+    const ventureTasks = Array.isArray(tasks) ? tasks.filter((t) => t.ventureId === ventureId) : [];
     const openTasks = ventureTasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
 
     return {
