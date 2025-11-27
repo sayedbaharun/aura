@@ -2170,6 +2170,14 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         return res.status(400).json({ error: "Message is required" });
       }
 
+      // Check if OpenRouter API key is configured
+      if (!process.env.OPENROUTER_API_KEY) {
+        return res.status(503).json({
+          error: "AI service not configured",
+          message: "OpenRouter API key is not set."
+        });
+      }
+
       await ensureDefaultUserExists();
       const userId = DEFAULT_USER_ID;
 
@@ -2181,16 +2189,45 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         metadata: {},
       });
 
-      // Get AI response using the existing processMessage function
-      const { processMessage } = await import("./ai-assistant");
-      const aiResponse = await processMessage(message, userId, "telegram");
+      // Get recent chat history for context
+      const recentHistory = await storage.getChatHistory(userId, 20);
+      const historyMessages = recentHistory.reverse().map(msg => ({
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+      }));
+
+      // Call OpenRouter API directly
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: "https://openrouter.ai/api/v1",
+      });
+
+      const systemPrompt = `You are Hikma, a helpful AI assistant for Hikma-OS - a personal productivity operating system.
+You help users manage their ventures, projects, tasks, health tracking, and knowledge base.
+Be concise, helpful, and friendly. Current date: ${new Date().toISOString().split('T')[0]}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "openai/gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...historyMessages,
+          { role: "user", content: message },
+        ],
+        max_tokens: 1000,
+      });
+
+      const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
 
       // Save AI response
       const assistantMessage = await storage.createChatMessage({
         userId,
         role: "assistant",
         content: aiResponse,
-        metadata: {},
+        metadata: {
+          model: "openai/gpt-4o-mini",
+          tokensUsed: completion.usage?.total_tokens,
+        },
       });
 
       res.json({
