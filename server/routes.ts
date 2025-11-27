@@ -59,6 +59,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // FAVICON FALLBACK (redirect to PNG icon since favicon.ico doesn't exist)
+  // ============================================================================
+  app.get('/favicon.ico', (req, res) => {
+    res.redirect(301, '/icons/icon-32x32.png');
+  });
+
+  // ============================================================================
   // Default user UUID (consistent across the app for single-user system)
   const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001";
 
