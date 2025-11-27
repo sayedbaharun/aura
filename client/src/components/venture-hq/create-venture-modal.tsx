@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,30 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
     icon: venture?.icon || "🚀",
     notes: venture?.notes || "",
   });
+
+  // Update form data when venture prop changes or modal opens
+  useEffect(() => {
+    if (venture) {
+      setFormData({
+        name: venture.name || "",
+        oneLiner: venture.oneLiner || "",
+        status: venture.status || "planning",
+        color: venture.color || "#FF6B6B",
+        icon: venture.icon || "🚀",
+        notes: venture.notes || "",
+      });
+    } else {
+      // Reset to defaults for create mode
+      setFormData({
+        name: "",
+        oneLiner: "",
+        status: "planning",
+        color: "#FF6B6B",
+        icon: "🚀",
+        notes: "",
+      });
+    }
+  }, [venture, open]);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
