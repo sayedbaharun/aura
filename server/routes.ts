@@ -1392,6 +1392,53 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   });
 
   // ============================================================================
+  // SETTINGS - AI ASSISTANT
+  // ============================================================================
+
+  // Get AI assistant settings
+  app.get("/api/settings/ai", async (req, res) => {
+    try {
+      const prefs = await storage.getUserPreferences(DEFAULT_USER_ID);
+      res.json({
+        aiInstructions: prefs?.aiInstructions || "",
+        aiContext: prefs?.aiContext || {
+          userName: "",
+          role: "",
+          goals: [],
+          preferences: ""
+        }
+      });
+    } catch (error) {
+      logger.error({ error }, "Error fetching AI settings");
+      res.status(500).json({ error: "Failed to fetch AI settings" });
+    }
+  });
+
+  // Update AI assistant settings
+  app.patch("/api/settings/ai", async (req, res) => {
+    try {
+      const { aiInstructions, aiContext } = req.body;
+      const updates: any = {};
+
+      if (aiInstructions !== undefined) {
+        updates.aiInstructions = aiInstructions;
+      }
+      if (aiContext !== undefined) {
+        updates.aiContext = aiContext;
+      }
+
+      const prefs = await storage.upsertUserPreferences(DEFAULT_USER_ID, updates);
+      res.json({
+        aiInstructions: prefs.aiInstructions || "",
+        aiContext: prefs.aiContext || {}
+      });
+    } catch (error) {
+      logger.error({ error }, "Error updating AI settings");
+      res.status(500).json({ error: "Failed to update AI settings" });
+    }
+  });
+
+  // ============================================================================
   // SETTINGS - INTEGRATIONS STATUS
   // ============================================================================
 
@@ -2393,6 +2440,11 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         metadata: null,
       });
 
+      // Get user preferences for custom AI instructions
+      const userPrefs = await storage.getUserPreferences(userId);
+      const customInstructions = userPrefs?.aiInstructions || "";
+      const aiContext = userPrefs?.aiContext || {};
+
       // Get recent chat history for context
       const recentHistory = await storage.getChatHistory(userId, 20);
       const historyMessages = recentHistory.reverse().map(msg => ({
@@ -2400,28 +2452,350 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         content: msg.content,
       }));
 
-      // Call OpenRouter API directly
+      // Call OpenRouter API with function calling
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
         apiKey: process.env.OPENROUTER_API_KEY,
         baseURL: "https://openrouter.ai/api/v1",
       });
 
-      const systemPrompt = `You are Hikma, a helpful AI assistant for Hikma-OS - a personal productivity operating system.
-You help users manage their ventures, projects, tasks, health tracking, and knowledge base.
-Be concise, helpful, and friendly. Current date: ${new Date().toISOString().split('T')[0]}`;
+      const today = new Date().toISOString().split('T')[0];
+      const systemPrompt = `You are Hikma, a powerful AI assistant for Hikma-OS - a personal productivity operating system.
 
-      const completion = await openai.chat.completions.create({
-        model: "openai/gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...historyMessages,
-          { role: "user", content: message },
-        ],
-        max_tokens: 1000,
+CAPABILITIES:
+- Full access to ventures, projects, tasks, captures, health entries, nutrition logs, and documents
+- Can create, update, and query all data
+- Helps with planning, tracking, and insights
+
+USER CONTEXT:
+${aiContext.userName ? `Name: ${aiContext.userName}` : ''}
+${aiContext.role ? `Role: ${aiContext.role}` : ''}
+${aiContext.goals?.length ? `Goals: ${aiContext.goals.join(', ')}` : ''}
+${aiContext.preferences ? `Preferences: ${aiContext.preferences}` : ''}
+
+${customInstructions ? `CUSTOM INSTRUCTIONS:\n${customInstructions}\n` : ''}
+RULES:
+- Be concise but helpful
+- Use tools to fetch real data before answering questions about ventures, tasks, projects, etc.
+- When creating items, confirm what was created
+- Format responses nicely with markdown when appropriate
+- Current date: ${today}`;
+
+      // Define tools for database access
+      const tools: any[] = [
+        {
+          type: "function",
+          function: {
+            name: "get_ventures",
+            description: "Get all ventures (business initiatives). Use this when user asks about their ventures, businesses, or initiatives.",
+            parameters: { type: "object", properties: {}, required: [] }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_projects",
+            description: "Get projects, optionally filtered by venture. Use when user asks about projects.",
+            parameters: {
+              type: "object",
+              properties: {
+                ventureId: { type: "string", description: "Optional venture ID to filter by" },
+                status: { type: "string", description: "Optional status filter" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_tasks",
+            description: "Get tasks with optional filters. Use when user asks about tasks, to-dos, or what they need to do.",
+            parameters: {
+              type: "object",
+              properties: {
+                status: { type: "string", description: "Filter by status: idea, next, in_progress, waiting, done, cancelled" },
+                ventureId: { type: "string", description: "Filter by venture ID" },
+                projectId: { type: "string", description: "Filter by project ID" },
+                priority: { type: "string", description: "Filter by priority: P0, P1, P2, P3" },
+                focusDate: { type: "string", description: "Filter by focus date (YYYY-MM-DD)" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_today_tasks",
+            description: "Get tasks scheduled for today. Use when user asks 'what do I have today' or 'today's tasks'.",
+            parameters: { type: "object", properties: {}, required: [] }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "create_task",
+            description: "Create a new task. Use when user wants to add a task or to-do item.",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Task title" },
+                status: { type: "string", description: "Status: idea, next, in_progress, waiting, done" },
+                priority: { type: "string", description: "Priority: P0, P1, P2, P3" },
+                ventureId: { type: "string", description: "Venture ID to associate with" },
+                projectId: { type: "string", description: "Project ID to associate with" },
+                dueDate: { type: "string", description: "Due date (YYYY-MM-DD)" },
+                focusDate: { type: "string", description: "Focus date for scheduling (YYYY-MM-DD)" },
+                notes: { type: "string", description: "Additional notes" }
+              },
+              required: ["title"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "update_task",
+            description: "Update an existing task. Use when user wants to modify, complete, or change a task.",
+            parameters: {
+              type: "object",
+              properties: {
+                taskId: { type: "string", description: "Task ID to update" },
+                title: { type: "string" },
+                status: { type: "string" },
+                priority: { type: "string" },
+                notes: { type: "string" },
+                dueDate: { type: "string" },
+                focusDate: { type: "string" }
+              },
+              required: ["taskId"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_captures",
+            description: "Get capture items (inbox/brain dump items). Use when user asks about their captures, inbox, or ideas.",
+            parameters: {
+              type: "object",
+              properties: {
+                clarified: { type: "boolean", description: "Filter by clarified status" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "create_capture",
+            description: "Create a quick capture/inbox item. Use for quick thoughts, ideas, or items to process later.",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Capture title/content" },
+                type: { type: "string", description: "Type: idea, task, note, link, question" },
+                notes: { type: "string", description: "Additional notes" }
+              },
+              required: ["title"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_health_entries",
+            description: "Get health tracking entries. Use when user asks about health, sleep, energy, workouts.",
+            parameters: {
+              type: "object",
+              properties: {
+                startDate: { type: "string", description: "Start date (YYYY-MM-DD)" },
+                endDate: { type: "string", description: "End date (YYYY-MM-DD)" },
+                limit: { type: "number", description: "Max entries to return" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_nutrition_entries",
+            description: "Get nutrition/meal entries. Use when user asks about meals, nutrition, calories.",
+            parameters: {
+              type: "object",
+              properties: {
+                startDate: { type: "string", description: "Start date (YYYY-MM-DD)" },
+                endDate: { type: "string", description: "End date (YYYY-MM-DD)" },
+                limit: { type: "number", description: "Max entries to return" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_docs",
+            description: "Get documents (SOPs, prompts, specs, templates). Use when user asks about documents or knowledge base.",
+            parameters: {
+              type: "object",
+              properties: {
+                type: { type: "string", description: "Filter by type: sop, prompt, spec, template, playbook" },
+                ventureId: { type: "string", description: "Filter by venture" }
+              }
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_summary",
+            description: "Get a summary of the user's system - venture count, active projects, pending tasks, etc.",
+            parameters: { type: "object", properties: {}, required: [] }
+          }
+        }
+      ];
+
+      // Tool execution function
+      async function executeTool(name: string, args: any): Promise<string> {
+        try {
+          switch (name) {
+            case "get_ventures": {
+              const ventures = await storage.getVentures();
+              return JSON.stringify(ventures.map(v => ({
+                id: v.id, name: v.name, status: v.status, domain: v.domain, oneLiner: v.oneLiner
+              })));
+            }
+            case "get_projects": {
+              const projects = await storage.getProjects(args.ventureId, args.status);
+              return JSON.stringify(projects.map(p => ({
+                id: p.id, name: p.name, status: p.status, ventureId: p.ventureId, priority: p.priority
+              })));
+            }
+            case "get_tasks": {
+              const tasks = await storage.getTasks(args);
+              return JSON.stringify(tasks.map(t => ({
+                id: t.id, title: t.title, status: t.status, priority: t.priority,
+                dueDate: t.dueDate, focusDate: t.focusDate, ventureId: t.ventureId
+              })));
+            }
+            case "get_today_tasks": {
+              const tasks = await storage.getTodayTasks();
+              return JSON.stringify(tasks.map(t => ({
+                id: t.id, title: t.title, status: t.status, priority: t.priority, focusSlot: t.focusSlot
+              })));
+            }
+            case "create_task": {
+              const task = await storage.createTask(args);
+              return JSON.stringify({ success: true, task: { id: task.id, title: task.title } });
+            }
+            case "update_task": {
+              const { taskId, ...updates } = args;
+              const task = await storage.updateTask(taskId, updates);
+              return JSON.stringify({ success: true, task: task ? { id: task.id, title: task.title, status: task.status } : null });
+            }
+            case "get_captures": {
+              const captures = await storage.getCaptures(args.clarified);
+              return JSON.stringify(captures.map(c => ({
+                id: c.id, title: c.title, type: c.type, clarified: c.clarified
+              })));
+            }
+            case "create_capture": {
+              const capture = await storage.createCapture(args);
+              return JSON.stringify({ success: true, capture: { id: capture.id, title: capture.title } });
+            }
+            case "get_health_entries": {
+              const entries = await storage.getHealthEntries(args.startDate, args.endDate, args.limit || 10);
+              return JSON.stringify(entries);
+            }
+            case "get_nutrition_entries": {
+              const entries = await storage.getNutritionEntries(args.startDate, args.endDate, args.limit || 10);
+              return JSON.stringify(entries);
+            }
+            case "get_docs": {
+              const docs = await storage.getDocs(args.type, args.ventureId);
+              return JSON.stringify(docs.map(d => ({
+                id: d.id, title: d.title, type: d.type, status: d.status
+              })));
+            }
+            case "get_summary": {
+              const [ventures, projects, tasks, captures] = await Promise.all([
+                storage.getVentures(),
+                storage.getProjects(),
+                storage.getTasks({}),
+                storage.getCaptures()
+              ]);
+              const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
+              const todayTasks = tasks.filter(t => t.focusDate === today);
+              return JSON.stringify({
+                ventures: ventures.length,
+                activeVentures: ventures.filter(v => v.status === 'active').length,
+                projects: projects.length,
+                activeProjects: projects.filter(p => p.status === 'in_progress').length,
+                totalTasks: tasks.length,
+                activeTasks: activeTasks.length,
+                todayTasks: todayTasks.length,
+                unclarifiedCaptures: captures.filter(c => !c.clarified).length
+              });
+            }
+            default:
+              return JSON.stringify({ error: "Unknown tool" });
+          }
+        } catch (error) {
+          logger.error({ error, tool: name }, "Tool execution error");
+          return JSON.stringify({ error: "Tool execution failed" });
+        }
+      }
+
+      // Initial completion with tools
+      let messages: any[] = [
+        { role: "system", content: systemPrompt },
+        ...historyMessages,
+        { role: "user", content: message },
+      ];
+
+      let completion = await openai.chat.completions.create({
+        model: "openai/gpt-4o",
+        messages,
+        tools,
+        tool_choice: "auto",
+        max_tokens: 2000,
       });
 
-      const aiResponse = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
+      let responseMessage = completion.choices[0]?.message;
+
+      // Handle tool calls (loop for multiple rounds if needed)
+      let iterations = 0;
+      while (responseMessage?.tool_calls && iterations < 5) {
+        iterations++;
+        const toolResults = await Promise.all(
+          responseMessage.tool_calls.map(async (toolCall: any) => {
+            const args = JSON.parse(toolCall.function.arguments || "{}");
+            const result = await executeTool(toolCall.function.name, args);
+            return {
+              role: "tool" as const,
+              tool_call_id: toolCall.id,
+              content: result,
+            };
+          })
+        );
+
+        messages = [
+          ...messages,
+          responseMessage,
+          ...toolResults,
+        ];
+
+        completion = await openai.chat.completions.create({
+          model: "openai/gpt-4o",
+          messages,
+          tools,
+          tool_choice: "auto",
+          max_tokens: 2000,
+        });
+
+        responseMessage = completion.choices[0]?.message;
+      }
+
+      const aiResponse = responseMessage?.content || "I'm sorry, I couldn't generate a response.";
 
       // Save AI response
       const assistantMessage = await storage.createChatMessage({
@@ -2429,7 +2803,7 @@ Be concise, helpful, and friendly. Current date: ${new Date().toISOString().spli
         role: "assistant" as const,
         content: aiResponse,
         metadata: {
-          model: "openai/gpt-4o-mini",
+          model: "openai/gpt-4o",
           tokensUsed: completion.usage?.total_tokens,
         },
       });
