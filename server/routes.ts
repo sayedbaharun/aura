@@ -2136,8 +2136,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Get chat history for current user
   app.get("/api/chat/history", async (req, res) => {
     try {
-      // Use mock user ID for now (in a real app, get from session)
-      const userId = "mock-user-id";
+      const userId = DEFAULT_USER_ID;
       const limit = parseInt(req.query.limit as string) || 50;
 
       const messages = await storage.getChatHistory(userId, limit);
@@ -2159,8 +2158,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         return res.status(400).json({ error: "Message is required" });
       }
 
-      // Use mock user ID for now (in a real app, get from session)
-      const userId = "mock-user-id";
+      const userId = DEFAULT_USER_ID;
 
       // Save user message
       const userMessage = await storage.createChatMessage({
@@ -2195,7 +2193,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // Clear chat history for current user
   app.delete("/api/chat/history", async (req, res) => {
     try {
-      const userId = "mock-user-id";
+      const userId = DEFAULT_USER_ID;
       await storage.deleteChatHistory(userId);
       res.json({ success: true });
     } catch (error) {
