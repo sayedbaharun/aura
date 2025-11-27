@@ -31,6 +31,8 @@ import {
   type InsertBook,
   type AiAgentPrompt,
   type InsertAiAgentPrompt,
+  type ChatMessage,
+  type InsertChatMessage,
   ventures,
   projects,
   milestones,
@@ -47,6 +49,7 @@ import {
   shoppingItems,
   books,
   aiAgentPrompts,
+  chatMessages,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like } from "drizzle-orm";
@@ -1143,6 +1146,28 @@ export class DBStorage implements IStorage {
 
   async deleteAiAgentPrompt(id: string): Promise<void> {
     await this.db.delete(aiAgentPrompts).where(eq(aiAgentPrompts.id, id));
+  }
+
+  // ============================================================================
+  // CHAT MESSAGES
+  // ============================================================================
+
+  async createChatMessage(data: InsertChatMessage): Promise<ChatMessage> {
+    const results = await this.db.insert(chatMessages).values(data).returning();
+    return results[0];
+  }
+
+  async getChatHistory(userId: string, limit: number = 50): Promise<ChatMessage[]> {
+    return await this.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.userId, userId))
+      .orderBy(desc(chatMessages.createdAt))
+      .limit(limit);
+  }
+
+  async deleteChatHistory(userId: string): Promise<void> {
+    await this.db.delete(chatMessages).where(eq(chatMessages.userId, userId));
   }
 }
 

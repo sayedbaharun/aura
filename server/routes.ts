@@ -2125,6 +2125,81 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
     }
   });
 
+  // ============================================================================
+  // CHAT API
+  // ============================================================================
+
+  // Get chat history for current user
+  app.get("/api/chat/history", async (req, res) => {
+    try {
+      // Use mock user ID for now (in a real app, get from session)
+      const userId = "mock-user-id";
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      const messages = await storage.getChatHistory(userId, limit);
+
+      // Return in chronological order (oldest first)
+      res.json(messages.reverse());
+    } catch (error) {
+      logger.error({ error }, "Error fetching chat history");
+      res.status(500).json({ error: "Failed to fetch chat history" });
+    }
+  });
+
+  // Send a chat message and get AI response
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message } = req.body;
+
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      // Use mock user ID for now (in a real app, get from session)
+      const userId = "mock-user-id";
+
+      // Save user message
+      const userMessage = await storage.createChatMessage({
+        userId,
+        role: "user",
+        content: message,
+        metadata: {},
+      });
+
+      // Get AI response using the existing processMessage function
+      const { processMessage } = await import("./ai-assistant");
+      const aiResponse = await processMessage(message, userId, "telegram");
+
+      // Save AI response
+      const assistantMessage = await storage.createChatMessage({
+        userId,
+        role: "assistant",
+        content: aiResponse,
+        metadata: {},
+      });
+
+      res.json({
+        userMessage,
+        assistantMessage,
+      });
+    } catch (error) {
+      logger.error({ error }, "Error processing chat message");
+      res.status(500).json({ error: "Failed to process chat message" });
+    }
+  });
+
+  // Clear chat history for current user
+  app.delete("/api/chat/history", async (req, res) => {
+    try {
+      const userId = "mock-user-id";
+      await storage.deleteChatHistory(userId);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error }, "Error clearing chat history");
+      res.status(500).json({ error: "Failed to clear chat history" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
