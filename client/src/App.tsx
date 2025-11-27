@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CaptureModalProvider } from "@/lib/capture-modal-store";
 import { TaskDetailModalProvider } from "@/lib/task-detail-modal-store";
 import CaptureModal from "@/components/capture-modal";
-import CaptureButton from "@/components/capture-button";
 import TaskDetailModal from "@/components/task-detail-modal";
 import Layout from "@/components/layout";
 import Landing from "@/pages/landing";
@@ -77,7 +76,6 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
-            <CaptureButton />
             <CaptureModal />
             <TaskDetailModal />
           </TooltipProvider>
