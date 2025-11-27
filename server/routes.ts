@@ -2184,9 +2184,9 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
       // Save user message
       const userMessage = await storage.createChatMessage({
         userId,
-        role: "user",
+        role: "user" as const,
         content: message,
-        metadata: {},
+        metadata: null,
       });
 
       // Get recent chat history for context
@@ -2222,7 +2222,7 @@ Be concise, helpful, and friendly. Current date: ${new Date().toISOString().spli
       // Save AI response
       const assistantMessage = await storage.createChatMessage({
         userId,
-        role: "assistant",
+        role: "assistant" as const,
         content: aiResponse,
         metadata: {
           model: "openai/gpt-4o-mini",
