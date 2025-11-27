@@ -48,7 +48,22 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
       const method = isEdit ? "PATCH" : "POST";
       // Clean data to only send non-empty values
       const cleanData = cleanFormData(data);
+
+      // Debug logging
+      console.log('=== Venture Update Debug ===');
+      console.log('Original data:', data);
+      console.log('Clean data:', cleanData);
+      console.log('URL:', url);
+      console.log('Method:', method);
+
       const res = await apiRequest(method, url, cleanData);
+
+      if (!res.ok) {
+        const errorBody = await res.json();
+        console.error('Server error response:', errorBody);
+        throw new Error(JSON.stringify(errorBody));
+      }
+
       return await res.json();
     },
     onSuccess: () => {
@@ -68,10 +83,23 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
         notes: "",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Mutation error:', error);
+      let errorMessage = `Failed to ${isEdit ? "update" : "create"} venture`;
+
+      try {
+        const parsedError = JSON.parse(error.message);
+        if (parsedError.details) {
+          console.error('Validation errors:', parsedError.details);
+          errorMessage = `Validation error: ${parsedError.details.map((d: any) => d.message).join(', ')}`;
+        }
+      } catch (e) {
+        // Not a JSON error
+      }
+
       toast({
         title: "Error",
-        description: `Failed to ${isEdit ? "update" : "create"} venture`,
+        description: errorMessage,
         variant: "destructive",
       });
     },
