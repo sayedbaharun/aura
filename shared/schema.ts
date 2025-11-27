@@ -276,6 +276,13 @@ export const userPreferences = pgTable("user_preferences", {
     habits: MorningHabitConfig[];
   }>(),
   notificationSettings: jsonb("notification_settings").$type<NotificationSettingsConfig>(),
+  aiInstructions: text("ai_instructions"),
+  aiContext: jsonb("ai_context").$type<{
+    userName?: string;
+    role?: string;
+    goals?: string[];
+    preferences?: string;
+  }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
