@@ -2133,9 +2133,21 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // CHAT API
   // ============================================================================
 
+  // Helper to ensure default user exists for chat operations
+  async function ensureDefaultUserExists(): Promise<void> {
+    const existingUser = await storage.getUser(DEFAULT_USER_ID);
+    if (!existingUser) {
+      await storage.upsertUser({
+        id: DEFAULT_USER_ID,
+        email: "user@sb-os.com",
+      });
+    }
+  }
+
   // Get chat history for current user
   app.get("/api/chat/history", async (req, res) => {
     try {
+      await ensureDefaultUserExists();
       const userId = DEFAULT_USER_ID;
       const limit = parseInt(req.query.limit as string) || 50;
 
@@ -2158,6 +2170,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         return res.status(400).json({ error: "Message is required" });
       }
 
+      await ensureDefaultUserExists();
       const userId = DEFAULT_USER_ID;
 
       // Save user message
