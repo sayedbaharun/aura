@@ -162,9 +162,10 @@ app.use(cors({
 const PgSession = connectPgSimple(session);
 
 // Create a pool for session storage
+// Default: Allow self-signed certificates (common for Railway/Neon)
 const sessionPool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false" } : false,
+  ssl: isProduction ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true" } : false,
 });
 
 // SESSION_SECRET is validated in env-validator.ts - this will fail in production if not set
