@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectLabel } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -235,26 +235,32 @@ export default function CreateProjectModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectLabel>Growth</SelectLabel>
-                  {CATEGORY_OPTIONS.filter(opt => opt.group === "Growth").map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    <SelectLabel>Growth</SelectLabel>
+                    {CATEGORY_OPTIONS.filter(opt => opt.group === "Growth").map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                   <SelectSeparator />
-                  <SelectLabel>Product & Delivery</SelectLabel>
-                  {CATEGORY_OPTIONS.filter(opt => opt.group === "Product & Delivery").map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    <SelectLabel>Product & Delivery</SelectLabel>
+                    {CATEGORY_OPTIONS.filter(opt => opt.group === "Product & Delivery").map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                   <SelectSeparator />
-                  <SelectLabel>Enabling</SelectLabel>
-                  {CATEGORY_OPTIONS.filter(opt => opt.group === "Enabling").map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    <SelectLabel>Enabling</SelectLabel>
+                    {CATEGORY_OPTIONS.filter(opt => opt.group === "Enabling").map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
