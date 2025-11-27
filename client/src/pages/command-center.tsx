@@ -76,21 +76,14 @@ function MorningMode({ day }: { day: Day | null }) {
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4 md:space-y-6">
           <TodayHeader />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-            <div className="lg:col-span-2">
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-4">
-                    Today's Tasks (Preview)
-                  </h3>
-                  <TasksForToday />
-                </CardContent>
-              </Card>
-            </div>
-            <div className="space-y-4 md:space-y-6">
-              <HealthSnapshot />
-            </div>
-          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="text-sm font-medium text-muted-foreground mb-4">
+                Today's Tasks (Preview)
+              </h3>
+              <TasksForToday />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Morning Ritual Tab */}
