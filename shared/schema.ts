@@ -948,4 +948,34 @@ export const insertAiAgentPromptSchema = createInsertSchema(aiAgentPrompts).omit
 });
 
 export type InsertAiAgentPrompt = z.infer<typeof insertAiAgentPromptSchema>;
+
+// Chat Messages: Web-based AI chat conversations
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    role: text("role").$type<"user" | "assistant" | "system">().notNull(),
+    content: text("content").notNull(),
+    metadata: jsonb("metadata").$type<{
+      model?: string;
+      tokensUsed?: number;
+      toolCalls?: any[];
+      [key: string]: any;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_chat_messages_user_id").on(table.userId),
+    index("idx_chat_messages_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type AiAgentPrompt = typeof aiAgentPrompts.$inferSelect;

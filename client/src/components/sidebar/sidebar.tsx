@@ -18,6 +18,7 @@ import {
   X,
   Zap,
   TrendingUp,
+  Bot,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
 import NavItem from "./nav-item";
@@ -123,6 +124,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
         href: "/knowledge",
         icon: BookOpen,
         label: "Knowledge",
+      },
+      {
+        href: "/ai-chat",
+        icon: Bot,
+        label: "AI Assistant",
       },
     ],
   },
