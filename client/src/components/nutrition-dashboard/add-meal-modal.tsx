@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Star, Trash2, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { cleanFormData } from "@/lib/utils";
 import { getSavedMeals, saveMeal, deleteSavedMeal, type SavedMeal } from "@/lib/saved-meals";
 
 interface AddMealModalProps {
@@ -210,16 +211,19 @@ export default function AddMealModal({ open, onOpenChange }: AddMealModalProps) 
       datetime,
       mealType: formData.mealType,
       description: formData.description,
-      calories: formData.calories ? parseFloat(formData.calories) : null,
-      proteinG: formData.proteinG ? parseFloat(formData.proteinG) : null,
-      carbsG: formData.carbsG ? parseFloat(formData.carbsG) : null,
-      fatsG: formData.fatsG ? parseFloat(formData.fatsG) : null,
+      calories: formData.calories ? parseFloat(formData.calories) : undefined,
+      proteinG: formData.proteinG ? parseFloat(formData.proteinG) : undefined,
+      carbsG: formData.carbsG ? parseFloat(formData.carbsG) : undefined,
+      fatsG: formData.fatsG ? parseFloat(formData.fatsG) : undefined,
       context: formData.context,
-      tags: formData.tags.length > 0 ? formData.tags : null,
-      notes: formData.notes || null,
+      tags: formData.tags.length > 0 ? formData.tags : undefined,
+      notes: formData.notes,
     };
 
-    createMealMutation.mutate(payload);
+    // Clean data to only send non-empty values
+    const cleanPayload = cleanFormData(payload);
+
+    createMealMutation.mutate(cleanPayload);
   };
 
   const toggleTag = (tag: string) => {

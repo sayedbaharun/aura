@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { cleanFormData } from "@/lib/utils";
 import {
   Edit2,
   Trash2,
@@ -155,7 +156,9 @@ export default function ProjectDetailModal({
   // Update milestone mutation
   const updateMilestoneMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Milestone> }) => {
-      const res = await apiRequest("PATCH", `/api/milestones/${id}`, data);
+      // Clean data to only send non-empty values
+      const cleanData = cleanFormData(data);
+      const res = await apiRequest("PATCH", `/api/milestones/${id}`, cleanData);
       return await res.json();
     },
     onSuccess: () => {

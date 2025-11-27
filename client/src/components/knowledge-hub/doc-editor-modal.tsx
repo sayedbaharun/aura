@@ -16,6 +16,7 @@ import { X } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { cleanFormData } from "@/lib/utils";
 
 interface Doc {
   id?: string;
@@ -175,7 +176,9 @@ export function DocEditorModal({ open, onClose, doc }: DocEditorModalProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (data: Doc) => {
-      const res = await apiRequest("PATCH", `/api/docs/${data.id}`, data);
+      // Clean data to only send non-empty values
+      const cleanData = cleanFormData(data);
+      const res = await apiRequest("PATCH", `/api/docs/${data.id}`, cleanData);
       return res.json();
     },
     onSuccess: () => {

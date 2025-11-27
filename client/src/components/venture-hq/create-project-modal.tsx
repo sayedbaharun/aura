@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectLabel, SelectGroup } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { cleanFormData } from "@/lib/utils";
 
 interface CreateProjectModalProps {
   open: boolean;
@@ -111,7 +112,9 @@ export default function CreateProjectModal({
     mutationFn: async (data: typeof formData) => {
       const url = isEdit ? `/api/projects/${project.id}` : "/api/projects";
       const method = isEdit ? "PATCH" : "POST";
-      const res = await apiRequest(method, url, data);
+      // Clean data to only send non-empty values
+      const cleanData = cleanFormData(data);
+      const res = await apiRequest(method, url, cleanData);
       return await res.json();
     },
     onSuccess: () => {

@@ -25,6 +25,7 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { cleanFormData } from "@/lib/utils";
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -179,24 +180,18 @@ export default function CreateTaskModal({
       return;
     }
 
-    const payload: any = {
+    // Prepare payload with cleaned data
+    const payload = {
+      ...formData,
       title: formData.title.trim(),
-      status: formData.status,
-      priority: formData.priority,
-      type: formData.type,
-      domain: formData.domain,
+      // Parse estEffort to float if present
+      estEffort: formData.estEffort ? parseFloat(formData.estEffort) : undefined,
     };
 
-    if (formData.ventureId) payload.ventureId = formData.ventureId;
-    if (formData.projectId) payload.projectId = formData.projectId;
-    if (formData.milestone) payload.milestone = formData.milestone;
-    if (formData.dueDate) payload.dueDate = formData.dueDate;
-    if (formData.focusDate) payload.focusDate = formData.focusDate;
-    if (formData.focusSlot) payload.focusSlot = formData.focusSlot;
-    if (formData.estEffort) payload.estEffort = parseFloat(formData.estEffort);
-    if (formData.notes) payload.notes = formData.notes;
+    // Clean data to only send non-empty values
+    const cleanPayload = cleanFormData(payload);
 
-    createTaskMutation.mutate(payload);
+    createTaskMutation.mutate(cleanPayload);
   };
 
   // Reset project when venture changes

@@ -37,7 +37,7 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, cleanFormData } from '@/lib/utils';
 import { CalendarIcon, Edit, Trash2, CheckCircle2, XCircle } from 'lucide-react';
 
 interface Task {
@@ -133,7 +133,9 @@ export default function TaskDetailModal() {
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
-      const response = await apiRequest('PATCH', `/api/tasks/${taskId}`, data);
+      // Clean data to only send non-empty values
+      const cleanData = cleanFormData(data);
+      const response = await apiRequest('PATCH', `/api/tasks/${taskId}`, cleanData);
       return response.json();
     },
     onSuccess: () => {
