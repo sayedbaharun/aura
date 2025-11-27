@@ -48,16 +48,30 @@ export default function HealthSnapshot() {
     mood: "medium",
     workoutDone: false,
     workoutType: "none",
+    workoutSubType: "",
+    workoutDuration: "",
   });
 
   useEffect(() => {
     if (todayEntry) {
+      // Parse combined workout type (e.g., "strength_push" -> type: "strength", subType: "push")
+      let parsedWorkoutType = todayEntry.workoutType || "none";
+      let parsedWorkoutSubType = "";
+
+      if (parsedWorkoutType.includes("_")) {
+        const [type, subType] = parsedWorkoutType.split("_");
+        parsedWorkoutType = type;
+        parsedWorkoutSubType = subType;
+      }
+
       setFormData({
         sleepHours: todayEntry.sleepHours?.toString() || "",
         energyLevel: todayEntry.energyLevel || 3,
         mood: todayEntry.mood || "medium",
         workoutDone: todayEntry.workoutDone || false,
-        workoutType: todayEntry.workoutType || "none",
+        workoutType: parsedWorkoutType,
+        workoutSubType: parsedWorkoutSubType,
+        workoutDuration: todayEntry.workoutDuration?.toString() || "",
       });
     }
   }, [todayEntry]);
@@ -107,13 +121,20 @@ export default function HealthSnapshot() {
   });
 
   const handleSave = () => {
+    // Combine workoutType with subType for storage (e.g., "strength_push", "cardio_hiit")
+    let finalWorkoutType = formData.workoutType;
+    if (formData.workoutDone && formData.workoutSubType) {
+      finalWorkoutType = `${formData.workoutType}_${formData.workoutSubType}`;
+    }
+
     const payload = {
       date: today,
       sleepHours: formData.sleepHours ? parseFloat(formData.sleepHours) : null,
       energyLevel: formData.energyLevel,
       mood: formData.mood,
       workoutDone: formData.workoutDone,
-      workoutType: formData.workoutDone ? formData.workoutType : "none",
+      workoutType: formData.workoutDone ? finalWorkoutType : "none",
+      workoutDurationMin: formData.workoutDone && formData.workoutDuration ? parseInt(formData.workoutDuration) : null,
     };
 
     if (todayEntry) {
@@ -172,8 +193,12 @@ export default function HealthSnapshot() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Workout</span>
-            <span className="font-medium">
-              {todayEntry.workoutDone ? `${todayEntry.workoutType || "Done"}` : "No"}
+            <span className="font-medium capitalize">
+              {todayEntry.workoutDone ? (
+                todayEntry.workoutType ?
+                  todayEntry.workoutType.replace("_", " - ") : "Done"
+              ) : "No"}
+              {todayEntry.workoutDone && todayEntry.workoutDuration && ` (${todayEntry.workoutDuration}min)`}
             </span>
           </div>
         </CardContent>
@@ -255,22 +280,76 @@ export default function HealthSnapshot() {
           </div>
 
           {formData.workoutDone && (
-            <div className="space-y-2 pl-6">
-              <Label htmlFor="workoutType">Workout Type</Label>
-              <Select
-                value={formData.workoutType}
-                onValueChange={(value) => setFormData({ ...formData, workoutType: value })}
-              >
-                <SelectTrigger id="workoutType">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="strength">Strength</SelectItem>
-                  <SelectItem value="cardio">Cardio</SelectItem>
-                  <SelectItem value="yoga">Yoga</SelectItem>
-                  <SelectItem value="sports">Sports</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-4 pl-6">
+              <div className="space-y-2">
+                <Label htmlFor="workoutType">Workout Type</Label>
+                <Select
+                  value={formData.workoutType}
+                  onValueChange={(value) => setFormData({ ...formData, workoutType: value, workoutSubType: "" })}
+                >
+                  <SelectTrigger id="workoutType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="strength">Strength</SelectItem>
+                    <SelectItem value="cardio">Cardio</SelectItem>
+                    <SelectItem value="yoga">Yoga</SelectItem>
+                    <SelectItem value="sport">Sport</SelectItem>
+                    <SelectItem value="walk">Walk</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Conditional sub-type for Strength */}
+              {formData.workoutType === "strength" && (
+                <div className="space-y-2">
+                  <Label htmlFor="workoutSubType">Muscle Group</Label>
+                  <Select
+                    value={formData.workoutSubType}
+                    onValueChange={(value) => setFormData({ ...formData, workoutSubType: value })}
+                  >
+                    <SelectTrigger id="workoutSubType">
+                      <SelectValue placeholder="Select muscle group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="push">Push</SelectItem>
+                      <SelectItem value="pull">Pull</SelectItem>
+                      <SelectItem value="legs">Legs</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Conditional sub-type for Cardio */}
+              {formData.workoutType === "cardio" && (
+                <div className="space-y-2">
+                  <Label htmlFor="workoutSubType">Cardio Type</Label>
+                  <Select
+                    value={formData.workoutSubType}
+                    onValueChange={(value) => setFormData({ ...formData, workoutSubType: value })}
+                  >
+                    <SelectTrigger id="workoutSubType">
+                      <SelectValue placeholder="Select cardio type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hiit">HIIT</SelectItem>
+                      <SelectItem value="zone_2">Zone 2</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Duration input */}
+              <div className="space-y-2">
+                <Label htmlFor="workoutDuration">Duration (minutes)</Label>
+                <Input
+                  id="workoutDuration"
+                  type="number"
+                  placeholder="45"
+                  value={formData.workoutDuration}
+                  onChange={(e) => setFormData({ ...formData, workoutDuration: e.target.value })}
+                />
+              </div>
             </div>
           )}
         </div>
