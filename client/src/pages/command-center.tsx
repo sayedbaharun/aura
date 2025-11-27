@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar, Plus, ExternalLink } from "lucide-react";
+import { Calendar } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link } from "wouter";
 import ModeController, {
   useModeController,
 } from "@/components/command-center/mode-controller";
 import VentureFocusPicker from "@/components/command-center/venture-focus-picker";
-import MorningHabitsMini from "@/components/command-center/morning-habits-mini";
 import TradingJournalEntry from "@/components/command-center/trading-journal-entry";
 import DayReviewSummary from "@/components/command-center/day-review-summary";
 import TodayHeader from "@/components/command-center/today-header";
@@ -16,13 +14,9 @@ import TasksForToday from "@/components/command-center/tasks-for-today";
 import HealthSnapshot from "@/components/command-center/health-snapshot";
 import NutritionSnapshot from "@/components/command-center/nutrition-snapshot";
 import ThisWeekPreview from "@/components/command-center/this-week-preview";
-import { Button } from "@/components/ui/button";
+import InlineMorningRitual from "@/components/command-center/inline-morning-ritual";
+import InlineEveningReview from "@/components/command-center/inline-evening-review";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import type { Day } from "@shared/schema";
 
 export default function CommandCenter() {
@@ -54,12 +48,6 @@ export default function CommandCenter() {
         {mode === "evening" && <EveningMode day={day || null} />}
       </div>
 
-      {/* Floating Capture Button (Mobile) */}
-      <div className="fixed bottom-6 right-6 md:hidden">
-        <Button size="lg" className="h-14 w-14 rounded-full shadow-lg">
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
     </div>
   );
 }
@@ -72,10 +60,9 @@ function MorningMode({ day }: { day: Day | null }) {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Venture Focus + Habits Row */}
+      {/* Venture Focus Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <VentureFocusPicker day={day} />
-        <MorningHabitsMini day={day} />
       </div>
 
       <Tabs value={morningTab} onValueChange={setMorningTab} className="space-y-4">
@@ -83,6 +70,7 @@ function MorningMode({ day }: { day: Day | null }) {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="ritual">Morning Ritual</TabsTrigger>
           <TabsTrigger value="workout">Workout</TabsTrigger>
+          <TabsTrigger value="evening">Evening Review</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -107,29 +95,7 @@ function MorningMode({ day }: { day: Day | null }) {
 
         {/* Morning Ritual Tab */}
         <TabsContent value="ritual">
-          <Card>
-            <CardHeader>
-              <CardTitle>Morning Ritual</CardTitle>
-              <CardDescription>Complete your daily habits and set intentions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  Track your morning habits, set your top 3 priorities, and plan your day
-                </p>
-                <Button asChild size="lg">
-                  <Link href="/morning-ritual">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open Full Morning Ritual
-                  </Link>
-                </Button>
-              </div>
-              <div className="pt-4 border-t">
-                <h4 className="text-sm font-medium mb-3">Quick Habits Check</h4>
-                <MorningHabitsMini day={day} />
-              </div>
-            </CardContent>
-          </Card>
+          <InlineMorningRitual day={day} />
         </TabsContent>
 
         {/* Workout Tab */}
@@ -143,6 +109,11 @@ function MorningMode({ day }: { day: Day | null }) {
               <HealthSnapshot />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Evening Review Tab */}
+        <TabsContent value="evening">
+          <InlineEveningReview day={day} />
         </TabsContent>
       </Tabs>
     </div>
