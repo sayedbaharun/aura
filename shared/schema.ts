@@ -29,10 +29,11 @@ import { z } from "zod";
 // ----------------------------------------------------------------------------
 
 export const ventureStatusEnum = pgEnum('venture_status', [
-  'active',
-  'development',
-  'paused',
-  'archived'
+  'archived',
+  'planning',
+  'building',
+  'on_hold',
+  'ongoing'
 ]);
 
 export const ventureDomainEnum = pgEnum('venture_domain', [
@@ -54,12 +55,21 @@ export const projectStatusEnum = pgEnum('project_status', [
 ]);
 
 export const projectCategoryEnum = pgEnum('project_category', [
-  'product',
+  // Growth
   'marketing',
-  'ops',
-  'fundraising',
-  'research',
-  'personal'
+  'sales_biz_dev',
+  'customer_success',
+  // Product & Delivery
+  'product',
+  'tech_engineering',
+  'operations',
+  'research_dev',
+  // Enabling
+  'finance',
+  'people_hr',
+  'legal_compliance',
+  'admin_general',
+  'strategy_leadership'
 ]);
 
 export const priorityEnum = pgEnum('priority', ['P0', 'P1', 'P2', 'P3']);
@@ -319,10 +329,10 @@ export const ventures = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    status: ventureStatusEnum("status").default("active").notNull(),
+    status: ventureStatusEnum("status").default("planning").notNull(),
     oneLiner: text("one_liner"),
-    domain: ventureDomainEnum("domain"),
-    primaryFocus: text("primary_focus"),
+    domain: ventureDomainEnum("domain"), // Deprecated but kept for backward compatibility
+    primaryFocus: text("primary_focus"), // Deprecated but kept for backward compatibility
     color: varchar("color", { length: 7 }), // Hex color code
     icon: varchar("icon", { length: 10 }), // Emoji
     notes: text("notes"),
