@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import {
@@ -21,10 +21,19 @@ import {
 import { getAllIntegrationStatuses, getIntegrationStatus } from "./integrations";
 import { z } from "zod";
 import { logger } from "./logger";
+import {
+  requireAuth,
+  authenticateUser,
+  setUserPassword,
+  logoutUser,
+  isAuthRequired,
+  isPasswordConfigured,
+  createAuditLog,
+} from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
-  // HEALTH CHECK
+  // HEALTH CHECK (No auth required)
   // ============================================================================
 
   app.get('/health', async (req, res) => {
@@ -53,17 +62,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Default user UUID (consistent across the app for single-user system)
   const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001";
 
-  // AUTHENTICATION (Mock for single-user)
+  // ============================================================================
+  // AUTHENTICATION ROUTES
   // ============================================================================
 
+  // Check if authentication is required and if password is configured
+  app.get('/api/auth/status', async (req, res) => {
+    try {
+      const authRequired = isAuthRequired();
+      const passwordConfigured = await isPasswordConfigured();
+      const session = req.session as any;
+
+      res.json({
+        authRequired,
+        passwordConfigured,
+        isAuthenticated: !!session?.userId,
+        setupRequired: authRequired && !passwordConfigured,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error checking auth status');
+      res.status(500).json({ error: 'Failed to check auth status' });
+    }
+  });
+
+  // Get current authenticated user
   app.get('/api/auth/user', async (req: any, res) => {
-    // Mock user for Railway deployment (no auth)
-    res.json({
-      id: DEFAULT_USER_ID,
-      email: 'user@sb-os.com',
-      firstName: '',
-      lastName: '',
-    });
+    const session = req.session as any;
+
+    // If auth not required, return mock user for backward compatibility
+    if (!isAuthRequired()) {
+      res.json({
+        id: DEFAULT_USER_ID,
+        email: 'user@hikma-os.local',
+        firstName: '',
+        lastName: '',
+        isAuthenticated: true,
+      });
+      return;
+    }
+
+    // Check if user is logged in
+    if (!session?.userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    try {
+      const user = await storage.getUser(session.userId);
+      if (!user) {
+        res.status(401).json({ error: 'User not found' });
+        return;
+      }
+
+      // Don't send password hash to client
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        timezone: user.timezone,
+        isAuthenticated: true,
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error fetching user');
+      res.status(500).json({ error: 'Failed to fetch user' });
+    }
+  });
+
+  // Login endpoint
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        res.status(400).json({ error: 'Email and password are required' });
+        return;
+      }
+
+      const result = await authenticateUser(email, password, req);
+
+      if (!result.success) {
+        res.status(401).json({ error: result.error });
+        return;
+      }
+
+      // Set session
+      const session = req.session as any;
+      session.userId = result.userId;
+
+      res.json({ success: true, message: 'Login successful' });
+    } catch (error) {
+      logger.error({ error }, 'Login error');
+      res.status(500).json({ error: 'Login failed' });
+    }
+  });
+
+  // Logout endpoint
+  app.post('/api/auth/logout', async (req, res) => {
+    try {
+      await logoutUser(req);
+      res.json({ success: true, message: 'Logged out successfully' });
+    } catch (error) {
+      logger.error({ error }, 'Logout error');
+      res.status(500).json({ error: 'Logout failed' });
+    }
+  });
+
+  // Initial setup - create password for the default user
+  app.post('/api/auth/setup', async (req, res) => {
+    try {
+      // Check if already configured
+      const configured = await isPasswordConfigured();
+      if (configured) {
+        res.status(400).json({ error: 'Password already configured. Use change-password instead.' });
+        return;
+      }
+
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        res.status(400).json({ error: 'Email and password are required' });
+        return;
+      }
+
+      // Ensure default user exists with the provided email
+      await storage.upsertUser({
+        id: DEFAULT_USER_ID,
+        email,
+      });
+
+      // Set password
+      const result = await setUserPassword(DEFAULT_USER_ID, password, req);
+
+      if (!result.success) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+
+      // Log them in
+      const session = req.session as any;
+      session.userId = DEFAULT_USER_ID;
+
+      await createAuditLog(DEFAULT_USER_ID, 'account_setup', req, { email }, 'auth');
+
+      res.json({ success: true, message: 'Account setup complete' });
+    } catch (error) {
+      logger.error({ error }, 'Setup error');
+      res.status(500).json({ error: 'Setup failed' });
+    }
+  });
+
+  // Change password (requires authentication)
+  app.post('/api/auth/change-password', requireAuth, async (req: any, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        res.status(400).json({ error: 'Current password and new password are required' });
+        return;
+      }
+
+      // Verify current password
+      const user = await storage.getUser(req.userId);
+      if (!user?.email) {
+        res.status(400).json({ error: 'User not found' });
+        return;
+      }
+
+      const authResult = await authenticateUser(user.email, currentPassword, req);
+      if (!authResult.success) {
+        res.status(401).json({ error: 'Current password is incorrect' });
+        return;
+      }
+
+      // Set new password
+      const result = await setUserPassword(req.userId, newPassword, req);
+
+      if (!result.success) {
+        res.status(400).json({ error: result.error });
+        return;
+      }
+
+      res.json({ success: true, message: 'Password changed successfully' });
+    } catch (error) {
+      logger.error({ error }, 'Password change error');
+      res.status(500).json({ error: 'Password change failed' });
+    }
+  });
+
+  // Get CSRF token
+  app.get('/api/auth/csrf-token', (req, res) => {
+    const session = req.session as any;
+    res.json({ csrfToken: session.csrfToken });
+  });
+
+  // ============================================================================
+  // PROTECTED ROUTES - All routes below require authentication
+  // ============================================================================
+
+  // Apply authentication middleware to all /api routes except auth endpoints
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    // Skip auth for auth endpoints
+    if (req.path.startsWith('/auth/')) {
+      return next();
+    }
+    // Apply requireAuth
+    requireAuth(req, res, next);
   });
 
   // ============================================================================
