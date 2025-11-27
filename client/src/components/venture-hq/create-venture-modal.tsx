@@ -15,20 +15,12 @@ interface CreateVentureModalProps {
   venture?: any; // For edit mode
 }
 
-const DOMAIN_OPTIONS = [
-  { value: "saas", label: "SaaS" },
-  { value: "media", label: "Media" },
-  { value: "realty", label: "Realty" },
-  { value: "trading", label: "Trading" },
-  { value: "personal", label: "Personal" },
-  { value: "other", label: "Other" },
-];
-
 const STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "development", label: "Development" },
-  { value: "paused", label: "Paused" },
   { value: "archived", label: "Archived" },
+  { value: "planning", label: "Planning" },
+  { value: "building", label: "Building" },
+  { value: "on_hold", label: "On Hold" },
+  { value: "ongoing", label: "Ongoing" },
 ];
 
 const PRESET_COLORS = [
@@ -43,11 +35,9 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
   const [formData, setFormData] = useState({
     name: venture?.name || "",
     oneLiner: venture?.oneLiner || "",
-    domain: venture?.domain || "saas",
-    status: venture?.status || "development",
+    status: venture?.status || "planning",
     color: venture?.color || "#FF6B6B",
     icon: venture?.icon || "🚀",
-    primaryFocus: venture?.primaryFocus || "",
     notes: venture?.notes || "",
   });
 
@@ -69,11 +59,9 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
       setFormData({
         name: "",
         oneLiner: "",
-        domain: "saas",
-        status: "development",
+        status: "planning",
         color: "#FF6B6B",
         icon: "🚀",
-        primaryFocus: "",
         notes: "",
       });
     },
@@ -123,7 +111,7 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
             </div>
 
             <div className="col-span-2">
-              <Label htmlFor="oneLiner">One-Liner</Label>
+              <Label htmlFor="oneLiner">One-Line Description</Label>
               <Input
                 id="oneLiner"
                 value={formData.oneLiner}
@@ -133,26 +121,7 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
             </div>
 
             <div>
-              <Label htmlFor="domain">Domain</Label>
-              <Select
-                value={formData.domain}
-                onValueChange={(value) => setFormData({ ...formData, domain: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOMAIN_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">Status *</Label>
               <Select
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value })}
@@ -170,7 +139,7 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
               </Select>
             </div>
 
-            <div>
+            <div className="col-span-2">
               <Label htmlFor="icon">Icon (Emoji)</Label>
               <Input
                 id="icon"
@@ -181,8 +150,8 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
               />
             </div>
 
-            <div>
-              <Label>Color</Label>
+            <div className="col-span-2">
+              <Label>Colour</Label>
               <div className="flex gap-2 flex-wrap mt-2">
                 {PRESET_COLORS.map((color) => (
                   <button
@@ -197,17 +166,6 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
                   />
                 ))}
               </div>
-            </div>
-
-            <div className="col-span-2">
-              <Label htmlFor="primaryFocus">Primary Focus</Label>
-              <Textarea
-                id="primaryFocus"
-                value={formData.primaryFocus}
-                onChange={(e) => setFormData({ ...formData, primaryFocus: e.target.value })}
-                placeholder="What's the main focus right now?"
-                rows={2}
-              />
             </div>
 
             <div className="col-span-2">

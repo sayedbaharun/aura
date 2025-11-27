@@ -27,7 +27,7 @@ export default function VentureFocusPicker({
   });
 
   const activeVentures = Array.isArray(ventures)
-    ? ventures.filter((v) => v.status === "active")
+    ? ventures.filter((v) => v.status !== "archived")
     : [];
 
   const selectedVenture = activeVentures.find(

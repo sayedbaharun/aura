@@ -62,7 +62,7 @@ export default function InlineMorningRitual({ day }: InlineMorningRitualProps) {
     queryKey: ["/api/ventures"],
   });
 
-  const activeVentures = Array.isArray(ventures) ? ventures.filter(v => v.status === "active" || v.status === "development") : [];
+  const activeVentures = Array.isArray(ventures) ? ventures.filter(v => v.status !== "archived") : [];
 
   // Initialize rituals from default habits
   useEffect(() => {

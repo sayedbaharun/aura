@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectLabel } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -33,11 +33,23 @@ const STATUS_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = [
-  { value: "product", label: "Product" },
-  { value: "marketing", label: "Marketing" },
-  { value: "operations", label: "Operations" },
-  { value: "finance", label: "Finance" },
-  { value: "research", label: "Research" },
+  // Growth
+  { value: "marketing", label: "Marketing", group: "Growth" },
+  { value: "sales_biz_dev", label: "Sales / Business Development", group: "Growth" },
+  { value: "customer_success", label: "Customer Success / Support", group: "Growth" },
+
+  // Product & Delivery
+  { value: "product", label: "Product", group: "Product & Delivery" },
+  { value: "tech_engineering", label: "Technology / IT / Engineering", group: "Product & Delivery" },
+  { value: "operations", label: "Operations", group: "Product & Delivery" },
+  { value: "research_dev", label: "Research & Development", group: "Product & Delivery" },
+
+  // Enabling
+  { value: "finance", label: "Finance", group: "Enabling" },
+  { value: "people_hr", label: "People / HR / Talent", group: "Enabling" },
+  { value: "legal_compliance", label: "Legal & Compliance", group: "Enabling" },
+  { value: "admin_general", label: "Admin / General Management", group: "Enabling" },
+  { value: "strategy_leadership", label: "Strategy / Leadership", group: "Enabling" },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -223,7 +235,22 @@ export default function CreateProjectModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORY_OPTIONS.map((option) => (
+                  <SelectLabel>Growth</SelectLabel>
+                  {CATEGORY_OPTIONS.filter(opt => opt.group === "Growth").map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  <SelectSeparator />
+                  <SelectLabel>Product & Delivery</SelectLabel>
+                  {CATEGORY_OPTIONS.filter(opt => opt.group === "Product & Delivery").map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  <SelectSeparator />
+                  <SelectLabel>Enabling</SelectLabel>
+                  {CATEGORY_OPTIONS.filter(opt => opt.group === "Enabling").map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
