@@ -13,13 +13,13 @@ export default function VenturesHeader({ viewMode, onViewModeChange }: VenturesH
 
   return (
     <>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <Briefcase className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight">Venture HQ</h1>
+            <Briefcase className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Venture HQ</h1>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage all your ventures and projects
           </p>
         </div>
@@ -42,9 +42,9 @@ export default function VenturesHeader({ viewMode, onViewModeChange }: VenturesH
               <List className="h-4 w-4" />
             </Button>
           </div>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Venture
+          <Button onClick={() => setShowCreateModal(true)} size="sm">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">New Venture</span>
           </Button>
         </div>
       </div>

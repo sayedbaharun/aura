@@ -86,16 +86,18 @@ export default function VentureDetail() {
       <VentureDetailHeader venture={venture} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="projects">Projects</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-            <TabsTrigger value="docs">Knowledge Base</TabsTrigger>
-            <TabsTrigger value="ai-agent">AI Agent</TabsTrigger>
-          </TabsList>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex w-auto">
+              <TabsTrigger value="projects" className="text-xs sm:text-sm">Projects</TabsTrigger>
+              <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
+              <TabsTrigger value="docs" className="text-xs sm:text-sm whitespace-nowrap">Knowledge</TabsTrigger>
+              <TabsTrigger value="ai-agent" className="text-xs sm:text-sm whitespace-nowrap">AI Agent</TabsTrigger>
+            </TabsList>
+          </div>
 
           {activeTab === "projects" && (
-            <Button onClick={() => setCreateProjectModalOpen(true)}>
+            <Button onClick={() => setCreateProjectModalOpen(true)} size="sm" className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Project
             </Button>

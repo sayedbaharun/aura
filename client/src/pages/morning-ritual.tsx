@@ -303,19 +303,19 @@ export default function MorningRitual() {
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
-            <Sun className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+          <div className="p-2 sm:p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full shrink-0">
+            <Sun className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Morning Ritual</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold">Morning Ritual</h1>
+            <p className="text-sm text-muted-foreground">
               {format(new Date(), "EEEE, MMMM d, yyyy")}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {isAllRitualsComplete() && enabledHabits.length > 0 && (
             <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
               <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -327,8 +327,8 @@ export default function MorningRitual() {
               <Settings className="h-4 w-4" />
             </Link>
           </Button>
-          <Button onClick={handleSave} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? "Saving..." : "Save Progress"}
+          <Button onClick={handleSave} disabled={saveMutation.isPending} size="sm">
+            {saveMutation.isPending ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
