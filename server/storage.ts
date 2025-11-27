@@ -1195,8 +1195,13 @@ export class DBStorage implements IStorage {
 
   // Venture Conversations
   async createVentureConversation(data: InsertVentureConversation): Promise<VentureConversation> {
-    const results = await this.db.insert(ventureConversations).values(data).returning();
-    return results[0];
+    try {
+      const results = await this.db.insert(ventureConversations).values(data).returning();
+      return results[0];
+    } catch (error) {
+      console.error("Error creating venture conversation (table may not exist):", error);
+      throw error;
+    }
   }
 
   async getVentureConversations(
@@ -1204,28 +1209,38 @@ export class DBStorage implements IStorage {
     userId: string,
     limit: number = 20
   ): Promise<VentureConversation[]> {
-    return await this.db
-      .select()
-      .from(ventureConversations)
-      .where(
-        and(
-          eq(ventureConversations.ventureId, ventureId),
-          eq(ventureConversations.userId, userId)
+    try {
+      return await this.db
+        .select()
+        .from(ventureConversations)
+        .where(
+          and(
+            eq(ventureConversations.ventureId, ventureId),
+            eq(ventureConversations.userId, userId)
+          )
         )
-      )
-      .orderBy(desc(ventureConversations.createdAt))
-      .limit(limit);
+        .orderBy(desc(ventureConversations.createdAt))
+        .limit(limit);
+    } catch (error) {
+      // Table might not exist yet if migration hasn't been run
+      console.error("Error fetching venture conversations (table may not exist):", error);
+      return [];
+    }
   }
 
   async deleteVentureConversations(ventureId: string, userId: string): Promise<void> {
-    await this.db
-      .delete(ventureConversations)
-      .where(
-        and(
-          eq(ventureConversations.ventureId, ventureId),
-          eq(ventureConversations.userId, userId)
-        )
-      );
+    try {
+      await this.db
+        .delete(ventureConversations)
+        .where(
+          and(
+            eq(ventureConversations.ventureId, ventureId),
+            eq(ventureConversations.userId, userId)
+          )
+        );
+    } catch (error) {
+      console.error("Error deleting venture conversations (table may not exist):", error);
+    }
   }
 
   // Venture Context Cache
@@ -1233,68 +1248,119 @@ export class DBStorage implements IStorage {
     ventureId: string,
     contextType: string
   ): Promise<VentureContextCache | undefined> {
-    const results = await this.db
-      .select()
-      .from(ventureContextCache)
-      .where(
-        and(
-          eq(ventureContextCache.ventureId, ventureId),
-          eq(ventureContextCache.contextType, contextType as any)
+    try {
+      const results = await this.db
+        .select()
+        .from(ventureContextCache)
+        .where(
+          and(
+            eq(ventureContextCache.ventureId, ventureId),
+            eq(ventureContextCache.contextType, contextType as any)
+          )
         )
-      )
-      .limit(1);
-    return results[0];
+        .limit(1);
+      return results[0];
+    } catch (error) {
+      // Table might not exist yet if migration hasn't been run
+      console.error("Error fetching venture context cache (table may not exist):", error);
+      return undefined;
+    }
   }
 
   async upsertVentureContextCache(
     data: InsertVentureContextCache & { ventureId: string; contextType: string }
   ): Promise<VentureContextCache> {
-    // Check if exists
-    const existing = await this.getVentureContextCache(data.ventureId, data.contextType);
+    try {
+      // Check if exists
+      const existing = await this.getVentureContextCache(data.ventureId, data.contextType);
 
-    if (existing) {
-      const results = await this.db
-        .update(ventureContextCache)
-        .set({
-          content: data.content,
-          tokenCount: data.tokenCount,
-          lastBuiltAt: data.lastBuiltAt || new Date(),
-          validUntil: data.validUntil,
-          metadata: data.metadata,
-          updatedAt: new Date(),
-        })
-        .where(eq(ventureContextCache.id, existing.id))
-        .returning();
+      if (existing) {
+        const results = await this.db
+          .update(ventureContextCache)
+          .set({
+            content: data.content,
+            tokenCount: data.tokenCount,
+            lastBuiltAt: data.lastBuiltAt || new Date(),
+            validUntil: data.validUntil,
+            metadata: data.metadata,
+            updatedAt: new Date(),
+          })
+          .where(eq(ventureContextCache.id, existing.id))
+          .returning();
+        return results[0];
+      }
+
+      const results = await this.db.insert(ventureContextCache).values(data).returning();
       return results[0];
+    } catch (error) {
+      console.error("Error upserting venture context cache (table may not exist):", error);
+      // Return a mock object to prevent crashes
+      return {
+        id: 'mock',
+        ventureId: data.ventureId,
+        contextType: data.contextType as any,
+        content: data.content,
+        tokenCount: data.tokenCount || null,
+        lastBuiltAt: new Date(),
+        validUntil: data.validUntil || null,
+        metadata: data.metadata || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
     }
-
-    const results = await this.db.insert(ventureContextCache).values(data).returning();
-    return results[0];
   }
 
   async invalidateVentureContextCache(ventureId: string): Promise<void> {
-    await this.db
-      .update(ventureContextCache)
-      .set({ validUntil: new Date() })
-      .where(eq(ventureContextCache.ventureId, ventureId));
+    try {
+      await this.db
+        .update(ventureContextCache)
+        .set({ validUntil: new Date() })
+        .where(eq(ventureContextCache.ventureId, ventureId));
+    } catch (error) {
+      console.error("Error invalidating venture context cache (table may not exist):", error);
+    }
   }
 
   // Venture Agent Actions (Audit Log)
   async createVentureAgentAction(data: InsertVentureAgentAction): Promise<VentureAgentAction> {
-    const results = await this.db.insert(ventureAgentActions).values(data).returning();
-    return results[0];
+    try {
+      const results = await this.db.insert(ventureAgentActions).values(data).returning();
+      return results[0];
+    } catch (error) {
+      console.error("Error creating venture agent action (table may not exist):", error);
+      // Return a mock object to prevent crashes
+      return {
+        id: 'mock',
+        ventureId: data.ventureId,
+        userId: data.userId,
+        conversationId: data.conversationId || null,
+        action: data.action,
+        entityType: data.entityType || null,
+        entityId: data.entityId || null,
+        parameters: data.parameters || null,
+        result: data.result || 'pending',
+        errorMessage: data.errorMessage || null,
+        executedAt: new Date(),
+      };
+    }
   }
 
   async getVentureAgentActions(
     ventureId: string,
     limit: number = 50
   ): Promise<VentureAgentAction[]> {
-    return await this.db
-      .select()
-      .from(ventureAgentActions)
-      .where(eq(ventureAgentActions.ventureId, ventureId))
-      .orderBy(desc(ventureAgentActions.executedAt))
-      .limit(limit);
+    try {
+      return await this.db
+        .select()
+        .from(ventureAgentActions)
+        .where(eq(ventureAgentActions.ventureId, ventureId))
+        .orderBy(desc(ventureAgentActions.executedAt))
+        .limit(limit);
+    } catch (error) {
+      // Table might not exist yet if migration hasn't been run
+      console.error("Error fetching venture agent actions (table may not exist):", error);
+      return [];
+    }
   }
 
   // Helper: Get AI Agent Prompt by ventureId (alias for consistency)
