@@ -23,8 +23,8 @@ interface HealthEntry {
   steps: number | null;
   workoutDone: boolean;
   workoutType: string | null;
-  workoutDuration: number | null;
-  weight: number | null;
+  workoutDurationMin: number | null;
+  weightKg: number | null;
   stressLevel: string | null;
   notes: string | null;
 }
@@ -71,7 +71,7 @@ export default function HealthSnapshot() {
         workoutDone: todayEntry.workoutDone || false,
         workoutType: parsedWorkoutType,
         workoutSubType: parsedWorkoutSubType,
-        workoutDuration: todayEntry.workoutDuration?.toString() || "",
+        workoutDuration: todayEntry.workoutDurationMin?.toString() || "",
       });
     }
   }, [todayEntry]);
@@ -198,7 +198,7 @@ export default function HealthSnapshot() {
                 todayEntry.workoutType ?
                   todayEntry.workoutType.replace("_", " - ") : "Done"
               ) : "No"}
-              {todayEntry.workoutDone && todayEntry.workoutDuration && ` (${todayEntry.workoutDuration}min)`}
+              {todayEntry.workoutDone && todayEntry.workoutDurationMin && ` (${todayEntry.workoutDurationMin}min)`}
             </span>
           </div>
         </CardContent>

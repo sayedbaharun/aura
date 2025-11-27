@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -48,12 +49,6 @@ interface Project {
   ventureId: string;
 }
 
-interface Milestone {
-  id: string;
-  name: string;
-  projectId: string;
-}
-
 const DOMAIN_OPTIONS = [
   { value: "home", label: "Home" },
   { value: "work", label: "Work" },
@@ -68,10 +63,6 @@ const DOMAIN_OPTIONS = [
 
 const TYPE_OPTIONS = [
   { value: "business", label: "Business" },
-  { value: "deep_work", label: "Deep Work" },
-  { value: "admin", label: "Admin" },
-  { value: "health", label: "Health" },
-  { value: "learning", label: "Learning" },
   { value: "personal", label: "Personal" },
 ];
 
@@ -99,13 +90,13 @@ export default function CreateTaskModal({
 
   const [formData, setFormData] = useState({
     title: "",
-    status: "next",
+    status: "todo",
     priority: "P2",
     type: "business",
     domain: "work",
     ventureId: defaultVentureId || "",
     projectId: defaultProjectId || "",
-    milestoneId: "",
+    milestone: "",
     dueDate: "",
     focusDate: defaultFocusDate || "",
     focusSlot: defaultFocusSlot || "",
@@ -118,13 +109,13 @@ export default function CreateTaskModal({
     if (open) {
       setFormData({
         title: "",
-        status: "next",
+        status: "todo",
         priority: "P2",
         type: "business",
         domain: "work",
         ventureId: defaultVentureId || "",
         projectId: defaultProjectId || "",
-        milestoneId: "",
+        milestone: "",
         dueDate: "",
         focusDate: defaultFocusDate || "",
         focusSlot: defaultFocusSlot || "",
@@ -149,17 +140,6 @@ export default function CreateTaskModal({
       return res.json();
     },
     enabled: open && !!formData.ventureId,
-  });
-
-  // Fetch milestones (filtered by project)
-  const { data: milestones = [] } = useQuery<Milestone[]>({
-    queryKey: ["/api/milestones", formData.projectId],
-    queryFn: async () => {
-      if (!formData.projectId) return [];
-      const res = await apiRequest("GET", `/api/milestones?project_id=${formData.projectId}`);
-      return res.json();
-    },
-    enabled: open && !!formData.projectId,
   });
 
   // Create task mutation
@@ -209,7 +189,7 @@ export default function CreateTaskModal({
 
     if (formData.ventureId) payload.ventureId = formData.ventureId;
     if (formData.projectId) payload.projectId = formData.projectId;
-    if (formData.milestoneId) payload.milestoneId = formData.milestoneId;
+    if (formData.milestone) payload.milestone = formData.milestone;
     if (formData.dueDate) payload.dueDate = formData.dueDate;
     if (formData.focusDate) payload.focusDate = formData.focusDate;
     if (formData.focusSlot) payload.focusSlot = formData.focusSlot;
@@ -222,14 +202,14 @@ export default function CreateTaskModal({
   // Reset project when venture changes
   useEffect(() => {
     if (!formData.ventureId) {
-      setFormData((prev) => ({ ...prev, projectId: "", milestoneId: "" }));
+      setFormData((prev) => ({ ...prev, projectId: "", milestone: "" }));
     }
   }, [formData.ventureId]);
 
   // Reset milestone when project changes
   useEffect(() => {
     if (!formData.projectId) {
-      setFormData((prev) => ({ ...prev, milestoneId: "" }));
+      setFormData((prev) => ({ ...prev, milestone: "" }));
     }
   }, [formData.projectId]);
 
@@ -247,6 +227,9 @@ export default function CreateTaskModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Task</DialogTitle>
+          <DialogDescription>
+            Create a new task with details about what needs to be done.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -276,10 +259,10 @@ export default function CreateTaskModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="idea">Idea</SelectItem>
-                  <SelectItem value="next">Next</SelectItem>
+                  <SelectItem value="todo">To Do</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="waiting">Waiting</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="done">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -391,30 +374,16 @@ export default function CreateTaskModal({
             </div>
           </div>
 
-          {/* Milestone (if project selected) */}
-          {formData.projectId && milestones.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="milestone">Milestone</Label>
-              <Select
-                value={formData.milestoneId || "none"}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, milestoneId: value === "none" ? "" : value })
-                }
-              >
-                <SelectTrigger id="milestone">
-                  <SelectValue placeholder="Select milestone (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {milestones.map((milestone) => (
-                    <SelectItem key={milestone.id} value={milestone.id}>
-                      {milestone.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Milestone */}
+          <div className="space-y-2">
+            <Label htmlFor="milestone">Milestone</Label>
+            <Input
+              id="milestone"
+              value={formData.milestone}
+              onChange={(e) => setFormData({ ...formData, milestone: e.target.value })}
+              placeholder="e.g., Phase 1, MVP Launch, Q1 Goals (optional)"
+            />
+          </div>
 
           {/* Due Date and Focus Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
