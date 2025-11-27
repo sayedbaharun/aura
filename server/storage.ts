@@ -33,6 +33,12 @@ import {
   type InsertAiAgentPrompt,
   type ChatMessage,
   type InsertChatMessage,
+  type VentureConversation,
+  type InsertVentureConversation,
+  type VentureContextCache,
+  type InsertVentureContextCache,
+  type VentureAgentAction,
+  type InsertVentureAgentAction,
   ventures,
   projects,
   milestones,
@@ -50,6 +56,9 @@ import {
   books,
   aiAgentPrompts,
   chatMessages,
+  ventureConversations,
+  ventureContextCache,
+  ventureAgentActions,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like } from "drizzle-orm";
@@ -98,7 +107,7 @@ export interface IStorage {
   deleteTask(id: string): Promise<void>;
 
   // Capture Items
-  getCaptures(filters?: { clarified?: boolean }): Promise<CaptureItem[]>;
+  getCaptures(filters?: { clarified?: boolean; ventureId?: string }): Promise<CaptureItem[]>;
   getCapture(id: string): Promise<CaptureItem | undefined>;
   createCapture(data: InsertCaptureItem): Promise<CaptureItem>;
   updateCapture(id: string, data: Partial<InsertCaptureItem>): Promise<CaptureItem | undefined>;
@@ -466,12 +475,22 @@ export class DBStorage implements IStorage {
   // CAPTURE ITEMS
   // ============================================================================
 
-  async getCaptures(filters?: { clarified?: boolean }): Promise<CaptureItem[]> {
+  async getCaptures(filters?: { clarified?: boolean; ventureId?: string }): Promise<CaptureItem[]> {
+    const conditions = [];
+
     if (filters?.clarified !== undefined) {
+      conditions.push(eq(captureItems.clarified, filters.clarified));
+    }
+
+    if (filters?.ventureId) {
+      conditions.push(eq(captureItems.ventureId, filters.ventureId));
+    }
+
+    if (conditions.length > 0) {
       return await this.db
         .select()
         .from(captureItems)
-        .where(eq(captureItems.clarified, filters.clarified))
+        .where(and(...conditions))
         .orderBy(desc(captureItems.createdAt));
     }
 
@@ -1168,6 +1187,119 @@ export class DBStorage implements IStorage {
 
   async deleteChatHistory(userId: string): Promise<void> {
     await this.db.delete(chatMessages).where(eq(chatMessages.userId, userId));
+  }
+
+  // ============================================================================
+  // VENTURE AI AGENT SYSTEM
+  // ============================================================================
+
+  // Venture Conversations
+  async createVentureConversation(data: InsertVentureConversation): Promise<VentureConversation> {
+    const results = await this.db.insert(ventureConversations).values(data).returning();
+    return results[0];
+  }
+
+  async getVentureConversations(
+    ventureId: string,
+    userId: string,
+    limit: number = 20
+  ): Promise<VentureConversation[]> {
+    return await this.db
+      .select()
+      .from(ventureConversations)
+      .where(
+        and(
+          eq(ventureConversations.ventureId, ventureId),
+          eq(ventureConversations.userId, userId)
+        )
+      )
+      .orderBy(desc(ventureConversations.createdAt))
+      .limit(limit);
+  }
+
+  async deleteVentureConversations(ventureId: string, userId: string): Promise<void> {
+    await this.db
+      .delete(ventureConversations)
+      .where(
+        and(
+          eq(ventureConversations.ventureId, ventureId),
+          eq(ventureConversations.userId, userId)
+        )
+      );
+  }
+
+  // Venture Context Cache
+  async getVentureContextCache(
+    ventureId: string,
+    contextType: string
+  ): Promise<VentureContextCache | undefined> {
+    const results = await this.db
+      .select()
+      .from(ventureContextCache)
+      .where(
+        and(
+          eq(ventureContextCache.ventureId, ventureId),
+          eq(ventureContextCache.contextType, contextType as any)
+        )
+      )
+      .limit(1);
+    return results[0];
+  }
+
+  async upsertVentureContextCache(
+    data: InsertVentureContextCache & { ventureId: string; contextType: string }
+  ): Promise<VentureContextCache> {
+    // Check if exists
+    const existing = await this.getVentureContextCache(data.ventureId, data.contextType);
+
+    if (existing) {
+      const results = await this.db
+        .update(ventureContextCache)
+        .set({
+          content: data.content,
+          tokenCount: data.tokenCount,
+          lastBuiltAt: data.lastBuiltAt || new Date(),
+          validUntil: data.validUntil,
+          metadata: data.metadata,
+          updatedAt: new Date(),
+        })
+        .where(eq(ventureContextCache.id, existing.id))
+        .returning();
+      return results[0];
+    }
+
+    const results = await this.db.insert(ventureContextCache).values(data).returning();
+    return results[0];
+  }
+
+  async invalidateVentureContextCache(ventureId: string): Promise<void> {
+    await this.db
+      .update(ventureContextCache)
+      .set({ validUntil: new Date() })
+      .where(eq(ventureContextCache.ventureId, ventureId));
+  }
+
+  // Venture Agent Actions (Audit Log)
+  async createVentureAgentAction(data: InsertVentureAgentAction): Promise<VentureAgentAction> {
+    const results = await this.db.insert(ventureAgentActions).values(data).returning();
+    return results[0];
+  }
+
+  async getVentureAgentActions(
+    ventureId: string,
+    limit: number = 50
+  ): Promise<VentureAgentAction[]> {
+    return await this.db
+      .select()
+      .from(ventureAgentActions)
+      .where(eq(ventureAgentActions.ventureId, ventureId))
+      .orderBy(desc(ventureAgentActions.executedAt))
+      .limit(limit);
+  }
+
+  // Helper: Get AI Agent Prompt by ventureId (alias for consistency)
+  async getAiAgentPrompt(ventureId: string): Promise<AiAgentPrompt | undefined> {
+    return this.getAiAgentPromptByVenture(ventureId);
   }
 }
 

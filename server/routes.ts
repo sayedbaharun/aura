@@ -2837,6 +2837,148 @@ RULES:
     }
   });
 
+  // ============================================================================
+  // VENTURE AI AGENT
+  // ============================================================================
+
+  // Send a chat message to a venture's AI agent
+  app.post("/api/ventures/:ventureId/chat", async (req, res) => {
+    try {
+      const { ventureId } = req.params;
+      const { message } = req.body;
+
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "Message is required" });
+      }
+
+      await ensureDefaultUserExists();
+      const userId = DEFAULT_USER_ID;
+
+      // Dynamically import to avoid circular dependencies
+      const { createVentureAgent } = await import("./venture-agent");
+
+      // Create and initialize the venture agent
+      const agent = await createVentureAgent(ventureId, userId);
+
+      // Process the message
+      const result = await agent.chat(message);
+
+      res.json({
+        response: result.response,
+        actions: result.actions,
+        model: result.model,
+        tokensUsed: result.tokensUsed,
+      });
+    } catch (error: any) {
+      logger.error({ error, ventureId: req.params.ventureId }, "Error processing venture chat message");
+      res.status(500).json({ error: error.message || "Failed to process message" });
+    }
+  });
+
+  // Get chat history for a venture
+  app.get("/api/ventures/:ventureId/chat/history", async (req, res) => {
+    try {
+      const { ventureId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      await ensureDefaultUserExists();
+      const userId = DEFAULT_USER_ID;
+
+      const history = await storage.getVentureConversations(ventureId, userId, limit);
+
+      // Return in chronological order
+      res.json(history.reverse());
+    } catch (error) {
+      logger.error({ error, ventureId: req.params.ventureId }, "Error fetching venture chat history");
+      res.status(500).json({ error: "Failed to fetch chat history" });
+    }
+  });
+
+  // Clear chat history for a venture
+  app.delete("/api/ventures/:ventureId/chat/history", async (req, res) => {
+    try {
+      const { ventureId } = req.params;
+
+      await ensureDefaultUserExists();
+      const userId = DEFAULT_USER_ID;
+
+      await storage.deleteVentureConversations(ventureId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ error, ventureId: req.params.ventureId }, "Error clearing venture chat history");
+      res.status(500).json({ error: "Failed to clear chat history" });
+    }
+  });
+
+  // Get venture AI agent actions (audit log)
+  app.get("/api/ventures/:ventureId/ai/actions", async (req, res) => {
+    try {
+      const { ventureId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      const actions = await storage.getVentureAgentActions(ventureId, limit);
+      res.json(actions);
+    } catch (error) {
+      logger.error({ error, ventureId: req.params.ventureId }, "Error fetching venture AI actions");
+      res.status(500).json({ error: "Failed to fetch AI actions" });
+    }
+  });
+
+  // Rebuild venture context cache
+  app.post("/api/ventures/:ventureId/ai/rebuild-context", async (req, res) => {
+    try {
+      const { ventureId } = req.params;
+
+      // Invalidate existing cache
+      await storage.invalidateVentureContextCache(ventureId);
+
+      // Dynamically import to avoid circular dependencies
+      const { getCachedOrBuildContext } = await import("./venture-context-builder");
+
+      // Build fresh context
+      const context = await getCachedOrBuildContext(ventureId, 0); // 0 hours = always rebuild
+
+      res.json({
+        success: true,
+        contextLength: context.length,
+        estimatedTokens: Math.ceil(context.length / 4),
+      });
+    } catch (error) {
+      logger.error({ error, ventureId: req.params.ventureId }, "Error rebuilding venture context");
+      res.status(500).json({ error: "Failed to rebuild context" });
+    }
+  });
+
+  // Get venture context status
+  app.get("/api/ventures/:ventureId/ai/context-status", async (req, res) => {
+    try {
+      const { ventureId } = req.params;
+
+      const cached = await storage.getVentureContextCache(ventureId, "full");
+
+      if (!cached) {
+        return res.json({
+          hasCachedContext: false,
+          isStale: true,
+        });
+      }
+
+      const isStale = !cached.validUntil || new Date(cached.validUntil) < new Date();
+
+      res.json({
+        hasCachedContext: true,
+        isStale,
+        lastBuiltAt: cached.lastBuiltAt,
+        validUntil: cached.validUntil,
+        tokenCount: cached.tokenCount,
+        metadata: cached.metadata,
+      });
+    } catch (error) {
+      logger.error({ error, ventureId: req.params.ventureId }, "Error fetching venture context status");
+      res.status(500).json({ error: "Failed to fetch context status" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
