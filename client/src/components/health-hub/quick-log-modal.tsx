@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { cleanFormData } from "@/lib/utils";
 
 interface QuickLogModalProps {
   open: boolean;
@@ -100,20 +101,23 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
 
     const payload = {
       date: formData.date,
-      sleepHours: formData.sleepHours ? parseFloat(formData.sleepHours) : null,
-      sleepQuality: formData.sleepQuality || null,
+      sleepHours: formData.sleepHours ? parseFloat(formData.sleepHours) : undefined,
+      sleepQuality: formData.sleepQuality,
       energyLevel: formData.energyLevel,
       mood: formData.mood,
       workoutDone: formData.workoutDone,
       workoutType: formData.workoutDone ? finalWorkoutType : "none",
-      workoutDurationMin: formData.workoutDone && formData.workoutDuration ? parseInt(formData.workoutDuration) : null,
-      steps: formData.steps ? parseInt(formData.steps) : null,
-      weightKg: formData.weight ? parseFloat(formData.weight) : null,
-      stressLevel: formData.stressLevel || null,
-      notes: formData.notes || null,
+      workoutDurationMin: formData.workoutDone && formData.workoutDuration ? parseInt(formData.workoutDuration) : undefined,
+      steps: formData.steps ? parseInt(formData.steps) : undefined,
+      weightKg: formData.weight ? parseFloat(formData.weight) : undefined,
+      stressLevel: formData.stressLevel,
+      notes: formData.notes,
     };
 
-    createHealthMutation.mutate(payload);
+    // Clean data to only send non-empty values
+    const cleanPayload = cleanFormData(payload);
+
+    createHealthMutation.mutate(cleanPayload);
   };
 
   return (
