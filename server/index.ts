@@ -1,6 +1,7 @@
 // Load environment variables from .env file (must be first)
 import 'dotenv/config';
 
+import crypto from "crypto";
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -193,7 +194,7 @@ app.use((req, res, next) => {
   // Generate CSRF token if not present
   const session = req.session as any;
   if (!session.csrfToken) {
-    session.csrfToken = require('crypto').randomBytes(32).toString('hex');
+    session.csrfToken = crypto.randomBytes(32).toString('hex');
   }
   res.locals.csrfToken = session.csrfToken;
   next();
