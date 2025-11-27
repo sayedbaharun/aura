@@ -230,6 +230,10 @@ export async function setUserPassword(
  * Check if authentication is required based on environment
  */
 export function isAuthRequired(): boolean {
+  // Allow explicitly disabling auth with REQUIRE_AUTH=false (even in production)
+  if (process.env.REQUIRE_AUTH === "false") {
+    return false;
+  }
   // Auth is required in production or when explicitly enabled
   return process.env.NODE_ENV === "production" ||
          process.env.REQUIRE_AUTH === "true";
