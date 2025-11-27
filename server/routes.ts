@@ -114,7 +114,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update venture
   app.patch("/api/ventures/:id", async (req, res) => {
     try {
+      logger.info({ ventureId: req.params.id, body: req.body }, "Updating venture");
       const updates = insertVentureSchema.partial().parse(req.body);
+      logger.info({ ventureId: req.params.id, updates }, "Validated venture updates");
       const venture = await storage.updateVenture(req.params.id, updates);
       if (!venture) {
         return res.status(404).json({ error: "Venture not found" });
@@ -124,8 +126,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid venture data", details: error.errors });
       } else {
-        logger.error({ error }, "Error updating venture");
-        res.status(500).json({ error: "Failed to update venture" });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        logger.error({ error, errorMessage, errorStack, ventureId: req.params.id, body: req.body }, "Error updating venture");
+        res.status(500).json({ error: "Failed to update venture", details: errorMessage });
       }
     }
   });
