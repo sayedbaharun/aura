@@ -26,23 +26,23 @@ export function KnowledgeHubHeader({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <BookOpen className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight">Knowledge Hub</h1>
+            <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Knowledge Hub</h1>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Your documented wisdom and processes
           </p>
         </div>
-        <Button onClick={onNewDoc}>
+        <Button onClick={onNewDoc} size="sm" className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           New Document
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -60,6 +60,7 @@ export function KnowledgeHubHeader({
           onValueChange={(value) => {
             if (value) onViewModeChange(value as "grid" | "list" | "table");
           }}
+          className="justify-center sm:justify-start"
         >
           <ToggleGroupItem value="grid" aria-label="Grid view">
             <Grid3x3 className="h-4 w-4" />

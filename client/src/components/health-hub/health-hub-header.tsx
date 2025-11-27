@@ -19,19 +19,19 @@ export default function HealthHubHeader({
   };
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <Heart className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold tracking-tight">Health & Performance</h1>
+          <Heart className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Health & Performance</h1>
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Track your physical and mental wellness, workouts, and sleep patterns
         </p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
         <Select value={dateRange} onValueChange={onDateRangeChange}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-32 sm:w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -41,13 +41,13 @@ export default function HealthHubHeader({
             <SelectItem value="all">All time</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={handleExport}>
+        <Button variant="outline" size="sm" onClick={handleExport} className="hidden sm:flex">
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>
-        <Button onClick={onOpenQuickLog}>
-          <Plus className="h-4 w-4 mr-2" />
-          Log Health
+        <Button onClick={onOpenQuickLog} size="sm">
+          <Plus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Log Health</span>
         </Button>
       </div>
     </div>

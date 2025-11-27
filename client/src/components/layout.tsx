@@ -47,7 +47,7 @@ export default function Layout({ children }: LayoutProps) {
         <TopBar onMenuClick={() => setMobileMenuOpen(true)} />
 
         {/* Page content */}
-        <main className="container mx-auto px-4 py-6">
+        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-6 safe-area-bottom">
           {children}
         </main>
       </div>
