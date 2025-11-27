@@ -54,7 +54,9 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
 
   const updateDayMutation = useMutation({
     mutationFn: async (data: Partial<Day>) => {
-      const res = await apiRequest("PATCH", `/api/days/${day?.date}`, data);
+      // Ensure we're using the date in YYYY-MM-DD format, not the ID
+      const dateStr = day?.date?.replace(/^day_/, '') || format(new Date(), 'yyyy-MM-dd');
+      const res = await apiRequest("PATCH", `/api/days/${dateStr}`, data);
       return await res.json();
     },
     onSuccess: () => {
