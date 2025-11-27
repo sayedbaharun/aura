@@ -89,11 +89,27 @@ export function validateEnvironment(): ValidationResult {
     warnings.push('AUTHORIZED_TELEGRAM_CHAT_IDS not configured - all Telegram chats will be allowed (security risk)');
   }
 
-  // Session Secret
+  // Session Secret - required in production, optional in development
+  const isProduction = process.env.NODE_ENV === 'production';
   if (!process.env.SESSION_SECRET) {
-    errors.push('SESSION_SECRET is required for secure session management');
+    if (isProduction) {
+      errors.push('SESSION_SECRET is required for secure session management in production');
+    } else {
+      warnings.push('SESSION_SECRET not set - using default for development only');
+    }
   } else if (process.env.SESSION_SECRET.length < 32) {
-    warnings.push('SESSION_SECRET should be at least 32 characters for security');
+    if (isProduction) {
+      errors.push('SESSION_SECRET must be at least 32 characters in production');
+    } else {
+      warnings.push('SESSION_SECRET should be at least 32 characters for security');
+    }
+  }
+
+  // Authentication mode
+  if (isProduction || process.env.REQUIRE_AUTH === 'true') {
+    warnings.push('Authentication is ENABLED - users must set up a password to access the app');
+  } else {
+    warnings.push('Authentication is DISABLED (development mode) - set NODE_ENV=production or REQUIRE_AUTH=true to enable');
   }
 
   // ========================================

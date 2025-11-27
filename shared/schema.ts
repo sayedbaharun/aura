@@ -227,6 +227,7 @@ export const sessions = pgTable(
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email").unique(),
+  passwordHash: varchar("password_hash"), // bcrypt hashed password
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
@@ -234,9 +235,37 @@ export const users = pgTable("users", {
   dateFormat: varchar("date_format").default("yyyy-MM-dd"),
   timeFormat: varchar("time_format").default("24h"),
   weekStartsOn: integer("week_starts_on").default(0), // 0 = Sunday
+  lastLoginAt: timestamp("last_login_at"),
+  failedLoginAttempts: integer("failed_login_attempts").default(0),
+  lockedUntil: timestamp("locked_until"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Audit log table - Track security-sensitive operations
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    action: varchar("action", { length: 100 }).notNull(), // 'login', 'logout', 'password_change', 'data_export', etc.
+    resource: varchar("resource", { length: 100 }), // 'ventures', 'tasks', 'health', etc.
+    resourceId: varchar("resource_id"), // ID of affected resource
+    ipAddress: varchar("ip_address", { length: 45 }), // IPv4 or IPv6
+    userAgent: text("user_agent"),
+    details: jsonb("details").$type<Record<string, unknown>>(), // Additional context
+    status: varchar("status", { length: 20 }).default("success"), // 'success', 'failure', 'blocked'
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_audit_logs_user_id").on(table.userId),
+    index("idx_audit_logs_action").on(table.action),
+    index("idx_audit_logs_created_at").on(table.createdAt),
+  ]
+);
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

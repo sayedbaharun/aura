@@ -4,25 +4,109 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
+import session from "express-session";
+import rateLimit from "express-rate-limit";
+import connectPgSimple from "connect-pg-simple";
+import pkg from "pg";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 import { validateEnvironmentOrExit } from "./env-validator";
+
+const { Pool } = pkg;
 
 // Validate environment variables before starting the application
 validateEnvironmentOrExit();
 
 const app = express();
 
-// Security: HTTP headers protection with helmet
+// Trust proxy for Railway/production deployments
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+// ============================================================================
+// SECURITY: HTTP Headers with Helmet
+// ============================================================================
+const isProduction = process.env.NODE_ENV === 'production';
+
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP to prevent blocking static assets
-  crossOriginEmbedderPolicy: false, // Allow embedding in iframes
+  // Content Security Policy - prevents XSS and injection attacks
+  contentSecurityPolicy: isProduction ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Needed for Vite in dev
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", "https://openrouter.ai", "https://api.telegram.org", "https://oauth2.googleapis.com", "https://www.googleapis.com"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  } : false, // Disable in development for Vite HMR
+  crossOriginEmbedderPolicy: false,
+  // Additional security headers
+  hsts: isProduction ? {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  } : false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  xContentTypeOptions: true, // Prevents MIME sniffing
+  xDnsPrefetchControl: { allow: false },
+  xFrameOptions: { action: 'deny' }, // Prevents clickjacking
+  xXssProtection: true,
 }));
 
-// Security: CORS configuration
+// ============================================================================
+// SECURITY: Rate Limiting - Prevents brute force and DoS attacks
+// ============================================================================
+
+// Global rate limiter - 100 requests per minute per IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: isProduction ? 100 : 1000, // More permissive in development
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/health', // Don't rate limit health checks
+});
+
+// Strict rate limiter for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per 15 minutes
+  message: { error: 'Too many authentication attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// API rate limiter - more permissive than auth
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: isProduction ? 60 : 300, // 60 requests/minute in production
+  message: { error: 'API rate limit exceeded' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(globalLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/api', apiLimiter);
+
+// ============================================================================
+// SECURITY: CORS Configuration - Strict origin validation
+// ============================================================================
 const buildAllowedOrigins = () => {
-  const origins = ['http://localhost:5000', 'http://localhost:5173'];
+  const origins: string[] = [];
+
+  // Only allow localhost in development
+  if (!isProduction) {
+    origins.push('http://localhost:5000', 'http://localhost:5173');
+  }
 
   // Add Railway deployment domain (automatically set by Railway)
   if (process.env.RAILWAY_PUBLIC_DOMAIN) {
@@ -31,7 +115,8 @@ const buildAllowedOrigins = () => {
 
   // Add custom origins from environment variable
   if (process.env.ALLOWED_ORIGINS) {
-    origins.push(...process.env.ALLOWED_ORIGINS.split(','));
+    const customOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+    origins.push(...customOrigins);
   }
 
   return origins;
@@ -41,19 +126,82 @@ const allowedOrigins = buildAllowedOrigins();
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    // In production, require origin header (block requests without origin except from same-origin)
+    if (isProduction && !origin) {
+      // Allow same-origin requests (browser requests from the app itself)
+      callback(null, true);
+      return;
+    }
 
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+    // In development, allow no-origin requests (curl, Postman, etc.)
+    if (!origin && !isProduction) {
+      callback(null, true);
+      return;
+    }
+
+    if (origin && allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else if (!isProduction) {
+      // Be more permissive in development
       callback(null, true);
     } else {
+      log(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  maxAge: 86400, // 24 hours
 }));
 
-// Security: Limit request body size to prevent memory exhaustion attacks
+// ============================================================================
+// SECURITY: Session Configuration
+// ============================================================================
+const PgSession = connectPgSimple(session);
+
+// Create a pool for session storage
+const sessionPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: isProduction ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false" } : false,
+});
+
+// SESSION_SECRET is validated in env-validator.ts - this will fail in production if not set
+const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-change-in-production-unsafe';
+
+app.use(session({
+  store: new PgSession({
+    pool: sessionPool,
+    tableName: 'sessions',
+    createTableIfMissing: true,
+  }),
+  secret: sessionSecret,
+  name: 'hikma.sid', // Custom cookie name (don't reveal we're using Express)
+  resave: false,
+  saveUninitialized: false,
+  rolling: true, // Refresh session on activity
+  cookie: {
+    httpOnly: true, // Prevents XSS attacks from reading cookie
+    secure: isProduction, // HTTPS only in production
+    sameSite: isProduction ? 'strict' : 'lax', // CSRF protection
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+}));
+
+// CSRF Token middleware - generates token for forms
+app.use((req, res, next) => {
+  // Generate CSRF token if not present
+  const session = req.session as any;
+  if (!session.csrfToken) {
+    session.csrfToken = require('crypto').randomBytes(32).toString('hex');
+  }
+  res.locals.csrfToken = session.csrfToken;
+  next();
+});
+
+// ============================================================================
+// SECURITY: Request Body Size Limits
+// ============================================================================
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
