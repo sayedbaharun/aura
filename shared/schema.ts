@@ -972,6 +972,11 @@ export const aiAgentPrompts = pgTable(
       label: string;
       prompt: string;
     }[]>().default([]),
+    // New fields for venture AI agent system
+    knowledgeSources: jsonb("knowledge_sources").$type<string[]>().default(['docs', 'tasks', 'projects']), // Which data types to include
+    actionPermissions: jsonb("action_permissions").$type<string[]>().default(['read']), // What actions agent can take: read, create_task, create_doc, etc.
+    contextRefreshHours: integer("context_refresh_hours").default(24), // Hours between context rebuilds
+    maxContextTokens: integer("max_context_tokens").default(8000), // Token budget for context
     enabled: boolean("enabled").default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1020,3 +1025,113 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type AiAgentPrompt = typeof aiAgentPrompts.$inferSelect;
+
+// ----------------------------------------------------------------------------
+// VENTURE AI AGENT SYSTEM
+// ----------------------------------------------------------------------------
+
+// Venture Conversations: Chat history scoped to specific ventures
+export const ventureConversations = pgTable(
+  "venture_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "cascade" }).notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    role: text("role").$type<"user" | "assistant" | "system">().notNull(),
+    content: text("content").notNull(),
+    metadata: jsonb("metadata").$type<{
+      model?: string;
+      tokensUsed?: number;
+      toolCalls?: any[];
+      toolResults?: any[];
+      actionsTaken?: string[];
+      [key: string]: any;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_venture_conversations_venture_id").on(table.ventureId),
+    index("idx_venture_conversations_user_id").on(table.userId),
+    index("idx_venture_conversations_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertVentureConversationSchema = createInsertSchema(ventureConversations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type VentureConversation = typeof ventureConversations.$inferSelect;
+export type InsertVentureConversation = z.infer<typeof insertVentureConversationSchema>;
+
+// Context type enum for venture context cache
+export const contextTypeEnum = pgEnum('context_type', ['full', 'summary', 'docs', 'tasks', 'projects']);
+
+// Venture Context Cache: Cached context summaries for AI agents
+export const ventureContextCache = pgTable(
+  "venture_context_cache",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "cascade" }).notNull(),
+    contextType: contextTypeEnum("context_type").default("full").notNull(),
+    content: text("content").notNull(),
+    tokenCount: integer("token_count"),
+    lastBuiltAt: timestamp("last_built_at").defaultNow().notNull(),
+    validUntil: timestamp("valid_until"),
+    metadata: jsonb("metadata").$type<{
+      projectCount?: number;
+      taskCount?: number;
+      docCount?: number;
+      buildDurationMs?: number;
+      [key: string]: any;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_venture_context_cache_venture_id").on(table.ventureId),
+    index("idx_venture_context_cache_type").on(table.contextType),
+    index("idx_venture_context_cache_valid_until").on(table.validUntil),
+  ]
+);
+
+export const insertVentureContextCacheSchema = createInsertSchema(ventureContextCache).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type VentureContextCache = typeof ventureContextCache.$inferSelect;
+export type InsertVentureContextCache = z.infer<typeof insertVentureContextCacheSchema>;
+
+// Venture Agent Actions: Audit log for actions taken by venture AI agents
+export const ventureAgentActions = pgTable(
+  "venture_agent_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "cascade" }).notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    conversationId: uuid("conversation_id").references(() => ventureConversations.id, { onDelete: "set null" }),
+    action: text("action").notNull(), // e.g., 'create_task', 'update_project', 'create_doc'
+    entityType: text("entity_type"), // e.g., 'task', 'project', 'doc', 'milestone'
+    entityId: uuid("entity_id"), // ID of created/updated entity
+    parameters: jsonb("parameters").$type<Record<string, any>>(),
+    result: text("result").$type<"success" | "failed" | "rejected" | "pending">().default("pending"),
+    errorMessage: text("error_message"),
+    executedAt: timestamp("executed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_venture_agent_actions_venture_id").on(table.ventureId),
+    index("idx_venture_agent_actions_user_id").on(table.userId),
+    index("idx_venture_agent_actions_action").on(table.action),
+    index("idx_venture_agent_actions_executed_at").on(table.executedAt),
+  ]
+);
+
+export const insertVentureAgentActionSchema = createInsertSchema(ventureAgentActions).omit({
+  id: true,
+  executedAt: true,
+});
+
+export type VentureAgentAction = typeof ventureAgentActions.$inferSelect;
+export type InsertVentureAgentAction = z.infer<typeof insertVentureAgentActionSchema>;

@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { Plus } from "lucide-react";
+import { Plus, Bot, Settings } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VentureDetailHeader from "@/components/venture-hq/venture-detail-header";
 import ProjectsBoard from "@/components/venture-hq/projects-board";
 import TasksList from "@/components/venture-hq/tasks-list";
 import VentureDocs from "@/components/docs/venture-docs";
 import CreateProjectModal from "@/components/venture-hq/create-project-modal";
 import AiAgentConfig from "@/components/venture-hq/ai-agent-config";
+import VentureAiChat from "@/components/venture-hq/venture-ai-chat";
 
 interface Venture {
   id: string;
@@ -27,6 +29,7 @@ export default function VentureDetail() {
   const ventureId = params?.id;
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("projects");
+  const [aiSubTab, setAiSubTab] = useState<"chat" | "config">("chat");
 
   const { data: venture, isLoading } = useQuery<Venture>({
     queryKey: ["/api/ventures", ventureId],
@@ -35,6 +38,20 @@ export default function VentureDetail() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch venture");
+      return await res.json();
+    },
+    enabled: !!ventureId,
+  });
+
+  // Fetch AI agent config for quick actions
+  const { data: aiAgentConfig } = useQuery({
+    queryKey: [`/api/ai-agent-prompts/venture/${ventureId}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/ai-agent-prompts/venture/${ventureId}`, {
+        credentials: "include",
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
       return await res.json();
     },
     enabled: !!ventureId,
@@ -97,8 +114,40 @@ export default function VentureDetail() {
           <VentureDocs ventureId={venture.id} />
         </TabsContent>
 
-        <TabsContent value="ai-agent">
-          <AiAgentConfig ventureId={venture.id} />
+        <TabsContent value="ai-agent" className="space-y-4">
+          {/* Sub-tabs for AI Agent */}
+          <div className="flex items-center gap-2 border-b pb-4">
+            <Button
+              variant={aiSubTab === "chat" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAiSubTab("chat")}
+            >
+              <Bot className="h-4 w-4 mr-2" />
+              Chat with AI
+            </Button>
+            <Button
+              variant={aiSubTab === "config" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAiSubTab("config")}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Configure Agent
+            </Button>
+          </div>
+
+          {aiSubTab === "chat" ? (
+            <Card className="h-[600px]">
+              <CardContent className="p-6 h-full">
+                <VentureAiChat
+                  ventureId={venture.id}
+                  ventureName={venture.name}
+                  quickActions={aiAgentConfig?.quickActions || []}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <AiAgentConfig ventureId={venture.id} />
+          )}
         </TabsContent>
       </Tabs>
 
