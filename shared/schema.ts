@@ -29,6 +29,11 @@ import { z } from "zod";
 // ----------------------------------------------------------------------------
 
 export const ventureStatusEnum = pgEnum('venture_status', [
+  // Legacy values (kept for backward compatibility with existing data)
+  'active',      // legacy - use 'ongoing' instead
+  'development', // legacy - use 'building' instead
+  'paused',      // legacy - use 'on_hold' instead
+  // Current values
   'archived',
   'planning',
   'building',
