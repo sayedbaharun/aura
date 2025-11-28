@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Hikma-OS** (formerly Aura) is a full-stack personal operating system and productivity engine for managing multiple business ventures, projects, tasks, health, and knowledge. Built as a custom "second brain" to replace Notion, Todoist, and other fragmented productivity tools.
+**SB-OS** (formerly Aura) is a full-stack personal operating system and productivity engine for managing multiple business ventures, projects, tasks, health, and knowledge. Built as a custom "second brain" to replace Notion, Todoist, and other fragmented productivity tools.
 
 ## Development Commands
 
@@ -281,7 +281,7 @@ Components appear in `client/src/components/ui/`.
 
 ## Project Philosophy
 
-Hikma-OS is designed around these principles:
+SB-OS is designed around these principles:
 
 1. **Single Source of Truth**: All life data in one system
 2. **Hierarchy Matters**: Ventures → Projects → Tasks creates clarity

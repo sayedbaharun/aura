@@ -27,7 +27,7 @@ function verify(name: string, condition: boolean, message: string) {
   });
 }
 
-console.log('🔍 Verifying Hikma-OS Automations Implementation\n');
+console.log('🔍 Verifying SB-OS Automations Implementation\n');
 console.log('=' .repeat(60));
 
 // ============================================================================

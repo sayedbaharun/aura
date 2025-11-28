@@ -1,5 +1,5 @@
 /**
- * Notification Types and Interfaces for Hikma-OS
+ * Notification Types and Interfaces for SB-OS
  */
 
 export type NotificationType =

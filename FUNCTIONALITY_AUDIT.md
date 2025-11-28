@@ -1,4 +1,4 @@
-# Hikma-OS Functionality Audit: What Actually Works?
+# SB-OS Functionality Audit: What Actually Works?
 
 **Date**: November 24, 2025
 **Status**: Phases 1-5 UI Complete, Backend Integration Assessment
@@ -10,7 +10,7 @@
 ### 1. **Notion Sync - Do we even need it?**
 
 **What it is**: Notion sync would allow you to:
-- Keep your Hikma-OS tasks synced with a Notion database
+- Keep your SB-OS tasks synced with a Notion database
 - Update tasks in either system and have changes reflected in both
 - Use Notion's mobile app to view/edit tasks
 - Leverage Notion's collaboration features if working with a team
@@ -18,7 +18,7 @@
 **Status**: ❌ NOT BUILT (Phase 6 feature)
 
 **Do you need it?**
-- ❌ **NO** if you're happy using Hikma-OS as your single source of truth
+- ❌ **NO** if you're happy using SB-OS as your single source of truth
 - ❌ **NO** if you don't currently use Notion heavily
 - ✅ **YES** if you want to use Notion mobile app for tasks
 - ✅ **YES** if you have existing Notion databases you want to keep synced
@@ -124,7 +124,7 @@
 
 **What doesn't work**:
 - ❌ Scheduling a task in Deep Work does NOT create Google Calendar event
-- ❌ No sync between Hikma-OS and Google Calendar
+- ❌ No sync between SB-OS and Google Calendar
 - ❌ Google Calendar credentials not configured
 
 **What needs to be built**:
@@ -171,7 +171,7 @@ const SLOT_TIMES = {
 
 **Is this critical?**
 - ✅ **YES** if you want Google Calendar integration (recommended!)
-- ❌ **NO** if you're okay just using Hikma-OS calendar view
+- ❌ **NO** if you're okay just using SB-OS calendar view
 
 ---
 

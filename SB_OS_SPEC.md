@@ -1,4 +1,4 @@
-# Hikma-OS: The Sayed Baharun Productivity Engine
+# SB-OS: The Sayed Baharun Productivity Engine
 ## Complete Technical & Product Specification
 
 ---
@@ -7,7 +7,7 @@
 
 ### Core Identity
 
-**Hikma-OS** is not a productivity tool—it is **the operating system for one founder: Sayed Baharun**.
+**SB-OS** is not a productivity tool—it is **the operating system for one founder: Sayed Baharun**.
 
 It is:
 - A **thinking partner + execution engine**, not a task manager
@@ -47,7 +47,7 @@ It is:
 
 ### 2.1. Entity: **User**
 
-**Description**: The single operator of Hikma-OS (Sayed Baharun). Single-user system for now.
+**Description**: The single operator of SB-OS (Sayed Baharun). Single-user system for now.
 
 **Schema**:
 
@@ -71,7 +71,7 @@ It is:
 
 ### 2.2. Entity: **Venture**
 
-**Description**: Each business or major initiative (e.g., Aivant Realty, MyDub.ai, Hikma Digital, Arab Money Official, Trading, etc.).
+**Description**: Each business or major initiative (e.g., Aivant Realty, MyDub.ai, SB Digital, Arab Money Official, Trading, etc.).
 
 **Schema**:
 
@@ -334,7 +334,7 @@ It is:
 |----------|------|-------------|---------|
 | `id` | string | Unique integration record ID | `int_001` |
 | `entity_type` | enum | `task \| project \| venture \| day \| doc` | `task` |
-| `entity_id` | string | Internal Hikma-OS entity ID | `task_001` |
+| `entity_id` | string | Internal SB-OS entity ID | `task_001` |
 | `external_system` | enum | `notion \| supabase \| gcal \| zapier` | `notion` |
 | `external_id` | string | External system ID | `notion_page_abc123` |
 | `sync_status` | enum | `synced \| pending \| error` | `synced` |
@@ -753,17 +753,17 @@ ORDER BY priority ASC, focus_slot ASC
 
 ## 5. INTEGRATION POINTS
 
-Design Hikma-OS to be **integration-friendly** with external tools.
+Design SB-OS to be **integration-friendly** with external tools.
 
 ### 5.1. **Notion Integration**
 
-**Purpose**: Mirror Hikma-OS entities to Notion databases for flexibility and mobile access.
+**Purpose**: Mirror SB-OS entities to Notion databases for flexibility and mobile access.
 
 **Approach**:
-- Each Hikma-OS entity maps to a Notion database
+- Each SB-OS entity maps to a Notion database
 - Use Notion API to sync bidirectionally
-- Store `external_id` (Notion page ID) on each Hikma-OS record
-- Store Hikma-OS ID in Notion as custom property
+- Store `external_id` (Notion page ID) on each SB-OS record
+- Store SB-OS ID in Notion as custom property
 
 **Entities to Sync**:
 - Ventures → Notion "Ventures" database
@@ -773,8 +773,8 @@ Design Hikma-OS to be **integration-friendly** with external tools.
 - Docs/SOPs → Notion "Knowledge Hub" database
 
 **Sync Strategy**:
-- **Push**: When entity is created/updated in Hikma-OS, push to Notion
-- **Pull**: Webhook from Notion on update → update Hikma-OS
+- **Push**: When entity is created/updated in SB-OS, push to Notion
+- **Pull**: Webhook from Notion on update → update SB-OS
 - **Conflict resolution**: Last-write-wins or manual review
 
 **Implementation Notes**:
@@ -785,7 +785,7 @@ Design Hikma-OS to be **integration-friendly** with external tools.
 
 ### 5.2. **Supabase / PostgreSQL**
 
-**Purpose**: Use Supabase as primary database backend for Hikma-OS.
+**Purpose**: Use Supabase as primary database backend for SB-OS.
 
 **Approach**:
 - Implement all entities as Supabase (PostgreSQL) tables
@@ -823,7 +823,7 @@ Design Hikma-OS to be **integration-friendly** with external tools.
 **Event Format**:
 ```
 Title: [Venture] Task Title
-Description: Task notes + link to Hikma-OS task
+Description: Task notes + link to SB-OS task
 Start: focus_date + focus_slot start time
 Duration: est_effort
 Color: Venture-specific color
@@ -833,7 +833,7 @@ Color: Venture-specific color
 
 ### 5.4. **Automation Tools (n8n, Zapier, Make)**
 
-**Purpose**: Trigger workflows and external actions based on Hikma-OS events.
+**Purpose**: Trigger workflows and external actions based on SB-OS events.
 
 **Events to Expose**:
 - `task.created`
@@ -848,7 +848,7 @@ Color: Venture-specific color
 - `capture.clarified`
 
 **Webhooks**:
-- Hikma-OS backend sends webhook POST to configured URL on each event
+- SB-OS backend sends webhook POST to configured URL on each event
 - Payload: `{ event: "task.created", entity: { ...task_data } }`
 
 **Example Use Cases**:
@@ -867,7 +867,7 @@ Color: Venture-specific color
 - Use Twilio (WhatsApp) or Telegraf (Telegram) to receive messages
 - Parse message text for intent: "Add task: ..." or "Idea: ..."
 - Create `Capture Item` with source = `whatsapp` or `telegram`
-- Reply with confirmation: "Captured! Clarify in Hikma-OS."
+- Reply with confirmation: "Captured! Clarify in SB-OS."
 
 **Implementation**:
 - Webhook endpoint: `/api/capture/whatsapp` or `/api/capture/telegram`
@@ -1037,7 +1037,7 @@ Color: Venture-specific color
 
 **Done When**:
 - Notion, Google Calendar, and messaging quick capture are live
-- Sayed can use Hikma-OS as single source of truth
+- Sayed can use SB-OS as single source of truth
 - System feels polished and delightful
 
 ---
@@ -1046,7 +1046,7 @@ Color: Venture-specific color
 
 **Duration**: Ongoing iteration
 
-**Goal**: Tailor Hikma-OS to Sayed's specific workflows and add venture-specific views.
+**Goal**: Tailor SB-OS to Sayed's specific workflows and add venture-specific views.
 
 **Scope**:
 1. **Venture-Specific Dashboards**:
@@ -1071,7 +1071,7 @@ Color: Venture-specific color
    - Venture ROI dashboard (future: link to finance data)
 
 **Done When**:
-- Hikma-OS feels like a truly personalized productivity engine for Sayed
+- SB-OS feels like a truly personalized productivity engine for Sayed
 - Each venture has tailored views and metrics
 - System evolves with Sayed's changing needs
 
@@ -1365,7 +1365,7 @@ This specification is **ready to hand to engineers or AI builders**.
 
 ## Summary
 
-**Hikma-OS** is a world-class, opinionated productivity platform designed for **one founder: Sayed Baharun**.
+**SB-OS** is a world-class, opinionated productivity platform designed for **one founder: Sayed Baharun**.
 
 It is:
 - **Today-centric**: Every day is a unified hub.
@@ -1383,7 +1383,7 @@ This specification provides:
 - ✅ 6-phase implementation roadmap
 - ✅ SQL-ready schemas for immediate implementation
 
-**Hikma-OS is not Notion. It is Sayed's personal operating system—built for precision, leverage, and defensibility.**
+**SB-OS is not Notion. It is Sayed's personal operating system—built for precision, leverage, and defensibility.**
 
 ---
 

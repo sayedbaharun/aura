@@ -14,7 +14,7 @@ export interface SavedMeal {
   createdAt: string;
 }
 
-const STORAGE_KEY = "hikma_saved_meals";
+const STORAGE_KEY = "sbos_saved_meals";
 
 export function getSavedMeals(): SavedMeal[] {
   try {

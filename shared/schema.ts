@@ -18,9 +18,9 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // ============================================================================
-// HIKMA-OS DATABASE SCHEMA
+// SB-OS DATABASE SCHEMA
 // ============================================================================
-// This schema defines the data model for Hikma-OS: The Sayed Baharun
+// This schema defines the data model for SB-OS: The Sayed Baharun
 // Productivity Engine. It replaces the previous Aura schema.
 // ============================================================================
 
@@ -361,7 +361,7 @@ export type InsertCustomCategory = z.infer<typeof insertCustomCategorySchema>;
 export type CustomCategory = typeof customCategories.$inferSelect;
 
 // ----------------------------------------------------------------------------
-// HIKMA-OS ENTITIES
+// SB-OS ENTITIES
 // ----------------------------------------------------------------------------
 
 // VENTURES: Business/strategic initiatives

@@ -1,6 +1,6 @@
 {
-  "name": "Hikma-OS",
-  "short_name": "Hikma",
+  "name": "SB-OS",
+  "short_name": "SBOS",
   "description": "Personal operating system for managing ventures, projects, tasks, health, and knowledge",
   "start_url": "/",
   "display": "standalone",

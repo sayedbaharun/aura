@@ -27,59 +27,59 @@ export async function getDriveClient(): Promise<drive_v3.Drive> {
   return google.drive({ version: 'v3', auth: oauth2Client });
 }
 
-// Hikma-OS folder name in Drive
-const HIKMA_ROOT_FOLDER = 'Hikma-OS';
+// SB-OS folder name in Drive
+const SBOS_ROOT_FOLDER = 'SB-OS';
 const KNOWLEDGE_BASE_FOLDER = 'Knowledge Base';
 
 // Cache for folder IDs
-let hikmaFolderId: string | null = null;
+let sbosFolderId: string | null = null;
 let knowledgeBaseFolderId: string | null = null;
 
 /**
- * Find or create the Hikma-OS root folder in Drive
+ * Find or create the SB-OS root folder in Drive
  */
-export async function getOrCreateHikmaFolder(): Promise<string> {
-  if (hikmaFolderId) return hikmaFolderId;
+export async function getOrCreateSBOSFolder(): Promise<string> {
+  if (sbosFolderId) return sbosFolderId;
 
   return retryGoogleAPI(async () => {
     const drive = await getDriveClient();
 
     // Search for existing folder
     const searchResponse = await drive.files.list({
-      q: `name='${HIKMA_ROOT_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      q: `name='${SBOS_ROOT_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       fields: 'files(id, name)',
       spaces: 'drive',
     });
 
     if (searchResponse.data.files && searchResponse.data.files.length > 0) {
-      hikmaFolderId = searchResponse.data.files[0].id!;
-      logger.info({ folderId: hikmaFolderId }, 'Found existing Hikma-OS folder');
-      return hikmaFolderId;
+      sbosFolderId = searchResponse.data.files[0].id!;
+      logger.info({ folderId: sbosFolderId }, 'Found existing SB-OS folder');
+      return sbosFolderId;
     }
 
     // Create new folder
     const createResponse = await drive.files.create({
       requestBody: {
-        name: HIKMA_ROOT_FOLDER,
+        name: SBOS_ROOT_FOLDER,
         mimeType: 'application/vnd.google-apps.folder',
-        description: 'Hikma-OS - Personal Operating System',
+        description: 'SB-OS - Personal Operating System',
       },
       fields: 'id',
     });
 
-    hikmaFolderId = createResponse.data.id!;
-    logger.info({ folderId: hikmaFolderId }, 'Created Hikma-OS folder');
-    return hikmaFolderId;
+    sbosFolderId = createResponse.data.id!;
+    logger.info({ folderId: sbosFolderId }, 'Created SB-OS folder');
+    return sbosFolderId;
   });
 }
 
 /**
- * Find or create the Knowledge Base folder inside Hikma-OS
+ * Find or create the Knowledge Base folder inside SB-OS
  */
 export async function getOrCreateKnowledgeBaseFolder(): Promise<string> {
   if (knowledgeBaseFolderId) return knowledgeBaseFolderId;
 
-  const parentId = await getOrCreateHikmaFolder();
+  const parentId = await getOrCreateSBOSFolder();
 
   return retryGoogleAPI(async () => {
     const drive = await getDriveClient();
@@ -103,7 +103,7 @@ export async function getOrCreateKnowledgeBaseFolder(): Promise<string> {
         name: KNOWLEDGE_BASE_FOLDER,
         mimeType: 'application/vnd.google-apps.folder',
         parents: [parentId],
-        description: 'Hikma-OS Knowledge Base - SOPs, Playbooks, and Documentation',
+        description: 'SB-OS Knowledge Base - SOPs, Playbooks, and Documentation',
       },
       fields: 'id',
     });

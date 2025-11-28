@@ -1,6 +1,6 @@
-# Hikma-OS Automations
+# SB-OS Automations
 
-This directory contains all automation logic for Hikma-OS backend behaviors.
+This directory contains all automation logic for SB-OS backend behaviors.
 
 ## Implemented Automations
 
@@ -236,7 +236,7 @@ Use the curl commands provided in each automation section above.
 ```bash
 npm run dev
 # Look for these log messages:
-# ✓ Hikma-OS automations initialized (day creation, reminders)
+# ✓ SB-OS automations initialized (day creation, reminders)
 # 📅 Daily day creation automation scheduled (runs at midnight)
 # 📆 Weekly planning reminder scheduled (Sundays at 6 PM)
 # 🌙 Daily reflection reminder scheduled (every day at 9 PM)
@@ -322,4 +322,4 @@ logger.error({ error }, 'Automation failed');
 
 ## License
 
-Part of Hikma-OS project.
+Part of SB-OS project.

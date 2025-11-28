@@ -1,4 +1,4 @@
-// NOTE: audit-logger.ts is disabled for Hikma-OS
+// NOTE: audit-logger.ts is disabled for SB-OS
 // The auditLogs table was removed during schema transformation
 // This file is kept for reference but functionality is disabled
 
@@ -9,7 +9,7 @@
  * Audit Logger for tracking all calendar operations
  * Logs: view_schedule, book, cancel, reschedule actions
  *
- * DISABLED: This functionality is not used in Hikma-OS
+ * DISABLED: This functionality is not used in SB-OS
  */
 
 export async function logAuditEvent(
@@ -21,7 +21,7 @@ export async function logAuditEvent(
   errorMessage?: string
 ): Promise<void> {
   try {
-    // Database logging disabled - auditLogs table removed in Hikma-OS schema
+    // Database logging disabled - auditLogs table removed in SB-OS schema
     // const auditLog: InsertAuditLog = {
     //   chatId,
     //   action,

@@ -4,8 +4,8 @@ const { Pool } = pkg;
 import * as schema from "../shared/schema";
 
 /**
- * Seed script for Hikma-OS initial data
- * Run with: tsx scripts/seed-hikma-os.ts
+ * Seed script for SB-OS initial data
+ * Run with: tsx scripts/seed-sb-os.ts
  */
 
 if (!process.env.DATABASE_URL) {
@@ -20,7 +20,7 @@ const pool = new Pool({
 const db = drizzle(pool, { schema });
 
 async function seed() {
-  console.log("🌱 Starting Hikma-OS seed...");
+  console.log("🌱 Starting SB-OS seed...");
 
   try {
     // 1. Create user (Sayed Baharun)
@@ -72,11 +72,11 @@ async function seed() {
         notes: "MVP in development, focus on visa and housing automation",
       },
       {
-        name: "Hikma Digital",
+        name: "SB Digital",
         domain: "saas" as const,
         status: "active" as const,
         oneLiner: "AI-powered productivity and business tools",
-        primaryFocus: "Hikma-OS and internal automation tools",
+        primaryFocus: "SB-OS and internal automation tools",
         color: "#8B5CF6", // Purple
         icon: "⚡",
         notes: "Internal tools and consulting services",
@@ -114,7 +114,7 @@ async function seed() {
     console.log("\nCreating sample projects...");
 
     const mydubVenture = ventures.find((v) => v.name === "MyDub.ai");
-    const hikmaVenture = ventures.find((v) => v.name === "Hikma Digital");
+    const sbVenture = ventures.find((v) => v.name === "SB Digital");
 
     const projectData = [
       {
@@ -129,8 +129,8 @@ async function seed() {
         notes: "Focus on UI/UX refresh and GPT-4 integration",
       },
       {
-        name: "Hikma-OS MVP Development",
-        ventureId: hikmaVenture?.id,
+        name: "SB-OS MVP Development",
+        ventureId: sbVenture?.id,
         status: "in_progress" as const,
         category: "product" as const,
         priority: "P0" as const,
@@ -160,8 +160,8 @@ async function seed() {
     // 4. Create sample tasks
     console.log("\nCreating sample tasks...");
 
-    const hikmaProject = projects.find((p) =>
-      p.name.includes("Hikma-OS MVP")
+    const sbProject = projects.find((p) =>
+      p.name.includes("SB-OS MVP")
     );
 
     const today = new Date().toISOString().split("T")[0];
@@ -174,8 +174,8 @@ async function seed() {
         priority: "P0" as const,
         type: "deep_work" as const,
         domain: "work" as const,
-        ventureId: hikmaVenture?.id,
-        projectId: hikmaProject?.id,
+        ventureId: sbVenture?.id,
+        projectId: sbProject?.id,
         focusDate: today,
         focusSlot: "morning" as const,
         estEffort: 3.0,
@@ -184,13 +184,13 @@ async function seed() {
         completedAt: new Date(),
       },
       {
-        title: "Implement database schema for Hikma-OS",
+        title: "Implement database schema for SB-OS",
         status: "in_progress" as const,
         priority: "P0" as const,
         type: "deep_work" as const,
         domain: "work" as const,
-        ventureId: hikmaVenture?.id,
-        projectId: hikmaProject?.id,
+        ventureId: sbVenture?.id,
+        projectId: sbProject?.id,
         focusDate: today,
         focusSlot: "midday" as const,
         estEffort: 4.0,
@@ -202,8 +202,8 @@ async function seed() {
         priority: "P0" as const,
         type: "deep_work" as const,
         domain: "work" as const,
-        ventureId: hikmaVenture?.id,
-        projectId: hikmaProject?.id,
+        ventureId: sbVenture?.id,
+        projectId: sbProject?.id,
         focusDate: tomorrow,
         focusSlot: "morning" as const,
         estEffort: 5.0,
@@ -277,12 +277,12 @@ async function seed() {
       .values({
         id: dayId,
         date: today,
-        title: `${today} - Hikma-OS Foundation Day`,
-        top3Outcomes: `1. Transform Aura database to Hikma-OS schema\n2. Create comprehensive seed data\n3. Document migration process`,
-        oneThingToShip: "Complete Hikma-OS database transformation",
+        title: `${today} - SB-OS Foundation Day`,
+        top3Outcomes: `1. Transform Aura database to SB-OS schema\n2. Create comprehensive seed data\n3. Document migration process`,
+        oneThingToShip: "Complete SB-OS database transformation",
         reflectionAm: "Focused on building the foundation for the new system",
         mood: "high" as const,
-        primaryVentureFocus: hikmaVenture?.id,
+        primaryVentureFocus: sbVenture?.id,
       })
       .returning();
 
@@ -395,7 +395,7 @@ async function seed() {
 
     // Summary
     console.log("\n" + "=".repeat(60));
-    console.log("🎉 HIKMA-OS SEED COMPLETE!");
+    console.log("🎉 SB-OS SEED COMPLETE!");
     console.log("=".repeat(60));
     console.log(`
 📊 Summary:
@@ -409,7 +409,7 @@ async function seed() {
    - Nutrition Entries: ${nutritionEntries.length}
    - Docs/SOPs: 1
 
-✅ Database is ready for Hikma-OS!
+✅ Database is ready for SB-OS!
 `);
   } catch (error) {
     console.error("❌ Seed failed:", error);

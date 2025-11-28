@@ -11,7 +11,7 @@ const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
   defaultHeaders: {
     "HTTP-Referer": process.env.SITE_URL || "http://localhost:5000",
-    "X-Title": "Hikma-OS Venture Agent",
+    "X-Title": "SB-OS Venture Agent",
   },
 });
 

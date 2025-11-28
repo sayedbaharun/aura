@@ -3,7 +3,7 @@ import { storage } from './storage';
 import { randomUUID } from 'crypto';
 
 async function testAutomations() {
-  console.log('🧪 Testing Hikma-OS Automations...\n');
+  console.log('🧪 Testing SB-OS Automations...\n');
 
   try {
     // ============================================================================
@@ -88,7 +88,7 @@ async function testAutomations() {
     const captureId = randomUUID();
     const capture = await storage.createCapture({
       id: captureId,
-      title: 'Build new feature for Hikma-OS',
+      title: 'Build new feature for SB-OS',
       type: 'idea',
       source: 'brain',
       domain: 'code',
@@ -99,7 +99,7 @@ async function testAutomations() {
 
     // Convert to task
     const converted = await storage.convertCaptureToTask(capture.id, {
-      title: 'Build new feature for Hikma-OS',
+      title: 'Build new feature for SB-OS',
       status: 'next',
       priority: 'P1',
       domain: 'code',
