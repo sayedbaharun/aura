@@ -294,22 +294,21 @@ export async function getCachedOrBuildContext(
     logger.info({ ventureId }, "Building fresh venture context");
     const context = await buildContextForPrompt(ventureId);
 
-    // Cache it
+    // Cache it (don't await - fire and forget to avoid blocking)
     const validUntil = new Date(Date.now() + refreshIfOlderThanHours * 60 * 60 * 1000);
-    await storage.upsertVentureContextCache({
+    storage.upsertVentureContextCache({
       ventureId,
       contextType: 'full',
       content: context,
       tokenCount: Math.ceil(context.length / 4), // Rough estimate
       lastBuiltAt: new Date(),
       validUntil,
-    });
+    }).catch(err => logger.warn({ ventureId, err }, "Failed to cache context (non-critical)"));
 
     return context;
   } catch (error) {
     logger.error({ ventureId, error }, "Failed to get/build venture context");
-    // Return minimal context on error
-    const venture = await storage.getVenture(ventureId);
-    return venture ? `Venture: ${venture.name}\nStatus: ${venture.status}` : '';
+    // Return minimal context on error - don't make any more DB calls that could fail
+    return `Venture context temporarily unavailable. Please try again.`;
   }
 }

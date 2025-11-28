@@ -34,21 +34,38 @@ export class VentureAgent {
    * Initialize the agent with venture data and configuration
    */
   async initialize(): Promise<void> {
-    const [venture, agentConfig] = await Promise.all([
-      storage.getVenture(this.ventureId),
-      storage.getAiAgentPrompt(this.ventureId),
-    ]);
+    try {
+      const [venture, agentConfig] = await Promise.all([
+        storage.getVenture(this.ventureId),
+        storage.getAiAgentPrompt(this.ventureId),
+      ]);
 
-    if (!venture) {
-      throw new Error(`Venture not found: ${this.ventureId}`);
+      if (!venture) {
+        throw new Error(`Venture not found: ${this.ventureId}`);
+      }
+
+      this.venture = venture;
+      this.agentConfig = agentConfig || null;
+
+      // Build or get cached context - this should never throw due to internal error handling
+      const refreshHours = agentConfig?.contextRefreshHours || 24;
+      this.context = await getCachedOrBuildContext(this.ventureId, refreshHours);
+    } catch (error: any) {
+      // If venture not found, re-throw to signal 404
+      if (error.message?.includes('Venture not found')) {
+        throw error;
+      }
+      // For other errors, log and continue with minimal context
+      logger.error({ error, ventureId: this.ventureId }, "Error initializing venture agent");
+      // Try to get just the venture info
+      const venture = await storage.getVenture(this.ventureId);
+      if (!venture) {
+        throw new Error(`Venture not found: ${this.ventureId}`);
+      }
+      this.venture = venture;
+      this.agentConfig = null;
+      this.context = `Venture: ${venture.name}\nStatus: ${venture.status}`;
     }
-
-    this.venture = venture;
-    this.agentConfig = agentConfig || null;
-
-    // Build or get cached context
-    const refreshHours = agentConfig?.contextRefreshHours || 24;
-    this.context = await getCachedOrBuildContext(this.ventureId, refreshHours);
   }
 
   /**
