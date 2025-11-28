@@ -1279,9 +1279,9 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
 
         // Validate the response has required fields
         if (typeof macros.calories !== 'number' ||
-            typeof macros.proteinG !== 'number' ||
-            typeof macros.carbsG !== 'number' ||
-            typeof macros.fatsG !== 'number') {
+          typeof macros.proteinG !== 'number' ||
+          typeof macros.carbsG !== 'number' ||
+          typeof macros.fatsG !== 'number') {
           throw new Error("Invalid macro values");
         }
 
@@ -2927,7 +2927,20 @@ RULES:
         return res.status(404).json({ error: errorMessage });
       }
 
-      res.status(500).json({ error: errorMessage });
+      // AI Service Errors (OpenRouter/OpenAI)
+      if (errorMessage.includes('All AI models failed') || errorMessage.includes('401') || errorMessage.includes('429')) {
+        return res.status(503).json({
+          error: "AI Service Unavailable",
+          message: "The AI service is currently unavailable or misconfigured. Please check your API key and credits.",
+          details: errorMessage
+        });
+      }
+
+      res.status(500).json({
+        error: errorMessage,
+        stack: process.env.NODE_ENV === 'production' ? undefined : error.stack,
+        details: "Check server logs for full stack trace"
+      });
     }
   });
 
