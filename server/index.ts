@@ -238,6 +238,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Ensure database schema is up to date (auto-migration for critical fixes)
+  await storage.ensureSchema();
+
   const server = await registerRoutes(app);
 
   // importantly only setup vite in development and after
@@ -314,7 +317,7 @@ app.use((req, res, next) => {
     try {
       const { setupTelegramWebhook, removeTelegramWebhook, bot } = await import('./telegram-bot');
       telegramBot = bot;
-      
+
       if (bot) {
         const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT;
 
@@ -340,11 +343,11 @@ app.use((req, res, next) => {
             const launchPromise = bot.launch({
               dropPendingUpdates: true, // Skip old updates
             });
-            
-            const timeoutPromise = new Promise((_, reject) => 
+
+            const timeoutPromise = new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Bot launch timeout')), 10000)
             );
-            
+
             await Promise.race([launchPromise, timeoutPromise]);
             log('✓ Telegram bot running in polling mode (development)');
           } catch (launchError) {
@@ -385,12 +388,12 @@ app.use((req, res, next) => {
     } catch (error) {
       log('Hikma-OS automations setup skipped:', String(error));
     }
-    
+
     // Graceful shutdown
     const gracefulShutdown = async () => {
       log('Shutting down gracefully...');
       clearInterval(cleanupInterval);
-      
+
       // Stop attendee tracking
       try {
         const { stopAttendeeTracking } = await import('./attendee-tracker');
@@ -399,7 +402,7 @@ app.use((req, res, next) => {
       } catch (error) {
         log('Error stopping attendee tracking:', String(error));
       }
-      
+
       // Stop scheduled jobs
       try {
         if ((globalThis as any).stopScheduledJobs) {
@@ -409,7 +412,7 @@ app.use((req, res, next) => {
       } catch (error) {
         log('Error stopping scheduled jobs:', String(error));
       }
-      
+
       if (telegramBot) {
         try {
           await telegramBot.stop();
@@ -420,7 +423,7 @@ app.use((req, res, next) => {
       }
       process.exit(0);
     };
-    
+
     process.once('SIGINT', gracefulShutdown);
     process.once('SIGTERM', gracefulShutdown);
   });

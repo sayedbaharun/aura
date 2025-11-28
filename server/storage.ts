@@ -61,7 +61,7 @@ import {
   ventureAgentActions,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, and, or, gte, lte, not, inArray, like } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
 import { db as database } from "../db";
 
 export interface IStorage {
@@ -184,6 +184,10 @@ export interface IStorage {
   createBook(data: InsertBook): Promise<Book>;
   updateBook(id: string, data: Partial<InsertBook>): Promise<Book | undefined>;
   deleteBook(id: string): Promise<void>;
+  deleteBook(id: string): Promise<void>;
+
+  // Schema Management
+  ensureSchema(): Promise<void>;
 }
 
 // PostgreSQL Storage Implementation
@@ -192,6 +196,30 @@ export class DBStorage implements IStorage {
 
   constructor() {
     // Using shared database connection from db/index.ts
+  }
+
+  // ============================================================================
+  // SCHEMA MANAGEMENT
+  // ============================================================================
+
+  async ensureSchema(): Promise<void> {
+    try {
+      // Check if password_hash column exists in users table
+      const result = await this.db.execute(sql`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'password_hash'
+      `);
+
+      if (result.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Adding missing password_hash column to users table...");
+        await this.db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password_hash" varchar`);
+        console.log("✅ Auto-Migration: Successfully added password_hash column");
+      }
+    } catch (error) {
+      console.error("❌ Auto-Migration Error:", error);
+      // Don't throw, let the app try to start anyway
+    }
   }
 
   // ============================================================================
