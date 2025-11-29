@@ -360,3 +360,56 @@
     inset: -1px;
   }
 }
+
+/* Markdown Table Styles */
+@layer base {
+  /* Style tables in prose content (markdown preview) */
+  .prose table {
+    @apply w-full border-collapse text-sm;
+    display: table;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .prose thead {
+    @apply border-b-2 border-border;
+  }
+
+  .prose th {
+    @apply bg-muted/50 px-4 py-2 text-left font-semibold;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .prose td {
+    @apply px-4 py-2;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .prose tbody tr {
+    @apply border-b border-border transition-colors;
+  }
+
+  .prose tbody tr:nth-child(even) {
+    @apply bg-muted/20;
+  }
+
+  .prose tbody tr:hover {
+    @apply bg-muted/40;
+  }
+
+  /* Responsive table wrapper for horizontal scroll on small screens */
+  .prose-table-wrapper {
+    @apply overflow-x-auto -mx-4 px-4;
+  }
+
+  @media (max-width: 768px) {
+    .prose table {
+      @apply text-xs;
+    }
+
+    .prose th,
+    .prose td {
+      @apply px-2 py-1;
+    }
+  }
+}
