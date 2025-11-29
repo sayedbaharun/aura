@@ -5,7 +5,6 @@ import WeeklyCalendar from "@/components/deep-work/weekly-calendar";
 import DeepWorkQueue from "@/components/deep-work/deep-work-queue";
 import SlotDetailModal from "@/components/deep-work/slot-detail-modal";
 import TaskPickerModal from "@/components/deep-work/task-picker-modal";
-import FocusSessionTimer from "@/components/deep-work/focus-session-timer";
 
 export default function DeepWork() {
   const [selectedWeek, setSelectedWeek] = useState(new Date());
@@ -127,9 +126,6 @@ export default function DeepWork() {
           />
         </div>
       </div>
-
-      {/* Focus Session Timer */}
-      <FocusSessionTimer />
 
       {/* Modals */}
       <SlotDetailModal
