@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { EnhancedMarkdownRenderer } from "./enhanced-markdown-renderer";
 import TableToolbarButton from "./table-toolbar-button";
+import EditTableButton from "./edit-table-button";
 import { ImageUploadButton } from "./image-upload-button";
 import { BlockInsertMenu } from "./block-insert-menu";
 
@@ -178,6 +179,11 @@ export default function MarkdownEditor({
           {/* Add separator and new toolbar buttons */}
           <div className="w-px h-6 bg-border mx-1" />
           <TableToolbarButton onInsert={insertText} />
+          <EditTableButton
+            textareaRef={textareaRef}
+            value={value}
+            onChange={onChange}
+          />
           <ImageUploadButton
             onInsert={(markdown) => {
               const textarea = textareaRef.current;
