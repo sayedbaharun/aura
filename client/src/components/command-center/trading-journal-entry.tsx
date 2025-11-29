@@ -66,8 +66,8 @@ export default function TradingJournalEntry({ day }: TradingJournalEntryProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (updatedJournal: { sessions: TradingSession[] }) => {
-      if (!day?.id) return;
-      const res = await apiRequest("PATCH", `/api/days/${day.id}`, { tradingJournal: updatedJournal });
+      if (!day?.date) return;
+      const res = await apiRequest("PATCH", `/api/days/${day.date}`, { tradingJournal: updatedJournal });
       return res.json();
     },
     onSuccess: () => {

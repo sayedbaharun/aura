@@ -70,8 +70,8 @@ export default function MorningHabitsMini({ day }: MorningHabitsMiniProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (updatedRituals: typeof rituals) => {
-      if (!day?.id) return;
-      const res = await apiRequest("PATCH", `/api/days/${day.id}`, { morningRituals: updatedRituals });
+      if (!day?.date) return;
+      const res = await apiRequest("PATCH", `/api/days/${day.date}`, { morningRituals: updatedRituals });
       return res.json();
     },
     onSuccess: () => {

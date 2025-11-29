@@ -438,20 +438,17 @@ export class DBStorage implements IStorage {
 
   async getTasksForToday(date: string): Promise<Task[]> {
     // Tasks where focus_date = today OR due_date = today OR day_id = today's day_id
-    // AND status != 'done' AND status != 'cancelled'
+    // Include all tasks (including done/cancelled) so users can see what they accomplished
     const dayId = `day_${date}`;
 
     return await this.db
       .select()
       .from(tasks)
       .where(
-        and(
-          not(inArray(tasks.status, ['done', 'cancelled'])),
-          or(
-            eq(tasks.focusDate, date),
-            eq(tasks.dueDate, date),
-            eq(tasks.dayId, dayId)
-          )
+        or(
+          eq(tasks.focusDate, date),
+          eq(tasks.dueDate, date),
+          eq(tasks.dayId, dayId)
         )
       )
       .orderBy(tasks.priority, desc(tasks.createdAt));
