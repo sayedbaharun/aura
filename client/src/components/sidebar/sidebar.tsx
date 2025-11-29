@@ -19,6 +19,7 @@ import {
   Zap,
   TrendingUp,
   Bot,
+  CheckSquare,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
 import NavItem from "./nav-item";
@@ -109,6 +110,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
         href: "/ventures",
         icon: Briefcase,
         label: "Ventures",
+      },
+      {
+        href: "/tasks",
+        icon: CheckSquare,
+        label: "All Tasks",
       },
       {
         href: "/trading",

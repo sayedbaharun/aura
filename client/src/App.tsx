@@ -26,6 +26,7 @@ import Books from "@/pages/books";
 import CapturePage from "@/pages/capture";
 import TradingPage from "@/pages/trading";
 import AiChat from "@/pages/ai-chat";
+import AllTasks from "@/pages/all-tasks";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { dailyRemindersService } from "@/lib/daily-reminders";
@@ -62,6 +63,7 @@ function Router() {
             <Route path="/capture" component={CapturePage} />
             <Route path="/trading" component={TradingPage} />
             <Route path="/ai-chat" component={AiChat} />
+            <Route path="/tasks" component={AllTasks} />
             <Route component={NotFound} />
           </Switch>
         </Layout>
