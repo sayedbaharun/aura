@@ -1,8 +1,8 @@
-# Hikma-OS Notifications & Reminders System
+# SB-OS Notifications & Reminders System
 
 ## Overview
 
-A comprehensive notification system with toast notifications, browser notifications, and a notification center for Hikma-OS.
+A comprehensive notification system with toast notifications, browser notifications, and a notification center for SB-OS.
 
 ## Features
 
@@ -281,4 +281,4 @@ User previously blocked notifications. Clear in browser settings or use a differ
 
 ## Credits
 
-Built for Hikma-OS Phase 5 by Agent 13.
+Built for SB-OS Phase 5 by Agent 13.

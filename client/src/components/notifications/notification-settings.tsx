@@ -100,7 +100,7 @@ export default function NotificationSettingsComponent() {
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Allow Hikma-OS to send you browser notifications for important updates and reminders.
+                Allow SB-OS to send you browser notifications for important updates and reminders.
               </p>
               <Button onClick={handleRequestPermission}>
                 <Bell className="h-4 w-4 mr-2" />

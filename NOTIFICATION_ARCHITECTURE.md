@@ -134,7 +134,7 @@ User clicks "Enable Notifications" in Settings
                     ▼
          ┌──────────────────────┐
          │  localStorage        │
-         │  'hikma_notification_│
+         │  'sbos_notification_ │
          │  settings'           │
          └──────────┬───────────┘
                     │

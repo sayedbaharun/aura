@@ -1,7 +1,7 @@
-// Hikma-OS Service Worker
-const CACHE_NAME = 'hikma-os-v1';
-const STATIC_CACHE = 'hikma-static-v1';
-const DYNAMIC_CACHE = 'hikma-dynamic-v1';
+// SB-OS Service Worker
+const CACHE_NAME = 'sb-os-v1';
+const STATIC_CACHE = 'sbos-static-v1';
+const DYNAMIC_CACHE = 'sbos-dynamic-v1';
 
 // Assets to cache immediately on install
 const STATIC_ASSETS = [

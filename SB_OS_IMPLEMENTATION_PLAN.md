@@ -1,4 +1,4 @@
-# Hikma-OS Implementation Plan
+# SB-OS Implementation Plan
 ## Leveraging Existing Aura Codebase
 
 **Status**: Ready to implement Phase 1
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This plan transforms the existing Aura codebase into **Hikma-OS: The Sayed Baharun Productivity Engine**.
+This plan transforms the existing Aura codebase into **SB-OS: The Sayed Baharun Productivity Engine**.
 
 ### Key Strategy
 - ✅ **Leverage existing tech stack** (Express, React, Drizzle ORM, PostgreSQL, shadcn/ui)
@@ -32,14 +32,14 @@ MVP with Command Center, task management, and daily operating rhythm.
 ### Parallel Sub-Agent Tasks
 
 #### 🔷 Agent 1: Database Schema Transformation
-**Objective**: Transform existing schema to Hikma-OS data model
+**Objective**: Transform existing schema to SB-OS data model
 
 **Tasks**:
 1. **Analyze existing schema** (`/shared/schema.ts`)
    - Current entities: `users`, `sessions`, `whatsappMessages`, `appointments`, `assistantSettings`
    - Identify what to keep, what to remove, what to add
 
-2. **Design new Hikma-OS schema**:
+2. **Design new SB-OS schema**:
    ```typescript
    // New entities to add:
    - ventures (new)
@@ -58,7 +58,7 @@ MVP with Command Center, task management, and daily operating rhythm.
    - sessions (keep auth infrastructure)
 
    // Entities to remove:
-   - whatsappMessages (not needed for Hikma-OS)
+   - whatsappMessages (not needed for SB-OS)
    - appointments (replaced by tasks)
    - assistantSettings (not needed)
    ```
@@ -302,7 +302,7 @@ MVP with Command Center, task management, and daily operating rhythm.
 ---
 
 #### 🔷 Agent 5: Navigation & Layout
-**Objective**: Update app navigation for Hikma-OS modules
+**Objective**: Update app navigation for SB-OS modules
 
 **Tasks**:
 1. **Update `/client/src/App.tsx`**:
@@ -346,7 +346,7 @@ MVP with Command Center, task management, and daily operating rhythm.
    - Delete message-related components
    - Keep shadcn/ui components
 
-**Deliverable**: Clean navigation with Hikma-OS routes
+**Deliverable**: Clean navigation with SB-OS routes
 
 **Estimated Time**: 1 day
 

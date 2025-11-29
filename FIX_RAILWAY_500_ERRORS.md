@@ -65,7 +65,7 @@ The migrations need to be run against the Railway PostgreSQL database to create 
 
 6. **Refresh your Railway deployment URL**:
    - The 500 errors should be gone
-   - You should see the Hikma-OS dashboard
+   - You should see the SB-OS dashboard
 
 ---
 
@@ -266,7 +266,7 @@ Once the database is working:
 1. **Seed Initial Data**: Create your first venture, project, and tasks
 2. **Test All Features**: Go through the functionality audit checklist
 3. **Add Google Calendar Integration**: Connect Deep Work to your Google Calendar
-4. **Start Using Hikma-OS**: Begin managing your productivity!
+4. **Start Using SB-OS**: Begin managing your productivity!
 
 ---
 

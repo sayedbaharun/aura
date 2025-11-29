@@ -100,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!isAuthRequired()) {
       res.json({
         id: DEFAULT_USER_ID,
-        email: 'user@hikma-os.local',
+        email: 'user@sb-os.local',
         firstName: '',
         lastName: '',
         isAuthenticated: true,
@@ -2113,7 +2113,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         });
       } else {
         // Create new Drive doc
-        const driveDoc = await createDoc(title, content || "", parentId, `Synced from Hikma-OS - Doc ID: ${docId}`);
+        const driveDoc = await createDoc(title, content || "", parentId, `Synced from SB-OS - Doc ID: ${docId}`);
 
         // Update local doc with Drive ID
         await storage.updateDoc(docId, {
@@ -2498,7 +2498,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
       });
 
       const today = new Date().toISOString().split('T')[0];
-      const systemPrompt = `You are Hikma, a powerful AI assistant for Hikma-OS - a personal productivity operating system.
+      const systemPrompt = `You are SBOS Assistant, a powerful AI assistant for SB-OS - a personal productivity operating system.
 
 CAPABILITIES:
 - Full access to ventures, projects, tasks, captures, health entries, nutrition logs, and documents

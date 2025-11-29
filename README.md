@@ -1,12 +1,12 @@
-# Hikma-OS
+# SB-OS
 
 **Personal Operating System & Productivity Engine**
 
 A full-stack web application for managing multiple business ventures, projects, tasks, health tracking, and knowledge management. Built as a custom "second brain" to replace Notion, Todoist, and other fragmented productivity tools.
 
-## 🎯 What is Hikma-OS?
+## 🎯 What is SB-OS?
 
-Hikma-OS (formerly Aura) is a personal productivity system designed for managing:
+SB-OS (formerly Aura) is a personal productivity system designed for managing:
 - **Multiple Ventures** - Business initiatives across different domains (SaaS, media, realty, trading, personal)
 - **Project Management** - Time-bound initiatives with milestones, budgets, and outcomes
 - **Task Execution** - Atomic work items with time blocking and effort tracking

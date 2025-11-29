@@ -178,7 +178,7 @@ app.use(session({
     createTableIfMissing: true,
   }),
   secret: sessionSecret,
-  name: 'hikma.sid', // Custom cookie name (don't reveal we're using Express)
+  name: 'sbos.sid', // Custom cookie name (don't reveal we're using Express)
   resave: false,
   saveUninitialized: false,
   rolling: true, // Refresh session on activity
@@ -374,7 +374,7 @@ app.use((req, res, next) => {
       log('Scheduled jobs setup skipped:', String(error));
     }
 
-    // Initialize Hikma-OS automations
+    // Initialize SB-OS automations
     try {
       const { scheduleDailyDayCreation } = await import('./automations/daily-day-creation');
       const { scheduleWeeklyPlanningReminder } = await import('./automations/weekly-planning-reminder');
@@ -384,9 +384,9 @@ app.use((req, res, next) => {
       scheduleWeeklyPlanningReminder();
       scheduleDailyReflectionReminder();
 
-      log('✓ Hikma-OS automations initialized (day creation, reminders)');
+      log('✓ SB-OS automations initialized (day creation, reminders)');
     } catch (error) {
-      log('Hikma-OS automations setup skipped:', String(error));
+      log('SB-OS automations setup skipped:', String(error));
     }
 
     // Graceful shutdown

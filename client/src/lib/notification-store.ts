@@ -6,8 +6,8 @@
 
 import { Notification, NotificationType, NotificationSettings, defaultNotificationSettings } from './notification-types';
 
-const NOTIFICATIONS_KEY = 'hikma_notifications';
-const SETTINGS_KEY = 'hikma_notification_settings';
+const NOTIFICATIONS_KEY = 'sbos_notifications';
+const SETTINGS_KEY = 'sbos_notification_settings';
 const MAX_NOTIFICATIONS = 100;
 
 /**

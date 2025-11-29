@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * PWA Icon & Splash Screen Generator for Hikma-OS
+ * PWA Icon & Splash Screen Generator for SB-OS
  *
  * This script generates all required icons and splash screens for iOS/Android PWA.
  *

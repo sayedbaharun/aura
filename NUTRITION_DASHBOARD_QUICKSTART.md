@@ -189,7 +189,7 @@ If no custom goals are set, these defaults apply:
 See these files for more details:
 - `NUTRITION_DASHBOARD_IMPLEMENTATION.md` - Full implementation details
 - `NUTRITION_DASHBOARD_STRUCTURE.txt` - Component hierarchy
-- `HIKMA_OS_API.md` - API documentation
+- `SB_OS_API.md` - API documentation
 
 ## 🙋 Support
 
@@ -202,6 +202,6 @@ For questions or issues:
 
 ---
 
-**Built by**: Agent 10 (Hikma-OS Phase 3)
+**Built by**: Agent 10 (SB-OS Phase 3)
 **Date**: November 24, 2025
 **Status**: ✅ Production Ready

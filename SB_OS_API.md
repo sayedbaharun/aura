@@ -1,6 +1,6 @@
-# Hikma-OS REST API Documentation
+# SB-OS REST API Documentation
 
-Complete API reference for all Hikma-OS Phase 1 endpoints.
+Complete API reference for all SB-OS Phase 1 endpoints.
 
 **Base URL**: `http://localhost:5000` (development) or your deployment URL
 
