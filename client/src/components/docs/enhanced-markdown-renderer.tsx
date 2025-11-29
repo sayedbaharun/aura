@@ -20,7 +20,7 @@ export function EnhancedMarkdownRenderer({
 
   const components: Components = {
     // Code blocks with syntax highlighting
-    code(props) {
+    code(props: any) {
       const { node, inline, className, children, ...rest } = props;
       return (
         <CodeBlock className={className} inline={inline}>

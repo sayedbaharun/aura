@@ -134,7 +134,7 @@ export function BacklinksPanel({
             </div>
           ) : (
             <div className="space-y-2">
-              {backlinks.map((doc) => {
+              {backlinks?.map((doc) => {
                 const Icon = typeIcons[doc.type as keyof typeof typeIcons] || FileText;
 
                 return (
