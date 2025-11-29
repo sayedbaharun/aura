@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Sidebar } from "./sidebar";
 import TopBar from "./top-bar";
+import FocusSessionTimer from "./deep-work/focus-session-timer";
 import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
 import { cn } from "@/lib/utils";
 
@@ -47,10 +48,13 @@ export default function Layout({ children }: LayoutProps) {
         <TopBar onMenuClick={() => setMobileMenuOpen(true)} />
 
         {/* Page content */}
-        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-6 safe-area-bottom">
+        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-24 safe-area-bottom">
           {children}
         </main>
       </div>
+
+      {/* Global Focus Session Timer */}
+      <FocusSessionTimer />
     </div>
   );
 }
