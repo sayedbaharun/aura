@@ -14,6 +14,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import MarkdownEditor from "./markdown-editor";
+import { AttachmentsPanel } from "./attachments-panel";
 import {
   Save,
   MoreHorizontal,
@@ -386,15 +387,24 @@ export default function DocEditor({ docId, onClose, onDelete }: DocEditorProps) 
         )}
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 min-h-0">
-        <MarkdownEditor
-          value={body}
-          onChange={handleBodyChange}
-          placeholder="Start writing..."
-          minHeight="100%"
-          className="h-full border-0 rounded-none"
-        />
+      {/* Editor and Attachments */}
+      <div className="flex flex-1 min-h-0 gap-4">
+        {/* Main Editor */}
+        <div className="flex-1 min-h-0">
+          <MarkdownEditor
+            value={body}
+            onChange={handleBodyChange}
+            placeholder="Start writing..."
+            minHeight="100%"
+            className="h-full border-0 rounded-none"
+            docId={docId}
+          />
+        </div>
+
+        {/* Attachments Panel */}
+        <div className="w-80 flex-shrink-0 border-l overflow-y-auto">
+          <AttachmentsPanel docId={docId} />
+        </div>
       </div>
     </div>
   );

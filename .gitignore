@@ -9,3 +9,6 @@ vite.config.ts.*
 RAILWAY_ENV_VARS.txt
 .env
 .env.local
+
+# Uploaded files
+uploads/

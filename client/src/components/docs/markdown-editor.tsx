@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,10 @@ import {
   Columns,
   Minus,
 } from "lucide-react";
+import { EnhancedMarkdownRenderer } from "./enhanced-markdown-renderer";
+import TableToolbarButton from "./table-toolbar-button";
+import { ImageUploadButton } from "./image-upload-button";
+import { BlockInsertMenu } from "./block-insert-menu";
 
 interface MarkdownEditorProps {
   value: string;
@@ -30,6 +35,7 @@ interface MarkdownEditorProps {
   minHeight?: string;
   className?: string;
   readOnly?: boolean;
+  docId?: string;
 }
 
 type ViewMode = "edit" | "preview" | "split";
@@ -41,6 +47,7 @@ export default function MarkdownEditor({
   minHeight = "400px",
   className,
   readOnly = false,
+  docId,
 }: MarkdownEditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(readOnly ? "preview" : "edit");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -133,11 +140,6 @@ export default function MarkdownEditor({
       action: () => insertText("[", "](url)", "link text"),
     },
     {
-      icon: <Image className="h-4 w-4" />,
-      label: "Image",
-      action: () => insertText("![", "](url)", "alt text"),
-    },
-    {
       icon: <Minus className="h-4 w-4" />,
       label: "Horizontal Rule",
       action: () => insertText("\n---\n"),
@@ -172,6 +174,51 @@ export default function MarkdownEditor({
               </Button>
             );
           })}
+
+          {/* Add separator and new toolbar buttons */}
+          <div className="w-px h-6 bg-border mx-1" />
+          <TableToolbarButton onInsert={insertText} />
+          <ImageUploadButton
+            onInsert={(markdown) => {
+              const textarea = textareaRef.current;
+              if (!textarea) {
+                onChange(value + "\n\n" + markdown);
+                return;
+              }
+
+              const start = textarea.selectionStart;
+              const end = textarea.selectionEnd;
+              const newText =
+                value.substring(0, start) +
+                markdown +
+                value.substring(end);
+
+              onChange(newText);
+
+              setTimeout(() => {
+                textarea.focus();
+                const newPosition = start + markdown.length;
+                textarea.setSelectionRange(newPosition, newPosition);
+              }, 0);
+            }}
+            docId={docId}
+          />
+          <BlockInsertMenu onInsert={(markdown) => {
+            const textarea = textareaRef.current;
+            if (!textarea) {
+              onChange(value + "\n\n" + markdown);
+              return;
+            }
+
+            const start = textarea.selectionStart;
+            const newText = value.substring(0, start) + markdown + value.substring(start);
+            onChange(newText);
+
+            setTimeout(() => {
+              textarea.focus();
+              textarea.setSelectionRange(start + markdown.length, start + markdown.length);
+            }, 0);
+          }} />
         </div>
 
         <div className="flex-1" />
@@ -222,13 +269,11 @@ export default function MarkdownEditor({
 
   const renderPreview = () => (
     <ScrollArea className="flex-1 p-4" style={{ minHeight }}>
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        {value ? (
-          <ReactMarkdown>{value}</ReactMarkdown>
-        ) : (
-          <p className="text-muted-foreground italic">{placeholder}</p>
-        )}
-      </div>
+      {value ? (
+        <EnhancedMarkdownRenderer content={value} />
+      ) : (
+        <p className="text-muted-foreground italic">{placeholder}</p>
+      )}
     </ScrollArea>
   );
 

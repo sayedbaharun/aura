@@ -30,6 +30,7 @@ import {
   isPasswordConfigured,
   createAuditLog,
 } from "./auth";
+import uploadRoutes from "./upload-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -1156,6 +1157,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to reorder docs" });
     }
   });
+
+  // ============================================================================
+  // FILE UPLOADS
+  // ============================================================================
+
+  app.use('/api', uploadRoutes);
 
   // ============================================================================
   // ATTACHMENTS

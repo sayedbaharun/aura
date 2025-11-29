@@ -19,7 +19,9 @@ import {
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, FolderPlus } from "lucide-react";
+import { FileText, FolderPlus, ArrowLeft } from "lucide-react";
+import TemplateSelector from "./template-selector";
+import type { DocTemplate } from "@/lib/doc-templates";
 
 interface CreateDocModalProps {
   open: boolean;
@@ -55,16 +57,19 @@ export default function CreateDocModal({
   const [title, setTitle] = useState("");
   const [type, setType] = useState("page");
   const [isFolder, setIsFolder] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<DocTemplate | null>(null);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(true);
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/docs", {
-        title: title.trim() || "Untitled",
+        title: title.trim() || selectedTemplate?.name || "Untitled",
         type,
         ventureId,
         parentId,
         isFolder,
         status: "draft",
+        body: selectedTemplate?.body || "",
       });
       return await res.json();
     },
@@ -75,10 +80,7 @@ export default function CreateDocModal({
         title: "Created",
         description: `${isFolder ? "Folder" : "Page"} created successfully`,
       });
-      onOpenChange(false);
-      setTitle("");
-      setType("page");
-      setIsFolder(false);
+      handleClose();
       onCreated?.(doc.id);
     },
     onError: () => {
@@ -95,21 +97,60 @@ export default function CreateDocModal({
     createMutation.mutate();
   };
 
+  const handleClose = () => {
+    setTitle("");
+    setType("page");
+    setIsFolder(false);
+    setSelectedTemplate(null);
+    setShowTemplateSelector(true);
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {isFolder ? (
-              <FolderPlus className="h-5 w-5" />
-            ) : (
-              <FileText className="h-5 w-5" />
-            )}
-            Create {isFolder ? "Folder" : "Page"}
+          <DialogTitle>
+            {showTemplateSelector ? "Create New Document" : "Document Details"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {showTemplateSelector ? (
+          <TemplateSelector
+            onSelect={(template) => {
+              if (template.id === 'blank') {
+                setSelectedTemplate(null);
+                setShowTemplateSelector(false);
+              } else {
+                setSelectedTemplate(template);
+                setType(template.defaultType);
+                setTitle(template.name);
+                setShowTemplateSelector(false);
+              }
+            }}
+          />
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {selectedTemplate && (
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                <span className="text-2xl">{selectedTemplate.icon}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{selectedTemplate.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedTemplate.description}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowTemplateSelector(true)}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Change
+                </Button>
+              </div>
+            )}
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input
@@ -153,19 +194,20 @@ export default function CreateDocModal({
             />
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Creating..." : "Create"}
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Creating..." : "Create"}
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

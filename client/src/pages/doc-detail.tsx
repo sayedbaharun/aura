@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import ReactMarkdown from "react-markdown";
+import { EnhancedMarkdownRenderer } from "@/components/docs/enhanced-markdown-renderer";
+import { TableOfContents } from "@/components/docs/table-of-contents";
+import { BacklinksPanel } from "@/components/docs/backlinks-panel";
+import { ExportMenu } from "@/components/docs/export-menu";
+import { ImageLightbox, useImageLightbox } from "@/components/docs/image-lightbox";
 
 interface Doc {
   id: string;
@@ -82,8 +86,11 @@ export default function DocDetail() {
   const { toast } = useToast();
   const [editorOpen, setEditorOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const docId = params?.id;
+
+  const { images, selectedIndex, lightboxOpen, setLightboxOpen } = useImageLightbox(contentRef);
 
   const { data: doc, isLoading } = useQuery<Doc>({
     queryKey: [`/api/docs/${docId}`],
@@ -202,6 +209,7 @@ export default function DocDetail() {
                 Copy
               </Button>
             )}
+            <ExportMenu doc={{ title: doc.title, body: doc.body || "" }} />
             <Button variant="outline" size="sm" onClick={() => setEditorOpen(true)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -214,14 +222,27 @@ export default function DocDetail() {
         </div>
       </div>
 
-      {/* Content */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown>{doc.body || ""}</ReactMarkdown>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Content with TOC */}
+      <div className="grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-6 mb-6">
+        {/* Table of Contents - Hidden on mobile */}
+        <aside className="hidden lg:block">
+          <TableOfContents content={doc.body || ""} />
+        </aside>
+
+        {/* Main Content */}
+        <div>
+          <Card>
+            <CardContent className="p-6">
+              <div
+                ref={contentRef}
+                className="prose prose-sm dark:prose-invert max-w-none reading-mode"
+              >
+                <EnhancedMarkdownRenderer content={doc.body || ""} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Metadata */}
       <Card>
@@ -279,6 +300,15 @@ export default function DocDetail() {
         </CardContent>
       </Card>
 
+      {/* Backlinks */}
+      <div className="mt-6">
+        <BacklinksPanel
+          docId={doc.id}
+          docTitle={doc.title}
+          defaultCollapsed={false}
+        />
+      </div>
+
       {/* Editor Modal */}
       <DocEditorModal
         open={editorOpen}
@@ -303,6 +333,14 @@ export default function DocDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Image Lightbox */}
+      <ImageLightbox
+        images={images}
+        initialIndex={selectedIndex}
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+      />
     </div>
   );
 }
