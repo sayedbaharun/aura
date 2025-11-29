@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Pencil, Save } from "lucide-react";
+import { Pencil, Save, ListTodo, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import TaskPicker from "./task-picker";
 
 interface Day {
   id: string;
@@ -54,8 +56,8 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
 
   const updateDayMutation = useMutation({
     mutationFn: async (data: Partial<Day>) => {
-      // Ensure we're using the date in YYYY-MM-DD format, not the ID
-      const dateStr = day?.date?.replace(/^day_/, '') || format(new Date(), 'yyyy-MM-dd');
+      // Use the date directly (it's already in YYYY-MM-DD format)
+      const dateStr = day?.date || format(new Date(), 'yyyy-MM-dd');
       const res = await apiRequest("PATCH", `/api/days/${dateStr}`, data);
       return await res.json();
     },
@@ -104,6 +106,42 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
       }
     });
     setIsEditingGratitude(false);
+  };
+
+  // Parse top3Outcomes from newline-separated string to array
+  const parseTop3 = (value: string | null): string[] => {
+    if (!value) return [];
+    return value.split("\n").filter(item => item.trim());
+  };
+
+  // Convert array back to newline-separated string
+  const formatTop3 = (items: string[]): string => {
+    return items.map((item, i) => `${i + 1}. ${item}`).join("\n");
+  };
+
+  // Handle task picker selection for Top 3 (Today's Focus)
+  const handleTop3TaskSelect = (tasks: string[]) => {
+    const formatted = formatTop3(tasks);
+    updateDayMutation.mutate({ top3Outcomes: formatted });
+  };
+
+  // Handle task picker selection for One Thing to Ship
+  const handleOneThingSelect = (tasks: string[]) => {
+    const selected = tasks[0] || "";
+    updateDayMutation.mutate({ oneThingToShip: selected });
+  };
+
+  // Get current selections for task pickers
+  const getCurrentTop3Tasks = (): string[] => {
+    if (!day?.top3Outcomes) return [];
+    // Remove numbering prefix if present (e.g., "1. Task name" -> "Task name")
+    return day.top3Outcomes.split("\n")
+      .map(line => line.replace(/^\d+\.\s*/, "").trim())
+      .filter(line => line);
+  };
+
+  const getCurrentOneThingTask = (): string[] => {
+    return day?.oneThingToShip ? [day.oneThingToShip] : [];
   };
 
   if (isLoading) {
@@ -233,34 +271,49 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
   }
 
   // Morning/Planning Mode (default)
+  const currentTop3 = getCurrentTop3Tasks();
+  const currentOneThing = getCurrentOneThingTask();
+
   return (
     <Card>
       <CardContent className="pt-6 space-y-6">
         {/* One Thing to Ship - Hero */}
         <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-primary">🎯 One Thing to Ship Today</label>
-            {!isEditingOneThingToShip ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setOneThingValue(day.oneThingToShip || "");
-                  setIsEditingOneThingToShip(true);
-                }}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSaveOneThingToShip}
-                disabled={updateDayMutation.isPending}
-              >
-                <Save className="h-4 w-4" />
-              </Button>
-            )}
+            <label className="text-sm font-medium text-primary">One Thing to Ship Today</label>
+            <div className="flex items-center gap-1">
+              <TaskPicker
+                selectedTasks={currentOneThing}
+                onSelect={handleOneThingSelect}
+                maxSelections={1}
+                priorityFilter={["P0", "P1"]}
+                triggerLabel="Pick Task"
+                dialogTitle="Pick One Thing to Ship (P0/P1)"
+                placeholder="Search P0/P1 tasks..."
+              />
+              {!isEditingOneThingToShip ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setOneThingValue(day.oneThingToShip || "");
+                    setIsEditingOneThingToShip(true);
+                  }}
+                  title="Manual entry"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSaveOneThingToShip}
+                  disabled={updateDayMutation.isPending}
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
           {isEditingOneThingToShip ? (
             <Input
@@ -272,50 +325,91 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
               className="text-lg font-semibold"
             />
           ) : (
-            <p className="text-lg font-semibold">
-              {day.oneThingToShip || "Not set - what will you ship?"}
-            </p>
+            <div className="flex items-center gap-2">
+              {day.oneThingToShip ? (
+                <>
+                  <p className="text-lg font-semibold flex-1">{day.oneThingToShip}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => updateDayMutation.mutate({ oneThingToShip: "" })}
+                    title="Clear"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <p className="text-lg font-semibold text-muted-foreground">
+                  Not set - pick a P0/P1 task to ship
+                </p>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Top 3 Outcomes */}
+        {/* Top 3 Outcomes / Today's Focus */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium">Top 3 Outcomes</label>
-            {!isEditingTop3 ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setTop3Value(day.top3Outcomes || "");
-                  setIsEditingTop3(true);
-                }}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSaveTop3}
-                disabled={updateDayMutation.isPending}
-              >
-                <Save className="h-4 w-4" />
-              </Button>
-            )}
+            <label className="text-sm font-medium">Today's Focus (3 Tasks)</label>
+            <div className="flex items-center gap-1">
+              <TaskPicker
+                selectedTasks={currentTop3}
+                onSelect={handleTop3TaskSelect}
+                maxSelections={3}
+                triggerLabel="Pick Tasks"
+                dialogTitle="Pick 3 Tasks for Today's Focus"
+                placeholder="Search tasks..."
+              />
+              {!isEditingTop3 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setTop3Value(day.top3Outcomes || "");
+                    setIsEditingTop3(true);
+                  }}
+                  title="Manual entry"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSaveTop3}
+                  disabled={updateDayMutation.isPending}
+                >
+                  <Save className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
           {isEditingTop3 ? (
             <Textarea
               value={top3Value}
               onChange={(e) => setTop3Value(e.target.value)}
-              placeholder="1. First outcome&#10;2. Second outcome&#10;3. Third outcome"
+              placeholder="1. First task&#10;2. Second task&#10;3. Third task"
               rows={4}
               onBlur={handleSaveTop3}
               autoFocus
             />
           ) : (
-            <div className="whitespace-pre-wrap text-sm text-muted-foreground">
-              {day.top3Outcomes || "No outcomes set"}
+            <div className="space-y-2">
+              {currentTop3.length > 0 ? (
+                currentTop3.map((task, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {i + 1}
+                    </Badge>
+                    <span className="text-sm">{task}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No focus tasks set - pick 3 tasks to work on today
+                </p>
+              )}
             </div>
           )}
         </div>

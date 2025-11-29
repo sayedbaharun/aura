@@ -36,8 +36,8 @@ export default function VentureFocusPicker({
 
   const updateMutation = useMutation({
     mutationFn: async (ventureId: string) => {
-      if (!day?.id) return;
-      const res = await apiRequest("PATCH", `/api/days/${day.id}`, { primaryVentureFocus: ventureId });
+      if (!day?.date) return;
+      const res = await apiRequest("PATCH", `/api/days/${day.date}`, { primaryVentureFocus: ventureId });
       return res.json();
     },
     onSuccess: () => {
