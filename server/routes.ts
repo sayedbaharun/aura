@@ -867,15 +867,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, ...healthData } = insertHealthEntrySchema.parse(req.body);
 
-      // Ensure Day exists for this date
-      const day = await storage.getDayOrCreate(date);
+      // Format date as string for day lookup
+      const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : String(date);
 
-      // Create health entry
+      // Ensure Day exists for this date
+      const day = await storage.getDayOrCreate(dateStr);
+
+      // Create health entry with dayId
       const entry = await storage.createHealthEntry({
         ...healthData,
         dayId: day.id,
         date,
-      });
+      } as any);
 
       res.status(201).json(entry);
     } catch (error) {
@@ -958,7 +961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entry = await storage.createNutritionEntry({
         ...validatedData,
         dayId: day.id,
-      });
+      } as any);
 
       res.status(201).json(entry);
     } catch (error) {
@@ -2700,7 +2703,7 @@ RULES:
       ];
 
       // Tool execution function
-      async function executeTool(name: string, args: any): Promise<string> {
+      const executeTool = async (name: string, args: any): Promise<string> => {
         try {
           switch (name) {
             case "get_ventures": {
@@ -2710,21 +2713,22 @@ RULES:
               })));
             }
             case "get_projects": {
-              const projects = await storage.getProjects(args.ventureId, args.status);
-              return JSON.stringify(projects.map(p => ({
+              const projects = await storage.getProjects({ ventureId: args.ventureId });
+              const filtered = args.status ? projects.filter(p => p.status === args.status) : projects;
+              return JSON.stringify(filtered.map(p => ({
                 id: p.id, name: p.name, status: p.status, ventureId: p.ventureId, priority: p.priority
               })));
             }
             case "get_tasks": {
               const tasks = await storage.getTasks(args);
-              return JSON.stringify(tasks.map(t => ({
+              return JSON.stringify(tasks.map((t: any) => ({
                 id: t.id, title: t.title, status: t.status, priority: t.priority,
                 dueDate: t.dueDate, focusDate: t.focusDate, ventureId: t.ventureId
               })));
             }
             case "get_today_tasks": {
-              const tasks = await storage.getTodayTasks();
-              return JSON.stringify(tasks.map(t => ({
+              const tasks = await storage.getTasksForToday(today);
+              return JSON.stringify(tasks.map((t: any) => ({
                 id: t.id, title: t.title, status: t.status, priority: t.priority, focusSlot: t.focusSlot
               })));
             }
@@ -2738,8 +2742,8 @@ RULES:
               return JSON.stringify({ success: true, task: task ? { id: task.id, title: task.title, status: task.status } : null });
             }
             case "get_captures": {
-              const captures = await storage.getCaptures(args.clarified);
-              return JSON.stringify(captures.map(c => ({
+              const captures = await storage.getCaptures({ clarified: args.clarified });
+              return JSON.stringify(captures.map((c: any) => ({
                 id: c.id, title: c.title, type: c.type, clarified: c.clarified
               })));
             }
@@ -2748,16 +2752,16 @@ RULES:
               return JSON.stringify({ success: true, capture: { id: capture.id, title: capture.title } });
             }
             case "get_health_entries": {
-              const entries = await storage.getHealthEntries(args.startDate, args.endDate, args.limit || 10);
-              return JSON.stringify(entries);
+              const entries = await storage.getHealthEntries({ dateGte: args.startDate, dateLte: args.endDate });
+              return JSON.stringify(entries.slice(0, args.limit || 10));
             }
             case "get_nutrition_entries": {
-              const entries = await storage.getNutritionEntries(args.startDate, args.endDate, args.limit || 10);
-              return JSON.stringify(entries);
+              const entries = await storage.getNutritionEntries({ date: args.startDate });
+              return JSON.stringify(entries.slice(0, args.limit || 10));
             }
             case "get_docs": {
-              const docs = await storage.getDocs(args.type, args.ventureId);
-              return JSON.stringify(docs.map(d => ({
+              const docs = await storage.getDocs({ type: args.type, ventureId: args.ventureId });
+              return JSON.stringify(docs.map((d: any) => ({
                 id: d.id, title: d.title, type: d.type, status: d.status
               })));
             }
@@ -2850,7 +2854,7 @@ RULES:
         metadata: {
           model: "openai/gpt-4o",
           tokensUsed: completion.usage?.total_tokens,
-        },
+        } as any,
       });
 
       res.json({
