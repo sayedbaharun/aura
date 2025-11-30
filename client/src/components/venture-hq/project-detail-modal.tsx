@@ -47,7 +47,7 @@ interface Project {
   notes: string | null;
 }
 
-interface Milestone {
+interface Phase {
   id: string;
   name: string;
   projectId: string;
@@ -61,7 +61,7 @@ interface Task {
   id: string;
   title: string;
   projectId: string | null;
-  milestoneId: string | null;
+  phaseId: string | null;
   status: string;
 }
 
@@ -72,7 +72,7 @@ interface ProjectDetailModalProps {
   onEdit?: (project: Project) => void;
 }
 
-const MILESTONE_STATUS_OPTIONS = [
+const PHASE_STATUS_OPTIONS = [
   { value: "not_started", label: "Not Started" },
   { value: "in_progress", label: "In Progress" },
   { value: "done", label: "Done" },
@@ -85,9 +85,9 @@ export default function ProjectDetailModal({
   onEdit,
 }: ProjectDetailModalProps) {
   const { toast } = useToast();
-  const [isAddingMilestone, setIsAddingMilestone] = useState(false);
-  const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
-  const [newMilestone, setNewMilestone] = useState({
+  const [isAddingPhase, setIsAddingPhase] = useState(false);
+  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null);
+  const [newPhase, setNewPhase] = useState({
     name: "",
     targetDate: "",
     notes: "",
@@ -105,11 +105,11 @@ export default function ProjectDetailModal({
     enabled: open && !!projectId,
   });
 
-  // Fetch milestones for this project
-  const { data: milestones = [] } = useQuery<Milestone[]>({
-    queryKey: ["/api/milestones", projectId],
+  // Fetch phases for this project
+  const { data: phases = [] } = useQuery<Phase[]>({
+    queryKey: ["/api/phases", projectId],
     queryFn: async () => {
-      const res = await fetch(`/api/milestones?project_id=${projectId}`, {
+      const res = await fetch(`/api/phases?project_id=${projectId}`, {
         credentials: "include",
       });
       return await res.json();
@@ -129,79 +129,79 @@ export default function ProjectDetailModal({
     enabled: open && !!projectId,
   });
 
-  // Create milestone mutation
-  const createMilestoneMutation = useMutation({
+  // Create phase mutation
+  const createPhaseMutation = useMutation({
     mutationFn: async (data: { name: string; targetDate: string; notes: string }) => {
-      const res = await apiRequest("POST", "/api/milestones", {
+      const res = await apiRequest("POST", "/api/phases", {
         ...data,
         projectId,
         status: "not_started",
-        order: milestones.length,
+        order: phases.length,
         targetDate: data.targetDate || null,
         notes: data.notes || null,
       });
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
-      toast({ title: "Success", description: "Milestone created" });
-      setIsAddingMilestone(false);
-      setNewMilestone({ name: "", targetDate: "", notes: "" });
+      queryClient.invalidateQueries({ queryKey: ["/api/phases"] });
+      toast({ title: "Success", description: "Phase created" });
+      setIsAddingPhase(false);
+      setNewPhase({ name: "", targetDate: "", notes: "" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to create milestone", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to create phase", variant: "destructive" });
     },
   });
 
-  // Update milestone mutation
-  const updateMilestoneMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Milestone> }) => {
+  // Update phase mutation
+  const updatePhaseMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Phase> }) => {
       // Clean data to only send non-empty values
       const cleanData = cleanFormData(data);
-      const res = await apiRequest("PATCH", `/api/milestones/${id}`, cleanData);
+      const res = await apiRequest("PATCH", `/api/phases/${id}`, cleanData);
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
-      toast({ title: "Success", description: "Milestone updated" });
-      setEditingMilestoneId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/phases"] });
+      toast({ title: "Success", description: "Phase updated" });
+      setEditingPhaseId(null);
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update milestone", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update phase", variant: "destructive" });
     },
   });
 
-  // Delete milestone mutation
-  const deleteMilestoneMutation = useMutation({
+  // Delete phase mutation
+  const deletePhaseMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/milestones/${id}`);
+      await apiRequest("DELETE", `/api/phases/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
-      toast({ title: "Success", description: "Milestone deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/phases"] });
+      toast({ title: "Success", description: "Phase deleted" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to delete milestone", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to delete phase", variant: "destructive" });
     },
   });
 
-  const handleAddMilestone = () => {
-    if (!newMilestone.name.trim()) {
-      toast({ title: "Error", description: "Milestone name is required", variant: "destructive" });
+  const handleAddPhase = () => {
+    if (!newPhase.name.trim()) {
+      toast({ title: "Error", description: "Phase name is required", variant: "destructive" });
       return;
     }
-    createMilestoneMutation.mutate(newMilestone);
+    createPhaseMutation.mutate(newPhase);
   };
 
-  const handleDeleteMilestone = (id: string) => {
-    if (confirm("Delete this milestone?")) {
-      deleteMilestoneMutation.mutate(id);
+  const handleDeletePhase = (id: string) => {
+    if (confirm("Delete this phase?")) {
+      deletePhaseMutation.mutate(id);
     }
   };
 
-  const handleToggleMilestoneStatus = (milestone: Milestone) => {
-    const newStatus = milestone.status === "done" ? "not_started" : "done";
-    updateMilestoneMutation.mutate({ id: milestone.id, data: { status: newStatus } });
+  const handleTogglePhaseStatus = (phase: Phase) => {
+    const newStatus = phase.status === "done" ? "not_started" : "done";
+    updatePhaseMutation.mutate({ id: phase.id, data: { status: newStatus } });
   };
 
   const getPriorityColor = (priority: string) => {
@@ -233,12 +233,12 @@ export default function ProjectDetailModal({
   // Calculate progress
   const doneTasks = tasks.filter((t) => t.status === "done").length;
   const taskProgress = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
-  const doneMilestones = milestones.filter((m) => m.status === "done").length;
-  const milestoneProgress = milestones.length > 0 ? Math.round((doneMilestones / milestones.length) * 100) : 0;
+  const donePhases = phases.filter((m) => m.status === "done").length;
+  const phaseProgress = phases.length > 0 ? Math.round((donePhases / phases.length) * 100) : 0;
 
-  // Get tasks per milestone
-  const getTasksForMilestone = (milestoneId: string) => {
-    return tasks.filter((t) => t.milestoneId === milestoneId);
+  // Get tasks per phase
+  const getTasksForPhase = (phaseId: string) => {
+    return tasks.filter((t) => t.phaseId === phaseId);
   };
 
   if (!project) return null;
@@ -307,86 +307,86 @@ export default function ProjectDetailModal({
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Milestone Progress</span>
+                <span className="font-medium">Phase Progress</span>
                 <span className="text-muted-foreground">
-                  {doneMilestones}/{milestones.length}
+                  {donePhases}/{phases.length}
                 </span>
               </div>
-              <Progress value={milestoneProgress} className="h-2" />
+              <Progress value={phaseProgress} className="h-2" />
             </div>
           </div>
         </div>
 
-        {/* Milestones Section */}
+        {/* Phases Section */}
         <div className="space-y-3 pt-4 border-t">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg">Milestones</h3>
+            <h3 className="font-semibold text-lg">Phases</h3>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setIsAddingMilestone(true)}
-              disabled={isAddingMilestone}
+              onClick={() => setIsAddingPhase(true)}
+              disabled={isAddingPhase}
             >
               <Plus className="h-4 w-4 mr-1" />
-              Add Milestone
+              Add Phase
             </Button>
           </div>
 
-          {/* Add Milestone Form */}
-          {isAddingMilestone && (
+          {/* Add Phase Form */}
+          {isAddingPhase && (
             <div className="p-4 border rounded-lg space-y-3 bg-muted/30">
               <Input
-                placeholder="Milestone name..."
-                value={newMilestone.name}
-                onChange={(e) => setNewMilestone({ ...newMilestone, name: e.target.value })}
+                placeholder="Phase name..."
+                value={newPhase.name}
+                onChange={(e) => setNewPhase({ ...newPhase, name: e.target.value })}
                 autoFocus
               />
               <div className="flex gap-2">
                 <Input
                   type="date"
                   placeholder="Target date"
-                  value={newMilestone.targetDate}
-                  onChange={(e) => setNewMilestone({ ...newMilestone, targetDate: e.target.value })}
+                  value={newPhase.targetDate}
+                  onChange={(e) => setNewPhase({ ...newPhase, targetDate: e.target.value })}
                   className="flex-1"
                 />
-                <Button onClick={handleAddMilestone} disabled={createMilestoneMutation.isPending}>
-                  {createMilestoneMutation.isPending ? "Adding..." : "Add"}
+                <Button onClick={handleAddPhase} disabled={createPhaseMutation.isPending}>
+                  {createPhaseMutation.isPending ? "Adding..." : "Add"}
                 </Button>
-                <Button variant="ghost" onClick={() => setIsAddingMilestone(false)}>
+                <Button variant="ghost" onClick={() => setIsAddingPhase(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Milestones List */}
-          {milestones.length === 0 && !isAddingMilestone ? (
+          {/* Phases List */}
+          {phases.length === 0 && !isAddingPhase ? (
             <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-              <p className="text-sm">No milestones yet</p>
-              <p className="text-xs mt-1">Add milestones to break down this project into phases</p>
+              <p className="text-sm">No phases yet</p>
+              <p className="text-xs mt-1">Add phases to break down this project</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {milestones
+              {phases
                 .sort((a, b) => a.order - b.order)
-                .map((milestone) => {
-                  const milestoneTasks = getTasksForMilestone(milestone.id);
-                  const doneTasksInMilestone = milestoneTasks.filter((t) => t.status === "done").length;
+                .map((phase) => {
+                  const phaseTasks = getTasksForPhase(phase.id);
+                  const doneTasksInPhase = phaseTasks.filter((t) => t.status === "done").length;
 
                   return (
                     <div
-                      key={milestone.id}
+                      key={phase.id}
                       className={cn(
                         "p-3 border rounded-lg transition-colors",
-                        milestone.status === "done" && "bg-green-50/50 dark:bg-green-900/10"
+                        phase.status === "done" && "bg-green-50/50 dark:bg-green-900/10"
                       )}
                     >
                       <div className="flex items-start gap-3">
                         <button
-                          onClick={() => handleToggleMilestoneStatus(milestone)}
-                          className={cn("mt-0.5", getStatusColor(milestone.status))}
+                          onClick={() => handleTogglePhaseStatus(phase)}
+                          className={cn("mt-0.5", getStatusColor(phase.status))}
                         >
-                          {milestone.status === "done" ? (
+                          {phase.status === "done" ? (
                             <CheckCircle2 className="h-5 w-5" />
                           ) : (
                             <Circle className="h-5 w-5" />
@@ -398,36 +398,36 @@ export default function ProjectDetailModal({
                             <h4
                               className={cn(
                                 "font-medium",
-                                milestone.status === "done" && "line-through text-muted-foreground"
+                                phase.status === "done" && "line-through text-muted-foreground"
                               )}
                             >
-                              {milestone.name}
+                              {phase.name}
                             </h4>
                             <div className="flex items-center gap-1">
-                              {milestone.targetDate && (
+                              {phase.targetDate && (
                                 <span className="text-xs text-muted-foreground">
-                                  {format(new Date(milestone.targetDate), "MMM d")}
+                                  {format(new Date(phase.targetDate), "MMM d")}
                                 </span>
                               )}
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteMilestone(milestone.id)}
+                                onClick={() => handleDeletePhase(phase.id)}
                               >
                                 <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                               </Button>
                             </div>
                           </div>
 
-                          {milestoneTasks.length > 0 && (
+                          {phaseTasks.length > 0 && (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span>
-                                {doneTasksInMilestone}/{milestoneTasks.length} tasks
+                                {doneTasksInPhase}/{phaseTasks.length} tasks
                               </span>
                               <Progress
                                 value={
-                                  milestoneTasks.length > 0
-                                    ? (doneTasksInMilestone / milestoneTasks.length) * 100
+                                  phaseTasks.length > 0
+                                    ? (doneTasksInPhase / phaseTasks.length) * 100
                                     : 0
                                 }
                                 className="h-1 w-20"
@@ -435,8 +435,8 @@ export default function ProjectDetailModal({
                             </div>
                           )}
 
-                          {milestone.notes && (
-                            <p className="text-xs text-muted-foreground">{milestone.notes}</p>
+                          {phase.notes && (
+                            <p className="text-xs text-muted-foreground">{phase.notes}</p>
                           )}
                         </div>
                       </div>

@@ -200,9 +200,9 @@ What are we trying to achieve?
 - Item 2
 - Item 3
 
-## Timeline & Milestones
+## Timeline & Phases
 
-| Milestone | Target Date | Owner | Status |
+| Phase | Target Date | Owner | Status |
 |-----------|-------------|-------|--------|
 | Phase 1 | YYYY-MM-DD | Name | Not Started |
 | Phase 2 | YYYY-MM-DD | Name | Not Started |

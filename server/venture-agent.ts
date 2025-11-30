@@ -143,7 +143,7 @@ IMPORTANT INSTRUCTIONS:
         type: "function",
         function: {
           name: "get_project_details",
-          description: "Get detailed information about a specific project including milestones and tasks",
+          description: "Get detailed information about a specific project including phases and tasks",
           parameters: {
             type: "object",
             properties: {
@@ -315,19 +315,19 @@ IMPORTANT INSTRUCTIONS:
       });
     }
 
-    if (permissions.includes('create_milestone') || permissions.includes('write')) {
+    if (permissions.includes('create_phase') || permissions.includes('write')) {
       tools.push({
         type: "function",
         function: {
-          name: "create_milestone",
-          description: "Create a new milestone for a project",
+          name: "create_phase",
+          description: "Create a new phase for a project",
           parameters: {
             type: "object",
             properties: {
               projectId: { type: "string", description: "Project ID" },
-              name: { type: "string", description: "Milestone name" },
+              name: { type: "string", description: "Phase name" },
               targetDate: { type: "string", description: "Target date YYYY-MM-DD" },
-              notes: { type: "string", description: "Milestone notes" },
+              notes: { type: "string", description: "Phase notes" },
             },
             required: ["projectId", "name"],
           },
@@ -429,15 +429,15 @@ IMPORTANT INSTRUCTIONS:
             return { result: "Project not found" };
           }
 
-          const [milestones, tasks] = await Promise.all([
-            storage.getMilestones({ projectId: project.id }),
+          const [phases, tasks] = await Promise.all([
+            storage.getPhases({ projectId: project.id }),
             storage.getTasks({ projectId: project.id }),
           ]);
 
           return {
             result: JSON.stringify({
               ...project,
-              milestones,
+              phases,
               tasks: tasks.map(t => ({ id: t.id, title: t.title, status: t.status, priority: t.priority })),
             }),
           };
@@ -630,8 +630,8 @@ IMPORTANT INSTRUCTIONS:
           };
         }
 
-        case "create_milestone": {
-          const milestone = await storage.createMilestone({
+        case "create_phase": {
+          const phase = await storage.createPhase({
             projectId: args.projectId,
             name: args.name,
             targetDate: args.targetDate,
@@ -640,13 +640,13 @@ IMPORTANT INSTRUCTIONS:
           });
 
           return {
-            result: `Created milestone: "${milestone.name}" (ID: ${milestone.id})`,
+            result: `Created phase: "${phase.name}" (ID: ${phase.id})`,
             action: {
               ventureId: this.ventureId,
               userId: this.userId,
-              action: 'create_milestone',
-              entityType: 'milestone',
-              entityId: milestone.id,
+              action: 'create_phase',
+              entityType: 'phase',
+              entityId: phase.id,
               parameters: args,
               result: 'success',
             },

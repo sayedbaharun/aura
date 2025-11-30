@@ -3,8 +3,8 @@ import {
   type InsertVenture,
   type Project,
   type InsertProject,
-  type Milestone,
-  type InsertMilestone,
+  type Phase,
+  type InsertPhase,
   type Task,
   type InsertTask,
   type CaptureItem,
@@ -41,7 +41,7 @@ import {
   type InsertVentureAgentAction,
   ventures,
   projects,
-  milestones,
+  phases,
   tasks,
   captureItems,
   days,
@@ -83,12 +83,12 @@ export interface IStorage {
   updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string): Promise<void>;
 
-  // Milestones
-  getMilestones(filters?: { projectId?: string }): Promise<Milestone[]>;
-  getMilestone(id: string): Promise<Milestone | undefined>;
-  createMilestone(data: InsertMilestone): Promise<Milestone>;
-  updateMilestone(id: string, data: Partial<InsertMilestone>): Promise<Milestone | undefined>;
-  deleteMilestone(id: string): Promise<void>;
+  // Phases
+  getPhases(filters?: { projectId?: string }): Promise<Phase[]>;
+  getPhase(id: string): Promise<Phase | undefined>;
+  createPhase(data: InsertPhase): Promise<Phase>;
+  updatePhase(id: string, data: Partial<InsertPhase>): Promise<Phase | undefined>;
+  deletePhase(id: string): Promise<void>;
 
   // Tasks
   getTasks(filters?: {
@@ -337,51 +337,51 @@ export class DBStorage implements IStorage {
   }
 
   // ============================================================================
-  // MILESTONES
+  // PHASES
   // ============================================================================
 
-  async getMilestones(filters?: { projectId?: string }): Promise<Milestone[]> {
+  async getPhases(filters?: { projectId?: string }): Promise<Phase[]> {
     if (filters?.projectId) {
       return await this.db
         .select()
-        .from(milestones)
-        .where(eq(milestones.projectId, filters.projectId))
-        .orderBy(milestones.order);
+        .from(phases)
+        .where(eq(phases.projectId, filters.projectId))
+        .orderBy(phases.order);
     }
 
     return await this.db
       .select()
-      .from(milestones)
-      .orderBy(milestones.order);
+      .from(phases)
+      .orderBy(phases.order);
   }
 
-  async getMilestone(id: string): Promise<Milestone | undefined> {
-    const [milestone] = await this.db
+  async getPhase(id: string): Promise<Phase | undefined> {
+    const [phase] = await this.db
       .select()
-      .from(milestones)
-      .where(eq(milestones.id, id));
-    return milestone;
+      .from(phases)
+      .where(eq(phases.id, id));
+    return phase;
   }
 
-  async createMilestone(insertMilestone: InsertMilestone): Promise<Milestone> {
-    const [milestone] = await this.db
-      .insert(milestones)
-      .values(insertMilestone)
+  async createPhase(insertPhase: InsertPhase): Promise<Phase> {
+    const [phase] = await this.db
+      .insert(phases)
+      .values(insertPhase)
       .returning();
-    return milestone;
+    return phase;
   }
 
-  async updateMilestone(id: string, updates: Partial<InsertMilestone>): Promise<Milestone | undefined> {
+  async updatePhase(id: string, updates: Partial<InsertPhase>): Promise<Phase | undefined> {
     const [updated] = await this.db
-      .update(milestones)
+      .update(phases)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(milestones.id, id))
+      .where(eq(phases.id, id))
       .returning();
     return updated;
   }
 
-  async deleteMilestone(id: string): Promise<void> {
-    await this.db.delete(milestones).where(eq(milestones.id, id));
+  async deletePhase(id: string): Promise<void> {
+    await this.db.delete(phases).where(eq(phases.id, id));
   }
 
   // ============================================================================

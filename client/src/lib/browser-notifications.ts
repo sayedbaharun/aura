@@ -107,10 +107,10 @@ export const browserNotifications = {
     });
   },
 
-  projectMilestone: (projectName: string) => {
-    showBrowserNotification('Project Milestone', {
+  projectPhase: (projectName: string) => {
+    showBrowserNotification('Project Phase', {
       body: `${projectName} target date is approaching`,
-      tag: 'project-milestone',
+      tag: 'project-phase',
       data: { link: '/ventures' },
     });
   },
