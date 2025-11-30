@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import {
   insertVentureSchema,
   insertProjectSchema,
-  insertMilestoneSchema,
+  insertPhaseSchema,
   insertTaskSchema,
   insertCaptureItemSchema,
   insertDaySchema,
@@ -434,78 +434,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
-  // MILESTONES
+  // PHASES
   // ============================================================================
 
-  // Get all milestones (optionally filter by project)
-  app.get("/api/milestones", async (req, res) => {
+  // Get all phases (optionally filter by project)
+  app.get("/api/phases", async (req, res) => {
     try {
       const projectId = req.query.project_id as string;
-      const milestones = await storage.getMilestones(projectId ? { projectId } : undefined);
-      res.json(milestones);
+      const phases = await storage.getPhases(projectId ? { projectId } : undefined);
+      res.json(phases);
     } catch (error) {
-      logger.error({ error }, "Error fetching milestones");
-      res.status(500).json({ error: "Failed to fetch milestones" });
+      logger.error({ error }, "Error fetching phases");
+      res.status(500).json({ error: "Failed to fetch phases" });
     }
   });
 
-  // Get single milestone
-  app.get("/api/milestones/:id", async (req, res) => {
+  // Get single phase
+  app.get("/api/phases/:id", async (req, res) => {
     try {
-      const milestone = await storage.getMilestone(req.params.id);
-      if (!milestone) {
-        return res.status(404).json({ error: "Milestone not found" });
+      const phase = await storage.getPhase(req.params.id);
+      if (!phase) {
+        return res.status(404).json({ error: "Phase not found" });
       }
-      res.json(milestone);
+      res.json(phase);
     } catch (error) {
-      logger.error({ error }, "Error fetching milestone");
-      res.status(500).json({ error: "Failed to fetch milestone" });
+      logger.error({ error }, "Error fetching phase");
+      res.status(500).json({ error: "Failed to fetch phase" });
     }
   });
 
-  // Create milestone
-  app.post("/api/milestones", async (req, res) => {
+  // Create phase
+  app.post("/api/phases", async (req, res) => {
     try {
-      const validatedData = insertMilestoneSchema.parse(req.body);
-      const milestone = await storage.createMilestone(validatedData);
-      res.status(201).json(milestone);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Invalid milestone data", details: error.errors });
-      } else {
-        logger.error({ error }, "Error creating milestone");
-        res.status(500).json({ error: "Failed to create milestone" });
-      }
-    }
-  });
-
-  // Update milestone
-  app.patch("/api/milestones/:id", async (req, res) => {
-    try {
-      const updates = insertMilestoneSchema.partial().parse(req.body);
-      const milestone = await storage.updateMilestone(req.params.id, updates);
-      if (!milestone) {
-        return res.status(404).json({ error: "Milestone not found" });
-      }
-      res.json(milestone);
+      const validatedData = insertPhaseSchema.parse(req.body);
+      const phase = await storage.createPhase(validatedData);
+      res.status(201).json(phase);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Invalid milestone data", details: error.errors });
+        res.status(400).json({ error: "Invalid phase data", details: error.errors });
       } else {
-        logger.error({ error }, "Error updating milestone");
-        res.status(500).json({ error: "Failed to update milestone" });
+        logger.error({ error }, "Error creating phase");
+        res.status(500).json({ error: "Failed to create phase" });
       }
     }
   });
 
-  // Delete milestone
-  app.delete("/api/milestones/:id", async (req, res) => {
+  // Update phase
+  app.patch("/api/phases/:id", async (req, res) => {
     try {
-      await storage.deleteMilestone(req.params.id);
+      const updates = insertPhaseSchema.partial().parse(req.body);
+      const phase = await storage.updatePhase(req.params.id, updates);
+      if (!phase) {
+        return res.status(404).json({ error: "Phase not found" });
+      }
+      res.json(phase);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid phase data", details: error.errors });
+      } else {
+        logger.error({ error }, "Error updating phase");
+        res.status(500).json({ error: "Failed to update phase" });
+      }
+    }
+  });
+
+  // Delete phase
+  app.delete("/api/phases/:id", async (req, res) => {
+    try {
+      await storage.deletePhase(req.params.id);
       res.json({ success: true });
     } catch (error) {
-      logger.error({ error }, "Error deleting milestone");
-      res.status(500).json({ error: "Failed to delete milestone" });
+      logger.error({ error }, "Error deleting phase");
+      res.status(500).json({ error: "Failed to delete phase" });
     }
   });
 

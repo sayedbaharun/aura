@@ -49,13 +49,13 @@ Main entry point that:
 Database abstraction layer (`DBStorage` class):
 - Implements `IStorage` interface for all database operations
 - Uses Drizzle ORM with Neon serverless PostgreSQL
-- Handles ventures, projects, tasks, milestones, captures, days, health, nutrition, docs
+- Handles ventures, projects, tasks, phases, captures, days, health, nutrition, docs
 
 #### `server/routes.ts`
 API route definitions for:
 - **Ventures**: GET /api/ventures, POST, PATCH, DELETE
 - **Projects**: GET /api/projects (with filters), POST, PATCH, DELETE
-- **Milestones**: GET /api/milestones, POST, PATCH, DELETE
+- **Phases**: GET /api/phases, POST, PATCH, DELETE
 - **Tasks**: GET /api/tasks (with filters), GET /api/tasks/today, POST, PATCH, DELETE
 - **Captures**: GET /api/captures, POST, PATCH, DELETE, POST /api/captures/:id/convert
 - **Days**: GET /api/days/today, GET /api/days/:date, POST, PATCH, DELETE
@@ -99,13 +99,13 @@ Main application pages:
    - outcome, notes
    - **budget, budgetSpent, revenueGenerated** (NEW)
 
-3. **milestones** - Project phases and key deliverables (NEW)
+3. **phases** - Project phases and key deliverables
    - name, projectId, status, order
    - targetDate, notes
 
 4. **tasks** - Atomic units of execution
    - title, status, priority, type, domain
-   - ventureId, projectId, milestoneId, dayId
+   - ventureId, projectId, phaseId, dayId
    - dueDate, focusDate, focusSlot
    - estEffort, actualEffort (hours)
    - notes, tags
@@ -170,7 +170,7 @@ Tasks can be assigned to specific time blocks for scheduling:
 ```
 ventures (saas/media/realty/trading/personal)
   └── projects (product/marketing/ops/etc)
-       └── milestones (Phase 1, Phase 2, etc)
+       └── phases (Phase 1, Phase 2, etc)
             └── tasks (atomic work items)
 
 days (daily logs)
@@ -263,7 +263,7 @@ Components appear in `client/src/components/ui/`.
 - ✅ Core entities (ventures, projects, tasks, captures, docs)
 - ✅ Health & nutrition tracking
 - ✅ Daily planning hub (days table)
-- 🚧 Milestones for project phases
+- ✅ Phases for project organization
 - 🚧 Budget tracking for projects
 - 🚧 Focus slot scheduling system
 

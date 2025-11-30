@@ -100,7 +100,7 @@ export default function NotificationsPage() {
         return '📅';
       case 'daily_reflection':
         return '🌙';
-      case 'project_milestone':
+      case 'project_phase':
         return '🎯';
       default:
         return '🔔';
@@ -183,7 +183,7 @@ export default function NotificationsPage() {
                     <SelectItem value="health_reminder">Health reminders</SelectItem>
                     <SelectItem value="weekly_planning">Weekly planning</SelectItem>
                     <SelectItem value="daily_reflection">Daily reflection</SelectItem>
-                    <SelectItem value="project_milestone">Project milestones</SelectItem>
+                    <SelectItem value="project_phase">Project phases</SelectItem>
                   </SelectContent>
                 </Select>
                 <span className="text-sm text-muted-foreground">

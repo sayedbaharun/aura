@@ -49,7 +49,7 @@ interface Task {
   domain: 'home' | 'work' | 'health' | 'finance' | 'travel' | 'learning' | 'play' | 'calls' | 'personal' | null;
   ventureId: string | null;
   projectId: string | null;
-  milestoneId: string | null;
+  phaseId: string | null;
   dayId: string | null;
   dueDate: string | null;
   focusDate: string | null;
@@ -77,7 +77,7 @@ interface Project {
   ventureId: string;
 }
 
-interface Milestone {
+interface Phase {
   id: string;
   name: string;
   projectId: string;
@@ -119,12 +119,12 @@ export default function TaskDetailModal() {
     enabled: !!formData.ventureId && isOpen && mode === 'edit',
   });
 
-  // Fetch milestones (filtered by project if selected)
-  const { data: milestones = [] } = useQuery<Milestone[]>({
-    queryKey: ['/api/milestones', formData.projectId],
+  // Fetch phases (filtered by project if selected)
+  const { data: phases = [] } = useQuery<Phase[]>({
+    queryKey: ['/api/phases', formData.projectId],
     queryFn: async () => {
       if (!formData.projectId) return [];
-      const response = await apiRequest('GET', `/api/milestones?project_id=${formData.projectId}`);
+      const response = await apiRequest('GET', `/api/phases?project_id=${formData.projectId}`);
       return response.json();
     },
     enabled: !!formData.projectId && isOpen && mode === 'edit',
@@ -210,14 +210,14 @@ export default function TaskDetailModal() {
   // Reset project when changing venture in edit mode
   useEffect(() => {
     if (mode === 'edit' && !formData.ventureId) {
-      setFormData((prev) => ({ ...prev, projectId: null, milestoneId: null }));
+      setFormData((prev) => ({ ...prev, projectId: null, phaseId: null }));
     }
   }, [formData.ventureId, mode]);
 
-  // Reset milestone when changing project in edit mode
+  // Reset phase when changing project in edit mode
   useEffect(() => {
     if (mode === 'edit' && !formData.projectId) {
-      setFormData((prev) => ({ ...prev, milestoneId: null }));
+      setFormData((prev) => ({ ...prev, phaseId: null }));
     }
   }, [formData.projectId, mode]);
 
@@ -349,10 +349,10 @@ export default function TaskDetailModal() {
     return project?.name || null;
   };
 
-  const getMilestoneName = (milestoneId: string | null) => {
-    if (!milestoneId) return null;
-    const milestone = milestones.find((m) => m.id === milestoneId);
-    return milestone?.name || null;
+  const getPhaseName = (phaseId: string | null) => {
+    if (!phaseId) return null;
+    const phase = phases.find((m) => m.id === phaseId);
+    return phase?.name || null;
   };
 
   const formatFocusSlot = (slot: string | null) => {
@@ -465,10 +465,10 @@ export default function TaskDetailModal() {
                   <p className="font-medium">{getProjectName(task.projectId)}</p>
                 </div>
               )}
-              {getMilestoneName(task.milestoneId) && (
+              {getPhaseName(task.phaseId) && (
                 <div>
-                  <Label className="text-muted-foreground">Milestone</Label>
-                  <p className="font-medium">{getMilestoneName(task.milestoneId)}</p>
+                  <Label className="text-muted-foreground">Phase</Label>
+                  <p className="font-medium">{getPhaseName(task.phaseId)}</p>
                 </div>
               )}
               {task.dueDate && (
@@ -771,24 +771,24 @@ export default function TaskDetailModal() {
               </div>
             </div>
 
-            {/* Milestone */}
+            {/* Phase */}
             {formData.projectId && (
               <div className="space-y-2">
-                <Label htmlFor="milestone">Milestone</Label>
+                <Label htmlFor="phase">Phase</Label>
                 <Select
-                  value={formData.milestoneId || 'none'}
+                  value={formData.phaseId || 'none'}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, milestoneId: value === 'none' ? null : value })
+                    setFormData({ ...formData, phaseId: value === 'none' ? null : value })
                   }
                 >
-                  <SelectTrigger id="milestone">
-                    <SelectValue placeholder="Select milestone" />
+                  <SelectTrigger id="phase">
+                    <SelectValue placeholder="Select phase" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {milestones.map((milestone) => (
-                      <SelectItem key={milestone.id} value={milestone.id}>
-                        {milestone.name}
+                    {phases.map((phase) => (
+                      <SelectItem key={phase.id} value={phase.id}>
+                        {phase.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

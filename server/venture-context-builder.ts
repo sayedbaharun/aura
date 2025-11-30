@@ -1,6 +1,6 @@
 import { storage } from "./storage";
 import { logger } from "./logger";
-import type { Venture, Project, Task, Doc, Milestone, CaptureItem } from "@shared/schema";
+import type { Venture, Project, Task, Doc, Phase, CaptureItem } from "@shared/schema";
 
 /**
  * Venture Context Builder
@@ -25,7 +25,7 @@ export interface VentureContext {
 }
 
 interface ProjectWithDetails extends Project {
-  milestones?: Milestone[];
+  phases?: Phase[];
   taskCount?: number;
   completedTaskCount?: number;
 }
@@ -50,14 +50,14 @@ export async function buildVentureContext(ventureId: string): Promise<VentureCon
       throw new Error(`Venture not found: ${ventureId}`);
     }
 
-    // Get milestones for each project
+    // Get phases for each project
     const projectsWithDetails: ProjectWithDetails[] = await Promise.all(
       projects.map(async (project: Project) => {
-        const milestones = await storage.getMilestones({ projectId: project.id });
+        const phases = await storage.getPhases({ projectId: project.id });
         const projectTasks = allTasks.filter((t: Task) => t.projectId === project.id);
         return {
           ...project,
-          milestones,
+          phases,
           taskCount: projectTasks.length,
           completedTaskCount: projectTasks.filter((t: Task) => t.status === 'done').length,
         };
@@ -128,10 +128,10 @@ function generateContextSummary(
         : 0;
       lines.push(`- **${project.name}** [${project.status}] - ${progress}% complete`);
       if (project.outcome) lines.push(`  Outcome: ${project.outcome}`);
-      if (project.milestones && project.milestones.length > 0) {
-        const activeMilestones = project.milestones.filter(m => m.status !== 'done');
-        if (activeMilestones.length > 0) {
-          lines.push(`  Active Milestones: ${activeMilestones.map(m => m.name).join(', ')}`);
+      if (project.phases && project.phases.length > 0) {
+        const activePhases = project.phases.filter(m => m.status !== 'done');
+        if (activePhases.length > 0) {
+          lines.push(`  Active Phases: ${activePhases.map(m => m.name).join(', ')}`);
         }
       }
     }

@@ -9,7 +9,7 @@ export type NotificationType =
   | 'weekly_planning'
   | 'daily_reflection'
   | 'task_completed'
-  | 'project_milestone';
+  | 'project_phase';
 
 export interface Notification {
   id: string;

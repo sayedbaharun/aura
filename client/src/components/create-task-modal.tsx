@@ -97,7 +97,7 @@ export default function CreateTaskModal({
     domain: "work",
     ventureId: defaultVentureId || "",
     projectId: defaultProjectId || "",
-    milestone: "",
+    phase: "",
     dueDate: "",
     focusDate: defaultFocusDate || "",
     focusSlot: defaultFocusSlot || "",
@@ -116,7 +116,7 @@ export default function CreateTaskModal({
         domain: "work",
         ventureId: defaultVentureId || "",
         projectId: defaultProjectId || "",
-        milestone: "",
+        phase: "",
         dueDate: "",
         focusDate: defaultFocusDate || "",
         focusSlot: defaultFocusSlot || "",
@@ -197,14 +197,14 @@ export default function CreateTaskModal({
   // Reset project when venture changes
   useEffect(() => {
     if (!formData.ventureId) {
-      setFormData((prev) => ({ ...prev, projectId: "", milestone: "" }));
+      setFormData((prev) => ({ ...prev, projectId: "", phase: "" }));
     }
   }, [formData.ventureId]);
 
-  // Reset milestone when project changes
+  // Reset phase when project changes
   useEffect(() => {
     if (!formData.projectId) {
-      setFormData((prev) => ({ ...prev, milestone: "" }));
+      setFormData((prev) => ({ ...prev, phase: "" }));
     }
   }, [formData.projectId]);
 
@@ -369,13 +369,13 @@ export default function CreateTaskModal({
             </div>
           </div>
 
-          {/* Milestone */}
+          {/* Phase */}
           <div className="space-y-2">
-            <Label htmlFor="milestone">Milestone</Label>
+            <Label htmlFor="phase">Phase</Label>
             <Input
-              id="milestone"
-              value={formData.milestone}
-              onChange={(e) => setFormData({ ...formData, milestone: e.target.value })}
+              id="phase"
+              value={formData.phase}
+              onChange={(e) => setFormData({ ...formData, phase: e.target.value })}
               placeholder="e.g., Phase 1, MVP Launch, Q1 Goals (optional)"
             />
           </div>

@@ -193,7 +193,7 @@ export const docDomainEnum = pgEnum('doc_domain', [
 
 export const docStatusEnum = pgEnum('doc_status', ['draft', 'active', 'archived']);
 
-export const milestoneStatusEnum = pgEnum('milestone_status', [
+export const phaseStatusEnum = pgEnum('milestone_status', [
   'not_started',
   'in_progress',
   'done',
@@ -435,14 +435,14 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 
-// MILESTONES: Project phases and key deliverables
-export const milestones = pgTable(
-  "milestones",
+// PHASES: Project phases and key deliverables
+export const phases = pgTable(
+  "milestones", // Keep SQL table name for backward compatibility
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
-    status: milestoneStatusEnum("status").default("not_started").notNull(),
+    status: phaseStatusEnum("status").default("not_started").notNull(),
     order: integer("order").default(0), // For sequencing phases
     targetDate: date("target_date"),
     notes: text("notes"),
@@ -456,14 +456,14 @@ export const milestones = pgTable(
   ]
 );
 
-export const insertMilestoneSchema = createInsertSchema(milestones).omit({
+export const insertPhaseSchema = createInsertSchema(phases).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
-export type Milestone = typeof milestones.$inferSelect;
+export type InsertPhase = z.infer<typeof insertPhaseSchema>;
+export type Phase = typeof phases.$inferSelect;
 
 // TASKS: Atomic units of execution
 export const tasks = pgTable(
@@ -477,7 +477,7 @@ export const tasks = pgTable(
     domain: domainEnum("domain"),
     ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
-    milestoneId: uuid("milestone_id").references(() => milestones.id, { onDelete: "set null" }),
+    phaseId: uuid("milestone_id").references(() => phases.id, { onDelete: "set null" }), // Keep SQL column name for backward compatibility
     dayId: text("day_id").references(() => days.id, { onDelete: "set null" }),
     dueDate: date("due_date"),
     focusDate: date("focus_date"),
@@ -494,7 +494,7 @@ export const tasks = pgTable(
   (table) => [
     index("idx_tasks_venture_id").on(table.ventureId),
     index("idx_tasks_project_id").on(table.projectId),
-    index("idx_tasks_milestone_id").on(table.milestoneId),
+    index("idx_tasks_milestone_id").on(table.phaseId), // Keep SQL index name for backward compatibility
     index("idx_tasks_day_id").on(table.dayId),
     index("idx_tasks_status").on(table.status),
     index("idx_tasks_priority").on(table.priority),
@@ -784,15 +784,15 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
     fields: [projects.ventureId],
     references: [ventures.id],
   }),
-  milestones: many(milestones),
+  phases: many(phases),
   tasks: many(tasks),
   docs: many(docs),
   captureItems: many(captureItems),
 }));
 
-export const milestonesRelations = relations(milestones, ({ one, many }) => ({
+export const phasesRelations = relations(phases, ({ one, many }) => ({
   project: one(projects, {
-    fields: [milestones.projectId],
+    fields: [phases.projectId],
     references: [projects.id],
   }),
   tasks: many(tasks),
@@ -807,9 +807,9 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
     fields: [tasks.projectId],
     references: [projects.id],
   }),
-  milestone: one(milestones, {
-    fields: [tasks.milestoneId],
-    references: [milestones.id],
+  phase: one(phases, {
+    fields: [tasks.phaseId],
+    references: [phases.id],
   }),
   day: one(days, {
     fields: [tasks.dayId],
@@ -1113,7 +1113,7 @@ export const ventureAgentActions = pgTable(
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
     conversationId: uuid("conversation_id").references(() => ventureConversations.id, { onDelete: "set null" }),
     action: text("action").notNull(), // e.g., 'create_task', 'update_project', 'create_doc'
-    entityType: text("entity_type"), // e.g., 'task', 'project', 'doc', 'milestone'
+    entityType: text("entity_type"), // e.g., 'task', 'project', 'doc', 'phase'
     entityId: uuid("entity_id"), // ID of created/updated entity
     parameters: jsonb("parameters").$type<Record<string, any>>(),
     result: text("result").$type<"success" | "failed" | "rejected" | "pending">().default("pending"),
