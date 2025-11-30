@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
   CheckSquare,
-  Filter,
   X,
   Calendar,
   Building2,
@@ -21,7 +20,6 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
-  FolderKanban,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +59,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTaskDetailModal } from "@/lib/task-detail-modal-store";
 import { cn } from "@/lib/utils";
 import CreateTaskModal from "@/components/create-task-modal";
-import type { Task, Venture, Project } from "@shared/schema";
+import type { Task, Venture } from "@shared/schema";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
@@ -81,7 +79,7 @@ const PRIORITY_OPTIONS = [
   { value: "P3", label: "P3 - Low", color: "bg-green-500" },
 ];
 
-type SortField = "title" | "venture" | "dueDate" | "effort" | "priority" | "status";
+type SortField = "title" | "venture" | "focusDate" | "effort" | "priority" | "status";
 type SortDirection = "asc" | "desc";
 
 const getStatusIcon = (status: string) => {
@@ -105,6 +103,25 @@ const getPriorityColor = (priority: string | null) => {
       return "bg-green-500 text-white";
     default:
       return "bg-gray-200 text-gray-700";
+  }
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "done":
+      return "text-green-600";
+    case "in_progress":
+      return "text-blue-600";
+    case "next":
+      return "text-purple-600";
+    case "waiting":
+      return "text-yellow-600";
+    case "cancelled":
+      return "text-gray-400";
+    case "idea":
+      return "text-cyan-600";
+    default:
+      return "text-gray-500";
   }
 };
 
@@ -147,7 +164,6 @@ export default function AllTasks() {
   const [ventureFilter, setVentureFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [focusDateFilter, setFocusDateFilter] = useState<Date | undefined>(undefined);
-  const [showFilters, setShowFilters] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Sort state
@@ -162,11 +178,6 @@ export default function AllTasks() {
   // Fetch ventures for filter dropdown
   const { data: ventures = [] } = useQuery<Venture[]>({
     queryKey: ["/api/ventures"],
-  });
-
-  // Fetch projects for display
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
   });
 
   // Update task mutation
@@ -209,13 +220,6 @@ export default function AllTasks() {
     if (!ventureId) return null;
     const venture = ventures.find((v) => v.id === ventureId);
     return venture?.name || null;
-  };
-
-  // Get project name helper
-  const getProjectName = (projectId: string | null) => {
-    if (!projectId) return null;
-    const project = projects.find((p) => p.id === projectId);
-    return project?.name || null;
   };
 
   // Get venture color helper
@@ -275,9 +279,9 @@ export default function AllTasks() {
           const ventureB = getVentureName(b.ventureId) || "";
           comparison = ventureA.localeCompare(ventureB);
           break;
-        case "dueDate":
-          const dateA = a.dueDate || "9999-12-31";
-          const dateB = b.dueDate || "9999-12-31";
+        case "focusDate":
+          const dateA = a.focusDate || "9999-12-31";
+          const dateB = b.focusDate || "9999-12-31";
           comparison = dateA.localeCompare(dateB);
           break;
         case "effort":
@@ -358,33 +362,6 @@ export default function AllTasks() {
     );
   };
 
-  // Effort progress bar
-  const EffortBar = ({ estimated, actual }: { estimated: number | null; actual: number | null }) => {
-    if (!estimated) return <span className="text-muted-foreground">-</span>;
-
-    const est = estimated || 0;
-    const act = actual || 0;
-    const percentage = est > 0 ? Math.min((act / est) * 100, 100) : 0;
-    const remaining = Math.max(0, est - act);
-
-    return (
-      <div className="flex items-center gap-2 min-w-[120px]">
-        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all",
-              percentage >= 100 ? "bg-green-500" : percentage >= 75 ? "bg-yellow-500" : "bg-blue-500"
-            )}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {act}/{est}h
-        </span>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
@@ -395,7 +372,7 @@ export default function AllTasks() {
               <div className="h-3 w-3 rounded-full bg-green-500" />
               <h1 className="text-2xl font-bold">All Tasks</h1>
               <span className="text-muted-foreground text-sm">
-                {stats.outstanding} Outstanding • {stats.inProgress} In Progress • {stats.done} Done
+                {stats.outstanding} Outstanding • {stats.inProgress} In Progress
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -532,6 +509,14 @@ export default function AllTasks() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[50px] text-muted-foreground font-medium">NO</TableHead>
                     <TableHead className="w-[40px]"></TableHead>
+                    <TableHead className="w-[50px]">
+                      <button
+                        className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
+                        onClick={() => handleSort("status")}
+                      >
+                        <SortIcon field="status" />
+                      </button>
+                    </TableHead>
                     <TableHead>
                       <button
                         className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
@@ -546,17 +531,17 @@ export default function AllTasks() {
                         className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
                         onClick={() => handleSort("venture")}
                       >
-                        VENTURE / PROJECT
+                        VENTURE
                         <SortIcon field="venture" />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button
                         className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
-                        onClick={() => handleSort("dueDate")}
+                        onClick={() => handleSort("focusDate")}
                       >
-                        DUE DATE
-                        <SortIcon field="dueDate" />
+                        FOCUS DATE
+                        <SortIcon field="focusDate" />
                       </button>
                     </TableHead>
                     <TableHead>
@@ -577,24 +562,13 @@ export default function AllTasks() {
                         <SortIcon field="priority" />
                       </button>
                     </TableHead>
-                    <TableHead>
-                      <button
-                        className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
-                        onClick={() => handleSort("status")}
-                      >
-                        STATUS
-                        <SortIcon field="status" />
-                      </button>
-                    </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedTasks.map((task, index) => {
-                    const statusBadge = getStatusBadge(task.status);
                     const ventureColor = getVentureColor(task.ventureId);
                     const ventureName = getVentureName(task.ventureId);
-                    const projectName = getProjectName(task.projectId);
 
                     return (
                       <TableRow
@@ -619,47 +593,46 @@ export default function AllTasks() {
                           />
                         </TableCell>
 
-                        {/* Task Title */}
+                        {/* Status Icon */}
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className={cn(
-                              task.status === "done" && "line-through text-muted-foreground"
-                            )}>
-                              {task.title}
-                            </span>
-                          </div>
+                          <span className={getStatusColor(task.status)}>
+                            {getStatusIcon(task.status)}
+                          </span>
                         </TableCell>
 
-                        {/* Venture / Project */}
+                        {/* Task Title */}
+                        <TableCell>
+                          <span className={cn(
+                            "font-medium",
+                            task.status === "done" && "line-through text-muted-foreground"
+                          )}>
+                            {task.title}
+                          </span>
+                        </TableCell>
+
+                        {/* Venture */}
                         <TableCell>
                           {ventureName ? (
                             <div className="flex items-center gap-2">
                               <div
-                                className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-xs font-medium"
+                                className="h-6 w-6 rounded flex items-center justify-center text-white"
                                 style={{ backgroundColor: ventureColor || "#6366f1" }}
                               >
-                                <Building2 className="h-4 w-4" />
+                                <Building2 className="h-3 w-3" />
                               </div>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium">{ventureName}</span>
-                                {projectName && (
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <FolderKanban className="h-3 w-3" />
-                                    {projectName}
-                                  </span>
-                                )}
-                              </div>
+                              <span className="text-sm">{ventureName}</span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
 
-                        {/* Due Date */}
+                        {/* Focus Date */}
                         <TableCell>
-                          {task.dueDate ? (
-                            <span className="text-sm">
-                              {format(parseISO(task.dueDate), "d MMM yyyy")}
+                          {task.focusDate ? (
+                            <span className="text-sm flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {format(parseISO(task.focusDate), "MMM d")}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
@@ -668,7 +641,14 @@ export default function AllTasks() {
 
                         {/* Effort */}
                         <TableCell>
-                          <EffortBar estimated={task.estEffort} actual={task.actualEffort} />
+                          {task.estEffort ? (
+                            <span className="text-sm flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              {task.estEffort}h
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
 
                         {/* Priority */}
@@ -680,16 +660,6 @@ export default function AllTasks() {
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
-                        </TableCell>
-
-                        {/* Status */}
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs border", statusBadge.className)}
-                          >
-                            {statusBadge.label}
-                          </Badge>
                         </TableCell>
 
                         {/* Actions */}
