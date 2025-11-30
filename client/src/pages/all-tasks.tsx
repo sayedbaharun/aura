@@ -110,7 +110,7 @@ const getStatusColor = (status: string) => {
 
 export default function AllTasks() {
   const { toast } = useToast();
-  const { openModal } = useTaskDetailModal();
+  const { openTaskDetail } = useTaskDetailModal();
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -425,7 +425,7 @@ export default function AllTasks() {
                       "group flex items-center gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer",
                       task.status === "done" && "opacity-60"
                     )}
-                    onClick={() => openModal(task.id)}
+                    onClick={() => openTaskDetail(task.id)}
                   >
                     {/* Checkbox */}
                     <div
@@ -510,7 +510,7 @@ export default function AllTasks() {
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
-                            openModal(task.id);
+                            openTaskDetail(task.id);
                           }}
                         >
                           View Details

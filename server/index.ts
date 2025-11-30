@@ -291,27 +291,6 @@ app.use((req, res, next) => {
       log('Categories seeding skipped:', String(error));
     }
 
-    // Start cleanup job for expired confirmations (runs every 5 minutes)
-    const cleanupInterval = setInterval(async () => {
-      try {
-        const deleted = await storage.cleanupExpiredConfirmations();
-        if (deleted > 0) {
-          log(`Cleaned up ${deleted} expired confirmation(s)`);
-        }
-      } catch (error) {
-        log('Error cleaning up expired confirmations:', String(error));
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-
-    // Initialize attendee tracking service (starts polling every 10 minutes)
-    try {
-      const { startAttendeeTracking } = await import('./attendee-tracker');
-      startAttendeeTracking();
-      log('✓ Attendee tracking service started');
-    } catch (error) {
-      log('Attendee tracking setup skipped:', String(error));
-    }
-
     // Initialize Telegram bot webhook or polling AFTER server starts
     let telegramBot: any = null;
     try {
@@ -360,20 +339,6 @@ app.use((req, res, next) => {
       log('Telegram bot setup skipped:', String(error));
     }
 
-    // Initialize scheduled jobs (proactive briefings and suggestions)
-    try {
-      const { initializeScheduledJobs, stopScheduledJobs } = await import('./scheduled-jobs');
-      const { sendProactiveMessage } = await import('./telegram-bot');
-
-      initializeScheduledJobs(sendProactiveMessage);
-      log('✓ Scheduled jobs system initialized (briefings, proactive checks)');
-
-      // Store reference for cleanup
-      (globalThis as any).stopScheduledJobs = stopScheduledJobs;
-    } catch (error) {
-      log('Scheduled jobs setup skipped:', String(error));
-    }
-
     // Initialize SB-OS automations
     try {
       const { scheduleDailyDayCreation } = await import('./automations/daily-day-creation');
@@ -392,25 +357,13 @@ app.use((req, res, next) => {
     // Graceful shutdown
     const gracefulShutdown = async () => {
       log('Shutting down gracefully...');
-      clearInterval(cleanupInterval);
 
-      // Stop attendee tracking
+      // Stop SB-OS automations
       try {
-        const { stopAttendeeTracking } = await import('./attendee-tracker');
-        stopAttendeeTracking();
-        log('Attendee tracking stopped');
+        // Automations use node-cron which doesn't need explicit cleanup
+        log('Automations stopped');
       } catch (error) {
-        log('Error stopping attendee tracking:', String(error));
-      }
-
-      // Stop scheduled jobs
-      try {
-        if ((globalThis as any).stopScheduledJobs) {
-          (globalThis as any).stopScheduledJobs();
-          log('Scheduled jobs stopped');
-        }
-      } catch (error) {
-        log('Error stopping scheduled jobs:', String(error));
+        log('Error stopping automations:', String(error));
       }
 
       if (telegramBot) {

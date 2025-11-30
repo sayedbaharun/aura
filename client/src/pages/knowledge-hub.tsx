@@ -133,14 +133,20 @@ export default function KnowledgeHub() {
   };
 
   const handleDuplicateDoc = (doc: Doc) => {
+    // Create a copy without the id (treated as new doc)
+    const { id, createdAt, updatedAt, ...rest } = doc;
     const duplicated = {
-      ...doc,
-      id: undefined,
+      ...rest,
       title: `${doc.title} (Copy)`,
-      status: "draft",
+      status: "draft" as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-    setEditingDoc(duplicated as Doc);
+    // Pass as partial doc for creation (null signals new doc mode)
+    setEditingDoc(null);
     setEditorOpen(true);
+    // Pre-fill the form with duplicated values after a tick
+    setTimeout(() => setEditingDoc({ ...duplicated, id: crypto.randomUUID() } as Doc), 0);
   };
 
   const handleDeleteDoc = (docId: string) => {
