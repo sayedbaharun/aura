@@ -63,6 +63,7 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/days/today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/days"] });
       toast({
         title: "Success",
         description: "Day updated successfully",
