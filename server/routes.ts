@@ -411,15 +411,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create project
   app.post("/api/projects", async (req, res) => {
     try {
-      const validatedData = insertProjectSchema.parse(req.body);
+      // Sanitize data - convert empty strings to null for optional fields
+      const sanitizedBody = { ...req.body };
+      const nullableFields = ['startDate', 'targetEndDate', 'actualEndDate', 'outcome', 'notes', 'budget', 'externalId'];
+      for (const field of nullableFields) {
+        if (sanitizedBody[field] === '') {
+          sanitizedBody[field] = null;
+        }
+      }
+
+      const validatedData = insertProjectSchema.parse(sanitizedBody);
       const project = await storage.createProject(validatedData);
       res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid project data", details: error.errors });
       } else {
-        logger.error({ error }, "Error creating project");
-        res.status(500).json({ error: "Failed to create project" });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ error, errorMessage, body: req.body }, "Error creating project");
+        res.status(500).json({ error: "Failed to create project", details: errorMessage });
       }
     }
   });
@@ -428,7 +438,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/projects/:id", async (req, res) => {
     try {
       logger.info({ projectId: req.params.id, body: req.body }, "Updating project");
-      const updates = insertProjectSchema.partial().parse(req.body);
+
+      // Sanitize data - convert empty strings to null for optional fields
+      const sanitizedBody = { ...req.body };
+      const nullableFields = ['startDate', 'targetEndDate', 'actualEndDate', 'outcome', 'notes', 'budget', 'externalId'];
+      for (const field of nullableFields) {
+        if (sanitizedBody[field] === '') {
+          sanitizedBody[field] = null;
+        }
+      }
+
+      const updates = insertProjectSchema.partial().parse(sanitizedBody);
       logger.info({ projectId: req.params.id, updates }, "Validated project updates");
       const project = await storage.updateProject(req.params.id, updates);
       if (!project) {
@@ -597,15 +617,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create task
   app.post("/api/tasks", async (req, res) => {
     try {
-      const validatedData = insertTaskSchema.parse(req.body);
+      // Sanitize data - convert empty strings to null for optional fields
+      const sanitizedBody = { ...req.body };
+      const nullableFields = ['dueDate', 'focusDate', 'notes', 'ventureId', 'projectId', 'phaseId', 'dayId'];
+      for (const field of nullableFields) {
+        if (sanitizedBody[field] === '') {
+          sanitizedBody[field] = null;
+        }
+      }
+
+      const validatedData = insertTaskSchema.parse(sanitizedBody);
       const task = await storage.createTask(validatedData);
       res.status(201).json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid task data", details: error.errors });
       } else {
-        logger.error({ error }, "Error creating task");
-        res.status(500).json({ error: "Failed to create task" });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ error, errorMessage, body: req.body }, "Error creating task");
+        res.status(500).json({ error: "Failed to create task", details: errorMessage });
       }
     }
   });
@@ -614,7 +644,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tasks/:id", async (req, res) => {
     try {
       logger.info({ taskId: req.params.id, body: req.body }, "Updating task");
-      const updates = insertTaskSchema.partial().parse(req.body);
+
+      // Sanitize data - convert empty strings to null for optional fields
+      const sanitizedBody = { ...req.body };
+      const nullableFields = ['dueDate', 'focusDate', 'notes', 'ventureId', 'projectId', 'phaseId', 'dayId'];
+      for (const field of nullableFields) {
+        if (sanitizedBody[field] === '') {
+          sanitizedBody[field] = null;
+        }
+      }
+
+      const updates = insertTaskSchema.partial().parse(sanitizedBody);
       logger.info({ taskId: req.params.id, updates }, "Validated task updates");
       const task = await storage.updateTask(req.params.id, updates);
       if (!task) {
