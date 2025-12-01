@@ -27,6 +27,7 @@ import CapturePage from "@/pages/capture";
 import TradingPage from "@/pages/trading";
 import AiChat from "@/pages/ai-chat";
 import AllTasks from "@/pages/all-tasks";
+import CommandCenterV2 from "@/pages/command-center-v2";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { dailyRemindersService } from "@/lib/daily-reminders";
@@ -62,6 +63,7 @@ function Router() {
             <Route path="/books" component={Books} />
             <Route path="/capture" component={CapturePage} />
             <Route path="/trading" component={TradingPage} />
+            <Route path="/command-center-v2" component={CommandCenterV2} />
             <Route path="/ai-chat" component={AiChat} />
             <Route path="/tasks" component={AllTasks} />
             <Route component={NotFound} />
