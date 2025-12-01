@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { Plus, Bot, Settings } from "lucide-react";
+import { Plus, Bot, Settings, Sparkles } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import VenturePhasesList from "@/components/venture-hq/venture-phases-list";
 import TasksList from "@/components/venture-hq/tasks-list";
 import VentureDocs from "@/components/docs/venture-docs";
 import CreateProjectModal from "@/components/venture-hq/create-project-modal";
+import ProjectWizard from "@/components/venture-hq/project-wizard";
 import AiAgentConfig from "@/components/venture-hq/ai-agent-config";
 import VentureAiChat from "@/components/venture-hq/venture-ai-chat";
 
@@ -29,6 +30,7 @@ export default function VentureDetail() {
   const [, params] = useRoute("/ventures/:id");
   const ventureId = params?.id;
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
+  const [projectWizardOpen, setProjectWizardOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("projects");
   const [aiSubTab, setAiSubTab] = useState<"chat" | "config">("chat");
 
@@ -99,10 +101,16 @@ export default function VentureDetail() {
           </div>
 
           {activeTab === "projects" && (
-            <Button onClick={() => setCreateProjectModalOpen(true)} size="sm" className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              New Project
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button onClick={() => setProjectWizardOpen(true)} size="sm" variant="outline" className="flex-1 sm:flex-initial">
+                <Sparkles className="h-4 w-4 mr-2" />
+                AI Wizard
+              </Button>
+              <Button onClick={() => setCreateProjectModalOpen(true)} size="sm" className="flex-1 sm:flex-initial">
+                <Plus className="h-4 w-4 mr-2" />
+                New Project
+              </Button>
+            </div>
           )}
         </div>
 
@@ -163,6 +171,13 @@ export default function VentureDetail() {
         open={createProjectModalOpen}
         onOpenChange={setCreateProjectModalOpen}
         ventureId={venture.id}
+      />
+
+      <ProjectWizard
+        open={projectWizardOpen}
+        onOpenChange={setProjectWizardOpen}
+        ventureId={venture.id}
+        ventureName={venture.name}
       />
     </div>
   );
