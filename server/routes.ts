@@ -445,6 +445,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // DASHBOARD - TASKS
+  // ============================================================================
+
+  app.get("/api/dashboard/tasks", async (req: Request, res: Response) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      // Fetch tasks for today (focus_date = today OR due_date <= today)
+      // Using getTasksForToday which likely handles this logic
+      const tasks = await storage.getTasksForToday(today);
+
+      // Filter out done/cancelled if not already handled
+      const activeTasks = tasks.filter(t => !['done', 'cancelled'].includes(t.status));
+
+      // Sort by Priority (P0 > P1 > P2 > P3)
+      const priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
+      activeTasks.sort((a, b) => {
+        const pA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 99;
+        const pB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 99;
+        return pA - pB;
+      });
+
+      // Map to UI format
+      const mappedTasks = activeTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        status: t.status,
+        ventureId: t.ventureId,
+        domain: t.domain,
+        tags: t.tags
+      }));
+
+      res.json(mappedTasks);
+    } catch (error) {
+      console.error("[Dashboard Tasks] Error:", error);
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  // ============================================================================
   // VENTURES
   // ============================================================================
 

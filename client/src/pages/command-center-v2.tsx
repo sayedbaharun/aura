@@ -89,6 +89,50 @@ export default function CommandCenterV2() {
 
     const currentConfig = modeConfig[mode];
 
+    const { data: tasks, isLoading: isLoadingTasks } = useQuery({
+        queryKey: ["tasks"],
+        queryFn: async () => {
+            const res = await fetch("/api/dashboard/tasks");
+            if (!res.ok) throw new Error("Failed to fetch tasks");
+            return res.json();
+        },
+        initialData: []
+    });
+
+    // Filter Tasks based on Mode
+    const filteredTasks = React.useMemo(() => {
+        if (!tasks.length) return [];
+
+        switch (mode) {
+            case "trading":
+                // Show only trading/finance tasks
+                return tasks.filter((t: any) =>
+                    t.domain === 'finance' ||
+                    t.tags?.includes('trading') ||
+                    t.title.toLowerCase().includes('trading') ||
+                    t.title.toLowerCase().includes('market')
+                );
+            case "deep_work":
+                // Show High Priority Venture tasks
+                return tasks.filter((t: any) =>
+                    (t.priority === 'P0' || t.priority === 'P1') &&
+                    t.domain !== 'finance' // Exclude trading
+                );
+            case "admin":
+            case "shutdown":
+            case "morning":
+                // Show Admin/Routine tasks or anything else
+                return tasks.filter((t: any) =>
+                    t.priority === 'P2' ||
+                    t.priority === 'P3' ||
+                    t.domain === 'admin' ||
+                    t.domain === 'health'
+                );
+            default:
+                return tasks;
+        }
+    }, [tasks, mode]);
+
     return (
         <div className="min-h-screen bg-background p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto">
             {/* HEADER: HUD */}
@@ -189,28 +233,23 @@ export default function CommandCenterV2() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {/* Mock Tasks */}
-                            <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                                <Circle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                                <div className="text-sm">
-                                    <div className="font-medium">Review Q3 Roadmap</div>
-                                    <div className="text-xs text-muted-foreground">Aura • P1</div>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                                <Circle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                                <div className="text-sm">
-                                    <div className="font-medium">Update Trading Journal</div>
-                                    <div className="text-xs text-muted-foreground">Alpha • Routine</div>
-                                </div>
-                            </div>
-                            <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-                                <div className="text-sm line-through text-muted-foreground">
-                                    <div className="font-medium">Morning Workout</div>
-                                    <div className="text-xs">Temple • Done</div>
-                                </div>
-                            </div>
+                            {isLoadingTasks ? (
+                                <div className="text-sm text-muted-foreground">Loading tasks...</div>
+                            ) : filteredTasks.length === 0 ? (
+                                <div className="text-sm text-muted-foreground">No tasks for this mode.</div>
+                            ) : (
+                                filteredTasks.map((t: any) => (
+                                    <div key={t.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                                        <Circle className={`h-5 w-5 mt-0.5 ${t.priority === 'P0' ? 'text-red-500' : 'text-muted-foreground'}`} />
+                                        <div className="text-sm">
+                                            <div className="font-medium">{t.title}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {t.priority} • {t.domain || 'General'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </CardContent>
                     </Card>
                 </div>
