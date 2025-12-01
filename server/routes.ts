@@ -406,7 +406,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update project
   app.patch("/api/projects/:id", async (req, res) => {
     try {
+      logger.info({ projectId: req.params.id, body: req.body }, "Updating project");
       const updates = insertProjectSchema.partial().parse(req.body);
+      logger.info({ projectId: req.params.id, updates }, "Validated project updates");
       const project = await storage.updateProject(req.params.id, updates);
       if (!project) {
         return res.status(404).json({ error: "Project not found" });
@@ -416,8 +418,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid project data", details: error.errors });
       } else {
-        logger.error({ error }, "Error updating project");
-        res.status(500).json({ error: "Failed to update project" });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        logger.error({ error, errorMessage, errorStack, projectId: req.params.id, body: req.body }, "Error updating project");
+        res.status(500).json({ error: "Failed to update project", details: errorMessage });
       }
     }
   });
@@ -482,7 +486,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update phase
   app.patch("/api/phases/:id", async (req, res) => {
     try {
+      logger.info({ phaseId: req.params.id, body: req.body }, "Updating phase");
       const updates = insertPhaseSchema.partial().parse(req.body);
+      logger.info({ phaseId: req.params.id, updates }, "Validated phase updates");
       const phase = await storage.updatePhase(req.params.id, updates);
       if (!phase) {
         return res.status(404).json({ error: "Phase not found" });
@@ -492,8 +498,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid phase data", details: error.errors });
       } else {
-        logger.error({ error }, "Error updating phase");
-        res.status(500).json({ error: "Failed to update phase" });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        logger.error({ error, errorMessage, errorStack, phaseId: req.params.id, body: req.body }, "Error updating phase");
+        res.status(500).json({ error: "Failed to update phase", details: errorMessage });
       }
     }
   });
@@ -603,7 +611,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update task
   app.patch("/api/tasks/:id", async (req, res) => {
     try {
+      logger.info({ taskId: req.params.id, body: req.body }, "Updating task");
       const updates = insertTaskSchema.partial().parse(req.body);
+      logger.info({ taskId: req.params.id, updates }, "Validated task updates");
       const task = await storage.updateTask(req.params.id, updates);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
@@ -632,8 +642,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid task data", details: error.errors });
       } else {
-        logger.error({ error }, "Error updating task");
-        res.status(500).json({ error: "Failed to update task" });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        logger.error({ error, errorMessage, errorStack, taskId: req.params.id, body: req.body }, "Error updating task");
+        res.status(500).json({ error: "Failed to update task", details: errorMessage });
       }
     }
   });
