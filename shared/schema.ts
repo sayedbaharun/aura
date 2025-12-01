@@ -711,7 +711,8 @@ export const docs = pgTable(
     status: docStatusEnum("status").default("draft").notNull(),
     icon: text("icon"), // Emoji or icon identifier
     coverImage: text("cover_image"), // URL to cover image
-    body: text("body"), // Markdown content
+    body: text("body"), // Markdown content (legacy, for backward compatibility)
+    content: jsonb("content").$type<unknown[]>(), // BlockNote JSON content (rich editor blocks)
     order: integer("order").default(0), // Sort order within parent
     isFolder: boolean("is_folder").default(false), // True for folder-type pages
     tags: jsonb("tags").$type<string[]>().default([]),

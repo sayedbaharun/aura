@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -13,18 +13,17 @@ import {
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import MarkdownEditor from "./markdown-editor";
+import BlockEditor from "./block-editor";
 import { AttachmentsPanel } from "./attachments-panel";
 import {
   Save,
   MoreHorizontal,
   Trash2,
-  Star,
   Calendar,
   Tag,
   FileText,
   FolderOpen,
-  X,
+  Code,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PartialBlock } from "@blocknote/core";
 
 interface Doc {
   id: string;
@@ -41,6 +41,7 @@ interface Doc {
   domain: string | null;
   status: string;
   body: string | null;
+  content: unknown[] | null; // BlockNote JSON content
   ventureId: string | null;
   projectId: string | null;
   parentId: string | null;
@@ -94,13 +95,16 @@ const DOC_STATUSES = [
 export default function DocEditor({ docId, onClose, onDelete }: DocEditorProps) {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [content, setContent] = useState<PartialBlock[] | null>(null);
+  const [markdownBody, setMarkdownBody] = useState<string>("");
   const [type, setType] = useState("page");
   const [domain, setDomain] = useState<string | null>(null);
   const [status, setStatus] = useState("draft");
   const [isFolder, setIsFolder] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
+  const [showAttachments, setShowAttachments] = useState(true);
+  const initializedRef = useRef(false);
 
   const { data: doc, isLoading } = useQuery<Doc>({
     queryKey: ["/api/docs", docId],
@@ -115,22 +119,42 @@ export default function DocEditor({ docId, onClose, onDelete }: DocEditorProps) 
 
   // Initialize form from doc data
   useEffect(() => {
-    if (doc) {
+    if (doc && !initializedRef.current) {
       setTitle(doc.title);
-      setBody(doc.body || "");
       setType(doc.type);
       setDomain(doc.domain);
       setStatus(doc.status);
       setIsFolder(doc.isFolder);
+
+      // Prefer content (blocks) over body (markdown)
+      if (doc.content && Array.isArray(doc.content) && doc.content.length > 0) {
+        setContent(doc.content as PartialBlock[]);
+        setMarkdownBody("");
+      } else if (doc.body) {
+        // Legacy markdown content - will be converted by BlockEditor
+        setContent(null);
+        setMarkdownBody(doc.body);
+      } else {
+        setContent([]);
+        setMarkdownBody("");
+      }
+
       setHasUnsavedChanges(false);
+      initializedRef.current = true;
     }
   }, [doc]);
+
+  // Reset initialized ref when docId changes
+  useEffect(() => {
+    initializedRef.current = false;
+  }, [docId]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("PATCH", `/api/docs/${docId}`, {
         title,
-        body,
+        content, // Save blocks as JSON
+        body: markdownBody, // Also save markdown for backward compatibility
         type,
         domain,
         status,
@@ -168,10 +192,14 @@ export default function DocEditor({ docId, onClose, onDelete }: DocEditorProps) 
     setHasUnsavedChanges(true);
   };
 
-  const handleBodyChange = (newBody: string) => {
-    setBody(newBody);
+  const handleContentChange = useCallback((blocks: PartialBlock[]) => {
+    setContent(blocks);
     setHasUnsavedChanges(true);
-  };
+  }, []);
+
+  const handleMarkdownChange = useCallback((markdown: string) => {
+    setMarkdownBody(markdown);
+  }, []);
 
   const handleSave = () => {
     saveMutation.mutate();
@@ -195,7 +223,7 @@ export default function DocEditor({ docId, onClose, onDelete }: DocEditorProps) 
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [hasUnsavedChanges, title, body, type, domain, status]);
+  }, [hasUnsavedChanges, handleSave]);
 
   if (isLoading) {
     return (
@@ -288,6 +316,12 @@ export default function DocEditor({ docId, onClose, onDelete }: DocEditorProps) 
                 >
                   <FolderOpen className="h-4 w-4 mr-2" />
                   {isFolder ? "Convert to page" : "Convert to folder"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setShowAttachments(!showAttachments)}
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  {showAttachments ? "Hide attachments" : "Show attachments"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -388,23 +422,25 @@ export default function DocEditor({ docId, onClose, onDelete }: DocEditorProps) 
       </div>
 
       {/* Editor and Attachments */}
-      <div className="flex flex-1 min-h-0 gap-4">
-        {/* Main Editor */}
-        <div className="flex-1 min-h-0">
-          <MarkdownEditor
-            value={body}
-            onChange={handleBodyChange}
-            placeholder="Start writing..."
-            minHeight="100%"
-            className="h-full border-0 rounded-none"
-            docId={docId}
+      <div className="flex flex-1 min-h-0">
+        {/* Main Editor - BlockNote */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          <BlockEditor
+            initialContent={content || undefined}
+            initialMarkdown={!content && markdownBody ? markdownBody : undefined}
+            onChange={handleContentChange}
+            onMarkdownChange={handleMarkdownChange}
+            editable={true}
+            className="min-h-full p-4"
           />
         </div>
 
         {/* Attachments Panel */}
-        <div className="w-80 flex-shrink-0 border-l overflow-y-auto">
-          <AttachmentsPanel docId={docId} />
-        </div>
+        {showAttachments && (
+          <div className="w-80 flex-shrink-0 border-l overflow-y-auto">
+            <AttachmentsPanel docId={docId} />
+          </div>
+        )}
       </div>
     </div>
   );
