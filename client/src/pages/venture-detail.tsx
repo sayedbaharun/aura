@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VentureDetailHeader from "@/components/venture-hq/venture-detail-header";
 import ProjectsBoard from "@/components/venture-hq/projects-board";
+import VenturePhasesList from "@/components/venture-hq/venture-phases-list";
 import TasksList from "@/components/venture-hq/tasks-list";
 import VentureDocs from "@/components/docs/venture-docs";
 import CreateProjectModal from "@/components/venture-hq/create-project-modal";
@@ -90,6 +91,7 @@ export default function VentureDetail() {
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <TabsList className="inline-flex w-auto">
               <TabsTrigger value="projects" className="text-xs sm:text-sm">Projects</TabsTrigger>
+              <TabsTrigger value="phases" className="text-xs sm:text-sm">Phases</TabsTrigger>
               <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
               <TabsTrigger value="docs" className="text-xs sm:text-sm whitespace-nowrap">Knowledge</TabsTrigger>
               <TabsTrigger value="ai-agent" className="text-xs sm:text-sm whitespace-nowrap">AI Agent</TabsTrigger>
@@ -106,6 +108,10 @@ export default function VentureDetail() {
 
         <TabsContent value="projects">
           <ProjectsBoard ventureId={venture.id} />
+        </TabsContent>
+
+        <TabsContent value="phases">
+          <VenturePhasesList ventureId={venture.id} />
         </TabsContent>
 
         <TabsContent value="tasks">

@@ -30,9 +30,10 @@ interface Task {
 
 interface VenturesGridProps {
   viewMode: "grid" | "list";
+  statusFilter: string;
 }
 
-export default function VenturesGrid({ viewMode }: VenturesGridProps) {
+export default function VenturesGrid({ viewMode, statusFilter }: VenturesGridProps) {
   const [, setLocation] = useLocation();
 
   const { data: ventures = [], isLoading: venturesLoading } = useQuery<Venture[]>({
@@ -115,6 +116,11 @@ export default function VenturesGrid({ viewMode }: VenturesGridProps) {
     );
   }
 
+  // Filter ventures by status
+  const filteredVentures = statusFilter === "all"
+    ? ventures
+    : ventures.filter((v) => v.status === statusFilter);
+
   if (ventures.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[400px] text-center border-2 border-dashed rounded-lg">
@@ -127,12 +133,24 @@ export default function VenturesGrid({ viewMode }: VenturesGridProps) {
     );
   }
 
+  if (filteredVentures.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[400px] text-center border-2 border-dashed rounded-lg">
+        <Briefcase className="h-16 w-16 text-muted-foreground/20 mb-4" />
+        <h3 className="text-lg font-semibold mb-2">No ventures match filter</h3>
+        <p className="text-sm text-muted-foreground">
+          Try selecting a different status filter
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       "grid gap-4",
       viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
     )}>
-      {ventures.map((venture) => {
+      {filteredVentures.map((venture) => {
         const stats = getVentureStats(venture.id);
         return (
           <Card

@@ -1,8 +1,22 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, Pencil, Target } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Pencil, Target, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import CreateVentureModal from "./create-venture-modal";
 
 interface Venture {
@@ -23,6 +37,31 @@ interface VentureDetailHeaderProps {
 export default function VentureDetailHeader({ venture }: VentureDetailHeaderProps) {
   const [, setLocation] = useLocation();
   const [showEditModal, setShowEditModal] = useState(false);
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/ventures/${venture.id}`);
+      if (!res.ok) {
+        throw new Error("Failed to delete venture");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ventures"] });
+      toast({
+        title: "Success",
+        description: "Venture deleted successfully",
+      });
+      setLocation("/ventures");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete venture",
+        variant: "destructive",
+      });
+    },
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -99,10 +138,36 @@ export default function VentureDetailHeader({ venture }: VentureDetailHeaderProp
             )}
           </div>
 
-          <Button onClick={() => setShowEditModal(true)}>
-            <Pencil className="h-4 w-4 mr-2" />
-            Edit Venture
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowEditModal(true)}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit Venture
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="icon">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Venture</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{venture.name}"? This will also delete all associated projects, phases, and tasks. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </div>
 
