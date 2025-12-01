@@ -203,9 +203,13 @@ export default function ProjectDetailModal({
       await apiRequest("DELETE", `/api/projects/${projectId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      toast({ title: "Success", description: "Project deleted" });
+      // Close modal first to prevent refetch of deleted project
       onOpenChange(false);
+      // Remove the specific project query from cache
+      queryClient.removeQueries({ queryKey: ["/api/projects", projectId] });
+      // Invalidate the projects list
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"], exact: false });
+      toast({ title: "Success", description: "Project deleted" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete project", variant: "destructive" });
