@@ -54,9 +54,9 @@ export default function TaskPicker({
 
   // Fetch all tasks (not just today's)
   const { data: tasks = [] } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", { status: "next,in_progress,backlog" }],
+    queryKey: ["/api/tasks", { status: "next,in_progress,idea" }],
     queryFn: async () => {
-      const res = await fetch("/api/tasks?status=next,in_progress,backlog", {
+      const res = await fetch("/api/tasks?status=next,in_progress,idea", {
         credentials: "include",
       });
       if (!res.ok) return [];
