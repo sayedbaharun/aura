@@ -3154,6 +3154,109 @@ RULES:
     }
   });
 
+  // ============================================================================
+  // PROJECT SCAFFOLDING - AI-powered project plan generation
+  // ============================================================================
+
+  // Get scaffolding options (categories, scopes)
+  app.get("/api/project-scaffolding/options", async (req, res) => {
+    try {
+      const { getProjectCategories, getScopeOptions } = await import("./project-scaffolding");
+      res.json({
+        categories: getProjectCategories(),
+        scopes: getScopeOptions(),
+      });
+    } catch (error) {
+      logger.error({ error }, "Error fetching scaffolding options");
+      res.status(500).json({ error: "Failed to fetch scaffolding options" });
+    }
+  });
+
+  // Generate a project plan from intake data
+  app.post("/api/project-scaffolding/generate", aiRateLimiter, async (req, res) => {
+    try {
+      const { ventureId, projectName, projectCategory, desiredOutcome, scope, keyConstraints, domainContext } = req.body;
+
+      // Validate required fields
+      if (!ventureId) {
+        return res.status(400).json({ error: "ventureId is required" });
+      }
+      if (!projectName) {
+        return res.status(400).json({ error: "projectName is required" });
+      }
+      if (!desiredOutcome) {
+        return res.status(400).json({ error: "desiredOutcome is required" });
+      }
+      if (!scope || !["small", "medium", "large"].includes(scope)) {
+        return res.status(400).json({ error: "scope must be one of: small, medium, large" });
+      }
+
+      // Check venture exists
+      const venture = await storage.getVenture(ventureId);
+      if (!venture) {
+        return res.status(404).json({ error: "Venture not found" });
+      }
+
+      const { generateProjectPlan } = await import("./project-scaffolding");
+
+      const plan = await generateProjectPlan({
+        ventureId,
+        projectName,
+        projectCategory: projectCategory || "admin_general",
+        desiredOutcome,
+        scope,
+        keyConstraints,
+        domainContext,
+      });
+
+      res.json(plan);
+    } catch (error: any) {
+      logger.error({ error }, "Error generating project plan");
+
+      if (error.message?.includes("All AI models failed")) {
+        return res.status(503).json({
+          error: "AI service temporarily unavailable",
+          message: "Please try again in a moment",
+        });
+      }
+
+      res.status(500).json({ error: "Failed to generate project plan" });
+    }
+  });
+
+  // Commit a generated project plan to the database
+  app.post("/api/project-scaffolding/commit", async (req, res) => {
+    try {
+      const { ventureId, plan, startDate, targetEndDate } = req.body;
+
+      // Validate required fields
+      if (!ventureId) {
+        return res.status(400).json({ error: "ventureId is required" });
+      }
+      if (!plan || !plan.project || !plan.phases) {
+        return res.status(400).json({ error: "plan with project and phases is required" });
+      }
+
+      // Check venture exists
+      const venture = await storage.getVenture(ventureId);
+      if (!venture) {
+        return res.status(404).json({ error: "Venture not found" });
+      }
+
+      const { commitProjectPlan } = await import("./project-scaffolding");
+
+      const result = await commitProjectPlan(ventureId, plan, {
+        startDate,
+        targetEndDate,
+      });
+
+      res.status(201).json(result);
+    } catch (error) {
+      logger.error({ error }, "Error committing project plan");
+      res.status(500).json({ error: "Failed to commit project plan" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
