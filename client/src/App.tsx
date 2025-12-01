@@ -50,7 +50,7 @@ function Router() {
             <Route path="/dashboard" component={CommandCenter} />
             <Route path="/ventures" component={VentureHQ} />
             <Route path="/ventures/:id" component={VentureDetail} />
-            <Route path="/health" component={HealthHub} />
+            <Route path="/health-hub" component={HealthHub} />
             <Route path="/nutrition" component={NutritionDashboard} />
             <Route path="/knowledge" component={KnowledgeHub} />
             <Route path="/knowledge/:id" component={DocDetail} />

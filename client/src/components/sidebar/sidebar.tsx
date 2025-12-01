@@ -142,7 +142,7 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
     label: "Wellness",
     items: [
       {
-        href: "/health",
+        href: "/health-hub",
         icon: Heart,
         label: "Health Hub",
       },

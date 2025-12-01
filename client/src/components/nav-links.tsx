@@ -8,7 +8,7 @@ const links = [
   { href: "/evening", label: "Evening", icon: Moon },
   { href: "/ventures", label: "Ventures", icon: Briefcase },
   { href: "/deep-work", label: "Deep Work", icon: Focus },
-  { href: "/health", label: "Health", icon: Heart },
+  { href: "/health-hub", label: "Health", icon: Heart },
   { href: "/nutrition", label: "Nutrition", icon: Apple },
   { href: "/shopping", label: "Shopping", icon: ShoppingCart },
   { href: "/books", label: "Books", icon: Library },
