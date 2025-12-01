@@ -18,6 +18,16 @@ export const MODEL_CASCADE = [
   { name: "anthropic/claude-3.5-sonnet", maxRetries: 1, description: "Fallback 2 - Reliable alternative" },
 ] as const;
 
+// Available models for selection in UI (via OpenRouter)
+export const AVAILABLE_MODELS = [
+  { id: "openai/gpt-4o", name: "GPT-4o", provider: "OpenAI", description: "Most capable, best for complex reasoning" },
+  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", description: "Fast and efficient, good for most tasks" },
+  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic", description: "Excellent reasoning and coding" },
+  { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku", provider: "Anthropic", description: "Fastest Claude model" },
+  { id: "google/gemini-pro-1.5", name: "Gemini Pro 1.5", provider: "Google", description: "Long context, multimodal" },
+  { id: "meta-llama/llama-3.1-70b-instruct", name: "Llama 3.1 70B", provider: "Meta", description: "Open source, strong performance" },
+] as const;
+
 // Task complexity classification for smart model selection
 export type TaskComplexity = "simple" | "moderate" | "complex";
 
@@ -62,23 +72,39 @@ export function selectModelForTask(complexity: TaskComplexity): string {
 /**
  * Multi-model chat completion with automatic fallback
  * Tries models in cascade order until success or all fail
+ * @param params - Chat completion parameters
+ * @param complexity - Task complexity for model selection (ignored if preferredModel is set)
+ * @param preferredModel - Optional specific model to use (bypasses complexity-based selection)
  */
 export async function chatCompletion(
   params: ChatCompletionParams,
   complexity: TaskComplexity = "complex",
+  preferredModel?: string,
 ): Promise<{
   response: OpenAI.Chat.ChatCompletion;
   metrics: ModelMetrics;
 }> {
-  // Determine starting model based on task complexity
-  const preferredModel = selectModelForTask(complexity);
-  const startIndex = MODEL_CASCADE.findIndex((m) => m.name === preferredModel);
-  
-  // Reorder cascade to start with preferred model
-  const orderedCascade = [
-    ...MODEL_CASCADE.slice(startIndex),
-    ...MODEL_CASCADE.slice(0, startIndex),
-  ];
+  // Use preferred model if specified, otherwise select based on complexity
+  const selectedModel = preferredModel || selectModelForTask(complexity);
+  const startIndex = MODEL_CASCADE.findIndex((m) => m.name === selectedModel);
+
+  // Build cascade: if preferred model is in cascade, reorder to start with it
+  // If not in cascade (custom model), prepend it to the cascade with default retries
+  let orderedCascade: Array<{ name: string; maxRetries: number; description: string }>;
+  if (startIndex >= 0) {
+    orderedCascade = [
+      ...MODEL_CASCADE.slice(startIndex),
+      ...MODEL_CASCADE.slice(0, startIndex),
+    ];
+  } else if (preferredModel) {
+    // Custom model not in cascade - try it first, then fall back to default cascade
+    orderedCascade = [
+      { name: preferredModel, maxRetries: 2, description: "Custom preferred model" },
+      ...MODEL_CASCADE,
+    ];
+  } else {
+    orderedCascade = [...MODEL_CASCADE];
+  }
 
   let lastError: Error | null = null;
   let totalAttempts = 0;
