@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -127,15 +127,6 @@ export default function VentureDetailHeader({ venture }: VentureDetailHeaderProp
               </Badge>
             </div>
 
-            {venture.primaryFocus && (
-              <div className="flex items-start gap-2 bg-muted/50 p-3 rounded-lg max-w-2xl">
-                <Target className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium mb-1">Primary Focus</p>
-                  <p className="text-sm text-muted-foreground">{venture.primaryFocus}</p>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="flex gap-2">
