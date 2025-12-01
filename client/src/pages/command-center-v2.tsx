@@ -9,19 +9,15 @@ export default function CommandCenterV2() {
     // Mock State - In production this would come from API
     const [time, setTime] = useState(new Date());
 
-    const { data: readiness } = useQuery({
+    const { data: readiness, isLoading, error } = useQuery({
         queryKey: ["readiness"],
         queryFn: async () => {
             const res = await fetch("/api/dashboard/readiness");
             if (!res.ok) throw new Error("Failed to fetch readiness");
             return res.json();
         },
-        initialData: { percentage: 0, sleep: 0, mood: "unknown" }
+        refetchInterval: 5000 // Refresh every 5 seconds
     });
-
-    if (readiness.status === "no_data") {
-        console.log("Readiness: No data found for today.");
-    }
 
     const [mission] = useState("Ship Aura MVP");
 
@@ -87,32 +83,21 @@ export default function CommandCenterV2() {
                     </div>
                 </div>
 
-                <div className="w-full md:w-auto flex items-center gap-2">
-                    <button
-                        onClick={async () => {
-                            try {
-                                const res = await fetch("/api/dashboard/readiness");
-                                if (res.status === 404) {
-                                    alert("🔴 API Not Found (404)\n\nACTION REQUIRED:\nYou must RESTART your server terminal.\nThe new code is not running yet.");
-                                } else if (res.ok) {
-                                    const data = await res.json();
-                                    alert(`🟢 Connection Successful!\n\nData: ${JSON.stringify(data, null, 2)}`);
-                                } else {
-                                    alert(`🔴 Error: ${res.status} ${res.statusText}`);
-                                }
-                            } catch (e) {
-                                alert(`🔴 Network Error: ${e}`);
-                            }
-                        }}
-                        className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200"
-                    >
-                        Debug
-                    </button>
-                    <HealthBattery
-                        percentage={readiness.percentage}
-                        sleepHours={readiness.sleep}
-                        mood={readiness.mood}
-                    />
+                <div className="w-full md:w-auto">
+                    {isLoading ? (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Clock className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Syncing...</span>
+                        </div>
+                    ) : error ? (
+                        <div className="text-sm text-red-500">Offline</div>
+                    ) : (
+                        <HealthBattery
+                            percentage={readiness.percentage}
+                            sleepHours={readiness.sleep}
+                            mood={readiness.mood}
+                        />
+                    )}
                 </div>
             </header>
 
