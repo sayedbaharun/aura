@@ -322,25 +322,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate Readiness Score
       let score = 0;
 
-      // 1. Sleep (60%)
-      // Target: 7+ hours
-      if (entry.sleepHours && entry.sleepHours >= 7) {
-        score += 60;
-      } else if (entry.sleepHours && entry.sleepHours >= 5) {
-        score += 30; // Partial credit
+      // 1. Sleep (50%) - Granular
+      // Target: 8 hours = 50 points
+      if (entry.sleepHours) {
+        const sleepScore = Math.min((entry.sleepHours / 8) * 50, 50);
+        score += sleepScore;
       }
 
-      // 2. Mood (30%)
+      // 2. Energy (20%)
+      // Scale 1-5
+      if (entry.energyLevel) {
+        score += (entry.energyLevel / 5) * 20;
+      }
+
+      // 3. Mood (15%)
       if (entry.mood === 'peak' || entry.mood === 'high') {
-        score += 30;
-      } else if (entry.mood === 'medium') {
         score += 15;
+      } else if (entry.mood === 'medium') {
+        score += 10;
+      } else {
+        score += 5; // Low mood gets minimal points
       }
 
-      // 3. Workout (10%)
-      if (entry.workoutDone) {
+      // 4. Stress (10%)
+      // Low stress is better
+      if (entry.stressLevel === 'low') {
         score += 10;
+      } else if (entry.stressLevel === 'medium') {
+        score += 5;
       }
+      // High stress = 0 points
+
+      // 5. Workout (5%)
+      if (entry.workoutDone) {
+        score += 5;
+      }
+
+      // Round to nearest integer
+      score = Math.round(score);
 
       res.json({
         percentage: score,
