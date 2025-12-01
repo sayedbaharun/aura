@@ -531,6 +531,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Object.entries(filters).filter(([_, value]) => value !== undefined)
       );
 
+      // Validate status filter if present
+      if (cleanFilters.status) {
+        const validStatuses = ['idea', 'next', 'in_progress', 'waiting', 'done', 'cancelled', 'backlog'];
+        const statuses = (cleanFilters.status as string).split(',').map(s => s.trim());
+        const validStatusValues = statuses.filter(s => validStatuses.includes(s));
+
+        if (validStatusValues.length === 0) {
+          // If no valid statuses, return empty list immediately instead of querying DB with invalid values
+          // or just ignore the status filter? 
+          // Better to ignore the invalid status filter or return empty if they explicitly asked for invalid ones.
+          // Let's return empty list if they asked for statuses and none were valid.
+          if (statuses.length > 0) {
+            return res.json([]);
+          }
+        }
+
+        cleanFilters.status = validStatusValues.join(',');
+      }
+
       const tasks = await storage.getTasks(cleanFilters);
       res.json(tasks);
     } catch (error) {

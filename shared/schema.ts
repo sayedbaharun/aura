@@ -85,7 +85,8 @@ export const taskStatusEnum = pgEnum('task_status', [
   'in_progress',
   'waiting',
   'done',
-  'cancelled'
+  'cancelled',
+  'backlog'
 ]);
 
 export const taskTypeEnum = pgEnum('task_type', [
