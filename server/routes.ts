@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import {
   insertVentureSchema,
@@ -33,6 +34,26 @@ import {
 import uploadRoutes from "./upload-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ============================================================================
+  // RATE LIMITERS
+  // ============================================================================
+
+  // Rate limiter for AI endpoints - 20 requests per minute per user
+  const aiRateLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 20, // 20 requests per minute
+    message: {
+      error: "Too many AI requests",
+      message: "Please wait a moment before sending more messages. Rate limit: 20 requests per minute.",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      // Use session user or IP for rate limiting
+      return (req as any).session?.userId || req.ip || "anonymous";
+    },
+  });
+
   // ============================================================================
   // HEALTH CHECK (No auth required)
   // ============================================================================
@@ -2492,7 +2513,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   });
 
   // Send a chat message and get AI response
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", aiRateLimiter, async (req, res) => {
     try {
       const { message } = req.body;
 
@@ -2915,7 +2936,7 @@ RULES:
   // ============================================================================
 
   // Send a chat message to a venture's AI agent
-  app.post("/api/ventures/:ventureId/chat", async (req, res) => {
+  app.post("/api/ventures/:ventureId/chat", aiRateLimiter, async (req, res) => {
     try {
       const { ventureId } = req.params;
       const { message } = req.body;
