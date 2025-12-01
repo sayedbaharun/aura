@@ -33,7 +33,7 @@ interface Task {
   id: string;
   title: string;
   status: string;
-  priority: "P1" | "P2" | "P3" | null;
+  priority: "P0" | "P1" | "P2" | "P3" | null;
 }
 
 interface HealthEntry {
@@ -81,20 +81,20 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
     },
   });
 
-  // Fetch all outstanding tasks for priority picker
+  // Fetch all tasks for priority picker
   const { data: allTasks = [] } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", { status: "todo" }],
-    queryFn: async () => {
-      const res = await fetch(`/api/tasks?status=todo`, { credentials: "include" });
-      return await res.json();
-    },
+    queryKey: ["/api/tasks"],
   });
 
-  // Group tasks by priority for dropdowns
+  // Filter to incomplete tasks and group by priority for dropdowns
+  const incompleteTasks = Array.isArray(allTasks)
+    ? allTasks.filter(t => !["done", "cancelled"].includes(t.status))
+    : [];
+
   const tasksByPriority = {
-    P1: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P1") : [],
-    P2: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P2") : [],
-    P3: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P3") : [],
+    P1: incompleteTasks.filter(t => t.priority === "P1"),
+    P2: incompleteTasks.filter(t => t.priority === "P2"),
+    P3: incompleteTasks.filter(t => t.priority === "P3"),
   };
 
   const todayHealth = Array.isArray(healthEntries) ? healthEntries[0] : null;
