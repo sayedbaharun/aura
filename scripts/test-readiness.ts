@@ -1,4 +1,4 @@
-
+import 'dotenv/config';
 import { storage } from "../server/storage";
 
 async function testReadiness() {
