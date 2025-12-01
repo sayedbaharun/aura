@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -396,6 +397,7 @@ export default function TaskDetailModal() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Loading...</DialogTitle>
+            <DialogDescription className="sr-only">Loading task details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-8">
             <div className="h-8 bg-muted animate-pulse rounded" />
@@ -413,6 +415,7 @@ export default function TaskDetailModal() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Task not found</DialogTitle>
+            <DialogDescription className="sr-only">The requested task could not be found</DialogDescription>
           </DialogHeader>
           <p className="text-muted-foreground">The task you're looking for doesn't exist.</p>
         </DialogContent>
@@ -425,6 +428,9 @@ export default function TaskDetailModal() {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === 'view' ? 'Task Details' : 'Edit Task'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {mode === 'view' ? 'View task information and details' : 'Edit task properties and settings'}
+          </DialogDescription>
         </DialogHeader>
 
         {mode === 'view' ? (

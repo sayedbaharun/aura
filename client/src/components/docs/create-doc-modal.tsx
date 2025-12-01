@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -113,6 +114,9 @@ export default function CreateDocModal({
           <DialogTitle>
             {showTemplateSelector ? "Create New Document" : "Document Details"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {showTemplateSelector ? "Select a template to create a new document" : "Enter document details"}
+          </DialogDescription>
         </DialogHeader>
 
         {showTemplateSelector ? (

@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -136,6 +137,7 @@ export default function TradingJournalEntry({ day }: TradingJournalEntryProps) {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Log Trading Session</DialogTitle>
+                  <DialogDescription className="sr-only">Record details of your trading session including P&L and lessons</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
                   <div>

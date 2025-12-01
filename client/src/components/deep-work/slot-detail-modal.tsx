@@ -4,6 +4,7 @@ import { Trash2, Plus, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -196,6 +197,7 @@ export default function SlotDetailModal({
               <X className="h-4 w-4" />
             </Button>
           </DialogTitle>
+          <DialogDescription className="sr-only">View and manage tasks for this time slot</DialogDescription>
         </DialogHeader>
 
         {/* Capacity Indicator */}

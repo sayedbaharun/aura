@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,9 @@ export default function CategoryEditModal({
           <DialogTitle>
             {isNew ? "Add New Category" : isDefault ? "View Category" : "Edit Category"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {isNew ? "Create a new custom category" : isDefault ? "View default category details" : "Modify category settings"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

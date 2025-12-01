@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -236,6 +237,7 @@ export default function TaskPickerModal({
               <X className="h-4 w-4" />
             </Button>
           </DialogTitle>
+          <DialogDescription className="sr-only">Select tasks to schedule for this time slot</DialogDescription>
         </DialogHeader>
 
         {/* Filters */}
