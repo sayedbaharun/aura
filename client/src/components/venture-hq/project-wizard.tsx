@@ -21,6 +21,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -32,6 +33,8 @@ import {
   Trash2,
   Plus,
   GripVertical,
+  Building2,
+  FolderPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,13 +45,14 @@ import { cn } from "@/lib/utils";
 interface ProjectWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  ventureId: string;
+  ventureId?: string; // Optional - if not provided, can create new venture
   ventureName?: string;
 }
 
 interface ScaffoldingOptions {
   categories: Array<{ value: string; label: string }>;
   scopes: Array<{ value: string; label: string; description: string }>;
+  ventureDomains: Array<{ value: string; label: string }>;
 }
 
 interface GeneratedTask {
@@ -66,7 +70,17 @@ interface GeneratedPhase {
   tasks: GeneratedTask[];
 }
 
+interface GeneratedVenture {
+  name: string;
+  domain: string;
+  oneLiner: string;
+  primaryFocus: string;
+  icon: string;
+  color: string;
+}
+
 interface GeneratedProjectPlan {
+  venture?: GeneratedVenture;
   project: {
     name: string;
     category: string;
@@ -80,13 +94,6 @@ interface GeneratedProjectPlan {
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-
-const TASK_TYPE_COLORS: Record<string, string> = {
-  deep_work: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  business: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  admin: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400",
-  learning: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-};
 
 const PRIORITY_COLORS: Record<string, string> = {
   P0: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
@@ -106,8 +113,23 @@ export default function ProjectWizard({
   ventureName,
 }: ProjectWizardProps) {
   const { toast } = useToast();
-  const [step, setStep] = useState<"intake" | "preview" | "commit">("intake");
+  const [step, setStep] = useState<"venture" | "intake" | "preview" | "commit">(
+    ventureId ? "intake" : "venture"
+  );
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedProjectPlan | null>(null);
+
+  // Venture selection state
+  const [ventureMode, setVentureMode] = useState<"existing" | "new">(
+    ventureId ? "existing" : "new"
+  );
+  const [selectedVentureId, setSelectedVentureId] = useState(ventureId || "");
+
+  // New venture state
+  const [newVenture, setNewVenture] = useState({
+    ventureName: "",
+    ventureDomain: "saas" as string,
+    ventureOneLiner: "",
+  });
 
   // Intake form state
   const [intake, setIntake] = useState({
@@ -137,13 +159,25 @@ export default function ProjectWizard({
     },
   });
 
+  // Fetch ventures for selection
+  const { data: ventures = [] } = useQuery<Array<{ id: string; name: string; icon: string | null }>>({
+    queryKey: ["/api/ventures"],
+  });
+
   // Generate plan mutation
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/project-scaffolding/generate", {
-        ventureId,
+      const payload: any = {
         ...intake,
-      });
+      };
+
+      if (ventureMode === "existing") {
+        payload.ventureId = selectedVentureId || ventureId;
+      } else {
+        payload.newVenture = newVenture;
+      }
+
+      const res = await apiRequest("POST", "/api/project-scaffolding/generate", payload);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to generate plan");
@@ -153,9 +187,10 @@ export default function ProjectWizard({
     onSuccess: (plan: GeneratedProjectPlan) => {
       setGeneratedPlan(plan);
       setStep("preview");
+      const ventureMsg = plan.venture ? ` and venture "${plan.venture.name}"` : "";
       toast({
         title: "Plan Generated",
-        description: `Created ${plan.phases.length} phases with ${plan.phases.reduce((sum, p) => sum + p.tasks.length, 0)} tasks`,
+        description: `Created ${plan.phases.length} phases with ${plan.phases.reduce((sum, p) => sum + p.tasks.length, 0)} tasks${ventureMsg}`,
       });
     },
     onError: (error: Error) => {
@@ -170,11 +205,17 @@ export default function ProjectWizard({
   // Commit plan mutation
   const commitMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/project-scaffolding/commit", {
-        ventureId,
+      const payload: any = {
         plan: generatedPlan,
         ...commitOptions,
-      });
+      };
+
+      // Only include ventureId if using existing venture
+      if (ventureMode === "existing") {
+        payload.ventureId = selectedVentureId || ventureId;
+      }
+
+      const res = await apiRequest("POST", "/api/project-scaffolding/commit", payload);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to commit plan");
@@ -182,12 +223,15 @@ export default function ProjectWizard({
       return res.json();
     },
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ventures"] });
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/phases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+
+      const ventureMsg = result.venture ? ` and venture "${result.venture.name}"` : "";
       toast({
-        title: "Project Created",
-        description: `Created project with ${result.phases.length} phases and ${result.tasks.length} tasks`,
+        title: "Success!",
+        description: `Created project with ${result.phases.length} phases and ${result.tasks.length} tasks${ventureMsg}`,
       });
       handleClose();
     },
@@ -201,8 +245,15 @@ export default function ProjectWizard({
   });
 
   const handleClose = () => {
-    setStep("intake");
+    setStep(ventureId ? "intake" : "venture");
     setGeneratedPlan(null);
+    setVentureMode(ventureId ? "existing" : "new");
+    setSelectedVentureId(ventureId || "");
+    setNewVenture({
+      ventureName: "",
+      ventureDomain: "saas",
+      ventureOneLiner: "",
+    });
     setIntake({
       projectName: "",
       projectCategory: "product",
@@ -213,6 +264,36 @@ export default function ProjectWizard({
     });
     setCommitOptions({ startDate: "", targetEndDate: "" });
     onOpenChange(false);
+  };
+
+  const handleVentureNext = () => {
+    if (ventureMode === "existing" && !selectedVentureId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a venture",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (ventureMode === "new") {
+      if (!newVenture.ventureName.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Venture name is required",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!newVenture.ventureOneLiner.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Venture description is required",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    setStep("intake");
   };
 
   const handleGenerate = () => {
@@ -246,7 +327,6 @@ export default function ProjectWizard({
   const deletePhase = (phaseIndex: number) => {
     if (!generatedPlan) return;
     const newPhases = generatedPlan.phases.filter((_, i) => i !== phaseIndex);
-    // Reorder remaining phases
     newPhases.forEach((phase, i) => (phase.order = i + 1));
     setGeneratedPlan({ ...generatedPlan, phases: newPhases });
   };
@@ -300,6 +380,12 @@ export default function ProjectWizard({
       0
     ) || 0;
 
+  // Determine steps based on whether ventureId was provided
+  const steps = ventureId
+    ? ["intake", "preview", "commit"]
+    : ["venture", "intake", "preview", "commit"];
+  const currentStepIndex = steps.indexOf(step);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -307,13 +393,14 @@ export default function ProjectWizard({
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             AI Project Wizard
-            {ventureName && (
+            {ventureName && ventureId && (
               <span className="text-muted-foreground font-normal">
                 for {ventureName}
               </span>
             )}
           </DialogTitle>
           <DialogDescription>
+            {step === "venture" && "Choose an existing venture or create a new one"}
             {step === "intake" && "Describe your project and AI will generate a complete plan"}
             {step === "preview" && "Review and customize the generated plan"}
             {step === "commit" && "Set dates and create your project"}
@@ -321,32 +408,26 @@ export default function ProjectWizard({
         </DialogHeader>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-4 py-4">
-          {["intake", "preview", "commit"].map((s, i) => (
+        <div className="flex items-center justify-center gap-2 py-4">
+          {steps.map((s, i) => (
             <div key={s} className="flex items-center">
               <div
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors",
                   step === s
                     ? "bg-primary text-primary-foreground"
-                    : ["intake", "preview", "commit"].indexOf(step) > i
+                    : currentStepIndex > i
                     ? "bg-primary/20 text-primary"
                     : "bg-muted text-muted-foreground"
                 )}
               >
-                {["intake", "preview", "commit"].indexOf(step) > i ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  i + 1
-                )}
+                {currentStepIndex > i ? <Check className="h-4 w-4" /> : i + 1}
               </div>
-              {i < 2 && (
+              {i < steps.length - 1 && (
                 <div
                   className={cn(
-                    "w-12 h-0.5 mx-2",
-                    ["intake", "preview", "commit"].indexOf(step) > i
-                      ? "bg-primary"
-                      : "bg-muted"
+                    "w-8 h-0.5 mx-1",
+                    currentStepIndex > i ? "bg-primary" : "bg-muted"
                   )}
                 />
               )}
@@ -355,6 +436,105 @@ export default function ProjectWizard({
         </div>
 
         <div className="flex-1 overflow-y-auto pr-2">
+          {/* Step 0: Venture Selection (only if no ventureId provided) */}
+          {step === "venture" && (
+            <div className="space-y-6">
+              <RadioGroup
+                value={ventureMode}
+                onValueChange={(v) => setVentureMode(v as "existing" | "new")}
+                className="space-y-4"
+              >
+                {/* Existing Venture Option */}
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem value="existing" id="existing" className="mt-1" />
+                  <div className="flex-1">
+                    <Label htmlFor="existing" className="flex items-center gap-2 cursor-pointer">
+                      <Building2 className="h-4 w-4" />
+                      Use Existing Venture
+                    </Label>
+                    {ventureMode === "existing" && (
+                      <div className="mt-3">
+                        <Select
+                          value={selectedVentureId}
+                          onValueChange={setSelectedVentureId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a venture" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ventures.map((v) => (
+                              <SelectItem key={v.id} value={v.id}>
+                                {v.icon} {v.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* New Venture Option */}
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem value="new" id="new" className="mt-1" />
+                  <div className="flex-1">
+                    <Label htmlFor="new" className="flex items-center gap-2 cursor-pointer">
+                      <FolderPlus className="h-4 w-4" />
+                      Create New Venture
+                    </Label>
+                    {ventureMode === "new" && (
+                      <div className="mt-3 space-y-4">
+                        <div>
+                          <Label htmlFor="ventureName">Venture Name *</Label>
+                          <Input
+                            id="ventureName"
+                            value={newVenture.ventureName}
+                            onChange={(e) =>
+                              setNewVenture({ ...newVenture, ventureName: e.target.value })
+                            }
+                            placeholder="e.g., MyStartup, Side Project, etc."
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="ventureDomain">Domain</Label>
+                          <Select
+                            value={newVenture.ventureDomain}
+                            onValueChange={(v) =>
+                              setNewVenture({ ...newVenture, ventureDomain: v })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {options?.ventureDomains.map((d) => (
+                                <SelectItem key={d.value} value={d.value}>
+                                  {d.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="ventureOneLiner">Description *</Label>
+                          <Textarea
+                            id="ventureOneLiner"
+                            value={newVenture.ventureOneLiner}
+                            onChange={(e) =>
+                              setNewVenture({ ...newVenture, ventureOneLiner: e.target.value })
+                            }
+                            placeholder="One sentence describing what this venture is about..."
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+
           {/* Step 1: Intake Form */}
           {step === "intake" && (
             <div className="space-y-4">
@@ -432,9 +612,7 @@ export default function ProjectWizard({
                 </div>
 
                 <div className="col-span-2">
-                  <Label htmlFor="keyConstraints">
-                    Key Constraints (optional)
-                  </Label>
+                  <Label htmlFor="keyConstraints">Key Constraints (optional)</Label>
                   <Textarea
                     id="keyConstraints"
                     value={intake.keyConstraints}
@@ -447,9 +625,7 @@ export default function ProjectWizard({
                 </div>
 
                 <div className="col-span-2">
-                  <Label htmlFor="domainContext">
-                    Additional Context (optional)
-                  </Label>
+                  <Label htmlFor="domainContext">Additional Context (optional)</Label>
                   <Textarea
                     id="domainContext"
                     value={intake.domainContext}
@@ -467,6 +643,27 @@ export default function ProjectWizard({
           {/* Step 2: Preview & Edit */}
           {step === "preview" && generatedPlan && (
             <div className="space-y-4">
+              {/* Venture Summary (if creating new) */}
+              {generatedPlan.venture && (
+                <Card className="border-primary/50 bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <span className="text-2xl">{generatedPlan.venture.icon}</span>
+                      <span>{generatedPlan.venture.name}</span>
+                      <Badge variant="outline">New Venture</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {generatedPlan.venture.oneLiner}
+                    </p>
+                    <p className="text-sm">
+                      <strong>Focus:</strong> {generatedPlan.venture.primaryFocus}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Project Summary */}
               <Card>
                 <CardHeader className="pb-2">
@@ -625,6 +822,23 @@ export default function ProjectWizard({
           {/* Step 3: Commit */}
           {step === "commit" && generatedPlan && (
             <div className="space-y-6">
+              {/* Venture Summary (if creating new) */}
+              {generatedPlan.venture && (
+                <Card className="border-primary/50 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="text-2xl">{generatedPlan.venture.icon}</span>
+                      New Venture: {generatedPlan.venture.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {generatedPlan.venture.oneLiner}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>Project Summary</CardTitle>
@@ -650,9 +864,7 @@ export default function ProjectWizard({
                       <p className="font-medium">{totalTasks}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">
-                        Estimated Effort
-                      </Label>
+                      <Label className="text-muted-foreground">Estimated Effort</Label>
                       <p className="font-medium">{totalEffort.toFixed(1)} hours</p>
                     </div>
                     <div>
@@ -715,14 +927,23 @@ export default function ProjectWizard({
           <Button
             variant="outline"
             onClick={() => {
-              if (step === "preview") setStep("intake");
+              if (step === "venture") handleClose();
+              else if (step === "intake") setStep(ventureId ? "intake" : "venture");
+              else if (step === "preview") setStep("intake");
               else if (step === "commit") setStep("preview");
-              else handleClose();
+              if (step === "intake" && ventureId) handleClose();
             }}
           >
             <ChevronLeft className="h-4 w-4 mr-2" />
-            {step === "intake" ? "Cancel" : "Back"}
+            {(step === "venture" || (step === "intake" && ventureId)) ? "Cancel" : "Back"}
           </Button>
+
+          {step === "venture" && (
+            <Button onClick={handleVentureNext}>
+              Continue
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          )}
 
           {step === "intake" && (
             <Button onClick={handleGenerate} disabled={generateMutation.isPending}>
@@ -757,7 +978,7 @@ export default function ProjectWizard({
               ) : (
                 <>
                   <Check className="h-4 w-4 mr-2" />
-                  Create Project
+                  {generatedPlan?.venture ? "Create Venture & Project" : "Create Project"}
                 </>
               )}
             </Button>

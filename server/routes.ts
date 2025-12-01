@@ -3158,13 +3158,14 @@ RULES:
   // PROJECT SCAFFOLDING - AI-powered project plan generation
   // ============================================================================
 
-  // Get scaffolding options (categories, scopes)
+  // Get scaffolding options (categories, scopes, venture domains)
   app.get("/api/project-scaffolding/options", async (req, res) => {
     try {
-      const { getProjectCategories, getScopeOptions } = await import("./project-scaffolding");
+      const { getProjectCategories, getScopeOptions, getVentureDomains } = await import("./project-scaffolding");
       res.json({
         categories: getProjectCategories(),
         scopes: getScopeOptions(),
+        ventureDomains: getVentureDomains(),
       });
     } catch (error) {
       logger.error({ error }, "Error fetching scaffolding options");
@@ -3172,14 +3173,14 @@ RULES:
     }
   });
 
-  // Generate a project plan from intake data
+  // Generate a project plan from intake data (with optional new venture)
   app.post("/api/project-scaffolding/generate", aiRateLimiter, async (req, res) => {
     try {
-      const { ventureId, projectName, projectCategory, desiredOutcome, scope, keyConstraints, domainContext } = req.body;
+      const { ventureId, newVenture, projectName, projectCategory, desiredOutcome, scope, keyConstraints, domainContext } = req.body;
 
       // Validate required fields
-      if (!ventureId) {
-        return res.status(400).json({ error: "ventureId is required" });
+      if (!ventureId && !newVenture) {
+        return res.status(400).json({ error: "Either ventureId or newVenture is required" });
       }
       if (!projectName) {
         return res.status(400).json({ error: "projectName is required" });
@@ -3191,16 +3192,32 @@ RULES:
         return res.status(400).json({ error: "scope must be one of: small, medium, large" });
       }
 
-      // Check venture exists
-      const venture = await storage.getVenture(ventureId);
-      if (!venture) {
-        return res.status(404).json({ error: "Venture not found" });
+      // If using existing venture, verify it exists
+      if (ventureId) {
+        const venture = await storage.getVenture(ventureId);
+        if (!venture) {
+          return res.status(404).json({ error: "Venture not found" });
+        }
+      }
+
+      // Validate new venture data if provided
+      if (newVenture) {
+        if (!newVenture.ventureName) {
+          return res.status(400).json({ error: "newVenture.ventureName is required" });
+        }
+        if (!newVenture.ventureDomain) {
+          return res.status(400).json({ error: "newVenture.ventureDomain is required" });
+        }
+        if (!newVenture.ventureOneLiner) {
+          return res.status(400).json({ error: "newVenture.ventureOneLiner is required" });
+        }
       }
 
       const { generateProjectPlan } = await import("./project-scaffolding");
 
       const plan = await generateProjectPlan({
         ventureId,
+        newVenture,
         projectName,
         projectCategory: projectCategory || "admin_general",
         desiredOutcome,
@@ -3224,28 +3241,32 @@ RULES:
     }
   });
 
-  // Commit a generated project plan to the database
+  // Commit a generated project plan to the database (creates venture if in plan)
   app.post("/api/project-scaffolding/commit", async (req, res) => {
     try {
       const { ventureId, plan, startDate, targetEndDate } = req.body;
 
       // Validate required fields
-      if (!ventureId) {
-        return res.status(400).json({ error: "ventureId is required" });
-      }
       if (!plan || !plan.project || !plan.phases) {
         return res.status(400).json({ error: "plan with project and phases is required" });
       }
 
-      // Check venture exists
-      const venture = await storage.getVenture(ventureId);
-      if (!venture) {
-        return res.status(404).json({ error: "Venture not found" });
+      // Either ventureId must be provided OR plan must include venture
+      if (!ventureId && !plan.venture) {
+        return res.status(400).json({ error: "Either ventureId or plan.venture is required" });
+      }
+
+      // If using existing venture, verify it exists
+      if (ventureId && !plan.venture) {
+        const venture = await storage.getVenture(ventureId);
+        if (!venture) {
+          return res.status(404).json({ error: "Venture not found" });
+        }
       }
 
       const { commitProjectPlan } = await import("./project-scaffolding");
 
-      const result = await commitProjectPlan(ventureId, plan, {
+      const result = await commitProjectPlan(ventureId || null, plan, {
         startDate,
         targetEndDate,
       });

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Briefcase, Plus, Grid3x3, List } from "lucide-react";
+import { Briefcase, Plus, Grid3x3, List, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CreateVentureModal from "./create-venture-modal";
+import ProjectWizard from "./project-wizard";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
@@ -22,6 +23,7 @@ interface VenturesHeaderProps {
 
 export default function VenturesHeader({ viewMode, onViewModeChange, statusFilter, onStatusFilterChange }: VenturesHeaderProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showProjectWizard, setShowProjectWizard] = useState(false);
 
   return (
     <>
@@ -66,6 +68,10 @@ export default function VenturesHeader({ viewMode, onViewModeChange, statusFilte
               <List className="h-4 w-4" />
             </Button>
           </div>
+          <Button onClick={() => setShowProjectWizard(true)} size="sm" variant="outline">
+            <Sparkles className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">AI Wizard</span>
+          </Button>
           <Button onClick={() => setShowCreateModal(true)} size="sm">
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">New Venture</span>
@@ -76,6 +82,11 @@ export default function VenturesHeader({ viewMode, onViewModeChange, statusFilte
       <CreateVentureModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
+      />
+
+      <ProjectWizard
+        open={showProjectWizard}
+        onOpenChange={setShowProjectWizard}
       />
     </>
   );

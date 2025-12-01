@@ -1,14 +1,21 @@
 import { storage } from "./storage";
 import { logger } from "./logger";
 import * as modelManager from "./model-manager";
-import type { Venture, Project, Phase, Task, InsertProject, InsertPhase, InsertTask } from "@shared/schema";
+import type { Venture, Project, Phase, Task, InsertProject, InsertPhase, InsertTask, InsertVenture } from "@shared/schema";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+export interface VentureIntakeData {
+  ventureName: string;
+  ventureDomain: "saas" | "media" | "realty" | "trading" | "personal" | "other";
+  ventureOneLiner: string;
+}
+
 export interface ProjectIntakeData {
-  ventureId: string;
+  ventureId?: string; // Optional - if not provided, must provide newVenture
+  newVenture?: VentureIntakeData; // For creating a new venture
   projectName: string;
   projectCategory: string;
   desiredOutcome: string;
@@ -32,7 +39,17 @@ export interface GeneratedPhase {
   tasks: GeneratedTask[];
 }
 
+export interface GeneratedVenture {
+  name: string;
+  domain: "saas" | "media" | "realty" | "trading" | "personal" | "other";
+  oneLiner: string;
+  primaryFocus: string;
+  icon: string;
+  color: string;
+}
+
 export interface GeneratedProjectPlan {
+  venture?: GeneratedVenture; // Only present if creating new venture
   project: {
     name: string;
     category: string;
@@ -44,6 +61,7 @@ export interface GeneratedProjectPlan {
 }
 
 export interface CommittedProjectPlan {
+  venture?: Venture; // Only present if created new venture
   project: Project;
   phases: Phase[];
   tasks: Task[];
@@ -53,26 +71,26 @@ export interface CommittedProjectPlan {
 // PROMPT TEMPLATES
 // ============================================================================
 
-function buildProjectScaffoldingPrompt(intake: ProjectIntakeData, venture: Venture): string {
-  const scopeGuidelines = {
-    small: {
-      phases: "2-3 phases",
-      tasksPerPhase: "3-5 tasks",
-      totalEffort: "10-40 hours total",
-    },
-    medium: {
-      phases: "3-4 phases",
-      tasksPerPhase: "4-7 tasks",
-      totalEffort: "40-120 hours total",
-    },
-    large: {
-      phases: "4-6 phases",
-      tasksPerPhase: "5-10 tasks",
-      totalEffort: "120+ hours total",
-    },
-  };
+const SCOPE_GUIDELINES = {
+  small: {
+    phases: "2-3 phases",
+    tasksPerPhase: "3-5 tasks",
+    totalEffort: "10-40 hours total",
+  },
+  medium: {
+    phases: "3-4 phases",
+    tasksPerPhase: "4-7 tasks",
+    totalEffort: "40-120 hours total",
+  },
+  large: {
+    phases: "4-6 phases",
+    tasksPerPhase: "5-10 tasks",
+    totalEffort: "120+ hours total",
+  },
+};
 
-  const scope = scopeGuidelines[intake.scope];
+function buildProjectScaffoldingPrompt(intake: ProjectIntakeData, venture: Venture): string {
+  const scope = SCOPE_GUIDELINES[intake.scope];
 
   return `You are an expert project manager helping to scaffold a new project for a venture.
 
@@ -145,28 +163,115 @@ Return a JSON object with this exact structure:
 Important: Return ONLY the JSON object, no markdown code blocks or other text.`;
 }
 
+function buildVentureAndProjectPrompt(intake: ProjectIntakeData): string {
+  const newVenture = intake.newVenture!;
+  const scope = SCOPE_GUIDELINES[intake.scope];
+
+  return `You are an expert business strategist and project manager helping to set up a new venture with its first project.
+
+## NEW VENTURE REQUEST
+- Venture Name: ${newVenture.ventureName}
+- Domain: ${newVenture.ventureDomain}
+- Description: ${newVenture.ventureOneLiner}
+
+## FIRST PROJECT REQUEST
+- Project Name: ${intake.projectName}
+- Category: ${intake.projectCategory}
+- Desired Outcome: ${intake.desiredOutcome}
+- Scope: ${intake.scope} (${scope.phases}, ${scope.tasksPerPhase}, ${scope.totalEffort})
+${intake.keyConstraints ? `- Key Constraints: ${intake.keyConstraints}` : ""}
+${intake.domainContext ? `- Domain Context: ${intake.domainContext}` : ""}
+
+## YOUR TASK
+Generate both the venture details and a comprehensive project plan.
+
+### For the Venture:
+- Refine the primary focus based on the venture description
+- Suggest an appropriate emoji icon (single emoji)
+- Suggest a hex color that fits the domain (e.g., #3B82F6 for tech, #10B981 for finance, #F59E0B for media)
+
+### For the Project:
+1. **Phases**: Create ${scope.phases} that represent logical stages
+2. **Tasks**: Create ${scope.tasksPerPhase} per phase
+   - Atomic, actionable items (0.5-8 hours each)
+   - Mix of types: deep_work, business, admin, learning
+   - Priorities: P0 (critical), P1 (important), P2 (normal), P3 (nice to have)
+
+## OUTPUT FORMAT
+Return a JSON object with this exact structure:
+{
+  "venture": {
+    "name": "string - the venture name",
+    "domain": "string - saas, media, realty, trading, personal, or other",
+    "oneLiner": "string - one sentence description",
+    "primaryFocus": "string - main strategic focus for this venture",
+    "icon": "string - single emoji that represents the venture",
+    "color": "string - hex color code like #3B82F6"
+  },
+  "project": {
+    "name": "string - the project name",
+    "category": "string - one of: marketing, sales_biz_dev, customer_success, product, tech_engineering, operations, research_dev, finance, people_hr, legal_compliance, admin_general, strategy_leadership",
+    "outcome": "string - what success looks like",
+    "notes": "string - strategy, approach, key considerations",
+    "priority": "string - P0, P1, P2, or P3"
+  },
+  "phases": [
+    {
+      "name": "string - phase name",
+      "order": 1,
+      "notes": "string - what this phase covers",
+      "tasks": [
+        {
+          "title": "string - specific, actionable task title",
+          "type": "string - business, deep_work, admin, or learning",
+          "priority": "string - P0, P1, P2, or P3",
+          "estEffort": 2.0,
+          "notes": "string - optional context or steps"
+        }
+      ]
+    }
+  ]
+}
+
+Important: Return ONLY the JSON object, no markdown code blocks or other text.`;
+}
+
 // ============================================================================
 // CORE FUNCTIONS
 // ============================================================================
 
 /**
  * Generate a project plan using AI based on intake data
+ * If newVenture is provided, will also generate venture details
  */
 export async function generateProjectPlan(intake: ProjectIntakeData): Promise<GeneratedProjectPlan> {
-  // Fetch venture data
-  const venture = await storage.getVenture(intake.ventureId);
-  if (!venture) {
-    throw new Error(`Venture not found: ${intake.ventureId}`);
+  const isCreatingNewVenture = !!intake.newVenture;
+  let prompt: string;
+
+  if (isCreatingNewVenture) {
+    // Creating new venture + project
+    prompt = buildVentureAndProjectPrompt(intake);
+    logger.info({
+      ventureName: intake.newVenture?.ventureName,
+      projectName: intake.projectName,
+      scope: intake.scope
+    }, "Generating venture and project plan with AI");
+  } else {
+    // Using existing venture
+    if (!intake.ventureId) {
+      throw new Error("Either ventureId or newVenture must be provided");
+    }
+    const venture = await storage.getVenture(intake.ventureId);
+    if (!venture) {
+      throw new Error(`Venture not found: ${intake.ventureId}`);
+    }
+    prompt = buildProjectScaffoldingPrompt(intake, venture);
+    logger.info({
+      ventureId: intake.ventureId,
+      projectName: intake.projectName,
+      scope: intake.scope
+    }, "Generating project plan with AI");
   }
-
-  // Build the prompt
-  const prompt = buildProjectScaffoldingPrompt(intake, venture);
-
-  logger.info({
-    ventureId: intake.ventureId,
-    projectName: intake.projectName,
-    scope: intake.scope
-  }, "Generating project plan with AI");
 
   // Call AI
   const { response, metrics } = await modelManager.chatCompletion(
@@ -188,8 +293,9 @@ export async function generateProjectPlan(intake: ProjectIntakeData): Promise<Ge
 
   logger.info({
     model: metrics.modelUsed,
-    tokensUsed: metrics.tokensUsed
-  }, "Project plan generated successfully");
+    tokensUsed: metrics.tokensUsed,
+    creatingVenture: isCreatingNewVenture
+  }, "Plan generated successfully");
 
   // Parse and validate the response
   let plan: GeneratedProjectPlan;
@@ -205,6 +311,11 @@ export async function generateProjectPlan(intake: ProjectIntakeData): Promise<Ge
     throw new Error("AI returned incomplete project plan");
   }
 
+  // If creating new venture, validate venture data
+  if (isCreatingNewVenture && !plan.venture) {
+    throw new Error("AI did not return venture data");
+  }
+
   // Ensure phases are ordered
   plan.phases = plan.phases.map((phase, index) => ({
     ...phase,
@@ -216,27 +327,55 @@ export async function generateProjectPlan(intake: ProjectIntakeData): Promise<Ge
 
 /**
  * Commit a generated project plan to the database
- * Creates project, phases, and tasks in a single transaction
+ * Creates venture (if new), project, phases, and tasks
  */
 export async function commitProjectPlan(
-  ventureId: string,
+  ventureId: string | null,
   plan: GeneratedProjectPlan,
   overrides?: {
     startDate?: string;
     targetEndDate?: string;
   }
 ): Promise<CommittedProjectPlan> {
+  let actualVentureId = ventureId;
+  let createdVenture: Venture | undefined;
+
+  // 1. Create venture if provided in plan
+  if (plan.venture) {
+    logger.info({
+      ventureName: plan.venture.name,
+      domain: plan.venture.domain
+    }, "Creating new venture");
+
+    const ventureData: InsertVenture = {
+      name: plan.venture.name,
+      domain: plan.venture.domain as any,
+      oneLiner: plan.venture.oneLiner,
+      primaryFocus: plan.venture.primaryFocus,
+      icon: plan.venture.icon,
+      color: plan.venture.color,
+      status: "active",
+    };
+
+    createdVenture = await storage.createVenture(ventureData);
+    actualVentureId = createdVenture.id;
+  }
+
+  if (!actualVentureId) {
+    throw new Error("No ventureId provided and no venture in plan");
+  }
+
   logger.info({
-    ventureId,
+    ventureId: actualVentureId,
     projectName: plan.project.name,
     phaseCount: plan.phases.length,
     taskCount: plan.phases.reduce((sum, p) => sum + p.tasks.length, 0)
   }, "Committing project plan to database");
 
-  // 1. Create the project
+  // 2. Create the project
   const projectData: InsertProject = {
     name: plan.project.name,
-    ventureId,
+    ventureId: actualVentureId,
     status: "not_started",
     category: plan.project.category as any,
     priority: plan.project.priority as any,
@@ -248,7 +387,7 @@ export async function commitProjectPlan(
 
   const project = await storage.createProject(projectData);
 
-  // 2. Create phases
+  // 3. Create phases
   const createdPhases: Phase[] = [];
   for (const phaseData of plan.phases) {
     const phase = await storage.createPhase({
@@ -261,7 +400,7 @@ export async function commitProjectPlan(
     createdPhases.push(phase);
   }
 
-  // 3. Create tasks
+  // 4. Create tasks
   const createdTasks: Task[] = [];
   for (let i = 0; i < plan.phases.length; i++) {
     const phaseData = plan.phases[i];
@@ -270,7 +409,7 @@ export async function commitProjectPlan(
     for (const taskData of phaseData.tasks) {
       const task = await storage.createTask({
         title: taskData.title,
-        ventureId,
+        ventureId: actualVentureId,
         projectId: project.id,
         phaseId: phase.id,
         status: "idea", // Start as idea, user can promote to next
@@ -284,16 +423,33 @@ export async function commitProjectPlan(
   }
 
   logger.info({
+    ventureCreated: !!createdVenture,
+    ventureId: actualVentureId,
     projectId: project.id,
     phasesCreated: createdPhases.length,
     tasksCreated: createdTasks.length
-  }, "Project plan committed successfully");
+  }, "Plan committed successfully");
 
   return {
+    venture: createdVenture,
     project,
     phases: createdPhases,
     tasks: createdTasks,
   };
+}
+
+/**
+ * Get venture domains for the intake form
+ */
+export function getVentureDomains() {
+  return [
+    { value: "saas", label: "SaaS / Software" },
+    { value: "media", label: "Media / Content" },
+    { value: "realty", label: "Real Estate" },
+    { value: "trading", label: "Trading / Finance" },
+    { value: "personal", label: "Personal" },
+    { value: "other", label: "Other" },
+  ];
 }
 
 /**
