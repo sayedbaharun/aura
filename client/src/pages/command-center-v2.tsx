@@ -87,7 +87,27 @@ export default function CommandCenterV2() {
                     </div>
                 </div>
 
-                <div className="w-full md:w-auto">
+                <div className="w-full md:w-auto flex items-center gap-2">
+                    <button
+                        onClick={async () => {
+                            try {
+                                const res = await fetch("/api/dashboard/readiness");
+                                if (res.status === 404) {
+                                    alert("🔴 API Not Found (404)\n\nACTION REQUIRED:\nYou must RESTART your server terminal.\nThe new code is not running yet.");
+                                } else if (res.ok) {
+                                    const data = await res.json();
+                                    alert(`🟢 Connection Successful!\n\nData: ${JSON.stringify(data, null, 2)}`);
+                                } else {
+                                    alert(`🔴 Error: ${res.status} ${res.statusText}`);
+                                }
+                            } catch (e) {
+                                alert(`🔴 Network Error: ${e}`);
+                            }
+                        }}
+                        className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200"
+                    >
+                        Debug
+                    </button>
                     <HealthBattery
                         percentage={readiness.percentage}
                         sleepHours={readiness.sleep}
