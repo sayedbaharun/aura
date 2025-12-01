@@ -50,6 +50,13 @@ interface Project {
   ventureId: string;
 }
 
+interface Phase {
+  id: string;
+  name: string;
+  projectId: string;
+  status: string;
+}
+
 const DOMAIN_OPTIONS = [
   { value: "home", label: "Home" },
   { value: "work", label: "Work" },
@@ -97,7 +104,7 @@ export default function CreateTaskModal({
     domain: "work",
     ventureId: defaultVentureId || "",
     projectId: defaultProjectId || "",
-    phase: "",
+    phaseId: "",
     dueDate: "",
     focusDate: defaultFocusDate || "",
     focusSlot: defaultFocusSlot || "",
@@ -116,7 +123,7 @@ export default function CreateTaskModal({
         domain: "work",
         ventureId: defaultVentureId || "",
         projectId: defaultProjectId || "",
-        phase: "",
+        phaseId: "",
         dueDate: "",
         focusDate: defaultFocusDate || "",
         focusSlot: defaultFocusSlot || "",
@@ -141,6 +148,17 @@ export default function CreateTaskModal({
       return res.json();
     },
     enabled: open && !!formData.ventureId,
+  });
+
+  // Fetch phases (filtered by project)
+  const { data: phases = [] } = useQuery<Phase[]>({
+    queryKey: ["/api/phases", formData.projectId],
+    queryFn: async () => {
+      if (!formData.projectId) return [];
+      const res = await apiRequest("GET", `/api/phases?project_id=${formData.projectId}`);
+      return res.json();
+    },
+    enabled: open && !!formData.projectId,
   });
 
   // Create task mutation
@@ -194,17 +212,17 @@ export default function CreateTaskModal({
     createTaskMutation.mutate(cleanPayload);
   };
 
-  // Reset project when venture changes
+  // Reset project and phase when venture changes
   useEffect(() => {
     if (!formData.ventureId) {
-      setFormData((prev) => ({ ...prev, projectId: "", phase: "" }));
+      setFormData((prev) => ({ ...prev, projectId: "", phaseId: "" }));
     }
   }, [formData.ventureId]);
 
   // Reset phase when project changes
   useEffect(() => {
     if (!formData.projectId) {
-      setFormData((prev) => ({ ...prev, phase: "" }));
+      setFormData((prev) => ({ ...prev, phaseId: "" }));
     }
   }, [formData.projectId]);
 
@@ -370,15 +388,34 @@ export default function CreateTaskModal({
           </div>
 
           {/* Phase */}
-          <div className="space-y-2">
-            <Label htmlFor="phase">Phase</Label>
-            <Input
-              id="phase"
-              value={formData.phase}
-              onChange={(e) => setFormData({ ...formData, phase: e.target.value })}
-              placeholder="e.g., Phase 1, MVP Launch, Q1 Goals (optional)"
-            />
-          </div>
+          {formData.projectId && (
+            <div className="space-y-2">
+              <Label htmlFor="phase">Phase</Label>
+              <Select
+                value={formData.phaseId || "none"}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, phaseId: value === "none" ? "" : value })
+                }
+              >
+                <SelectTrigger id="phase">
+                  <SelectValue placeholder="Select phase (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {phases.map((phase) => (
+                    <SelectItem key={phase.id} value={phase.id}>
+                      {phase.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {phases.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No phases found. Create phases in the project details.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Due Date and Focus Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
