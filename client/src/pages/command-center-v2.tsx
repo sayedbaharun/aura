@@ -3,11 +3,22 @@ import { HealthBattery, ContextCard, MissionStatement } from "@/components/cockp
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle2, Circle, Clock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 export default function CommandCenterV2() {
     // Mock State - In production this would come from API
     const [time, setTime] = useState(new Date());
-    const [readiness] = useState({ percentage: 85, sleep: 7.2, mood: "high" });
+
+    const { data: readiness } = useQuery({
+        queryKey: ["readiness"],
+        queryFn: async () => {
+            const res = await fetch("/api/dashboard/readiness");
+            if (!res.ok) throw new Error("Failed to fetch readiness");
+            return res.json();
+        },
+        initialData: { percentage: 0, sleep: 0, mood: "unknown" }
+    });
+
     const [mission] = useState("Ship Aura MVP");
 
     // Update time every minute

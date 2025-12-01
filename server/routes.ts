@@ -301,6 +301,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // DASHBOARD
+  // ============================================================================
+
+  app.get("/api/dashboard/readiness", async (req: Request, res: Response) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const entries = await storage.getHealthEntries({ dateGte: today, dateLte: today });
+      const entry = entries[0];
+
+      if (!entry) {
+        return res.json({
+          percentage: 0,
+          sleep: 0,
+          mood: "unknown",
+          status: "no_data"
+        });
+      }
+
+      // Calculate Readiness Score
+      let score = 0;
+
+      // 1. Sleep (60%)
+      // Target: 7+ hours
+      if (entry.sleepHours && entry.sleepHours >= 7) {
+        score += 60;
+      } else if (entry.sleepHours && entry.sleepHours >= 5) {
+        score += 30; // Partial credit
+      }
+
+      // 2. Mood (30%)
+      if (entry.mood === 'peak' || entry.mood === 'high') {
+        score += 30;
+      } else if (entry.mood === 'medium') {
+        score += 15;
+      }
+
+      // 3. Workout (10%)
+      if (entry.workoutDone) {
+        score += 10;
+      }
+
+      res.json({
+        percentage: score,
+        sleep: entry.sleepHours || 0,
+        mood: entry.mood || "unknown",
+        status: "calculated"
+      });
+    } catch (error) {
+      logger.error({ error }, "Error calculating readiness");
+      res.status(500).json({ error: "Failed to calculate readiness" });
+    }
+  });
+
+  // ============================================================================
   // VENTURES
   // ============================================================================
 
