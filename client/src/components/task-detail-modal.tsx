@@ -134,8 +134,10 @@ export default function TaskDetailModal() {
   // Update task mutation
   const updateTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
+      // Remove read-only fields that aren't part of the update schema
+      const { id, createdAt, updatedAt, completedAt, ...updateData } = data;
       // Clean data to only send non-empty values
-      const cleanData = cleanFormData(data);
+      const cleanData = cleanFormData(updateData);
       const response = await apiRequest('PATCH', `/api/tasks/${taskId}`, cleanData);
       return response.json();
     },
