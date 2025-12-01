@@ -1,14 +1,26 @@
 import { useState } from "react";
 import { Briefcase, Plus, Grid3x3, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CreateVentureModal from "./create-venture-modal";
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "planning", label: "Planning" },
+  { value: "building", label: "Building" },
+  { value: "ongoing", label: "Ongoing" },
+  { value: "on_hold", label: "On Hold" },
+  { value: "archived", label: "Archived" },
+];
 
 interface VenturesHeaderProps {
   viewMode: "grid" | "list";
   onViewModeChange: (mode: "grid" | "list") => void;
+  statusFilter: string;
+  onStatusFilterChange: (status: string) => void;
 }
 
-export default function VenturesHeader({ viewMode, onViewModeChange }: VenturesHeaderProps) {
+export default function VenturesHeader({ viewMode, onViewModeChange, statusFilter, onStatusFilterChange }: VenturesHeaderProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   return (
@@ -24,6 +36,18 @@ export default function VenturesHeader({ viewMode, onViewModeChange }: VenturesH
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex rounded-md border">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
