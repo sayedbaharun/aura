@@ -16,6 +16,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -327,6 +328,9 @@ export default function Shopping() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingItem ? "Edit Item" : "Add Shopping Item"}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {editingItem ? "Edit shopping item details" : "Add a new item to your shopping list"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

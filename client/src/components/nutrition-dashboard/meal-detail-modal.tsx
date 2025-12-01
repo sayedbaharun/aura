@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -93,6 +93,7 @@ export default function MealDetailModal({ open, onOpenChange, meal, onEdit }: Me
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Meal Details</DialogTitle>
+            <DialogDescription className="sr-only">View meal information and nutrition data</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">

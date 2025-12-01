@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -143,6 +144,9 @@ export default function CaptureModal() {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Quick Capture</DialogTitle>
+          <DialogDescription className="sr-only">
+            Quickly capture an idea, task, note, or other item
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

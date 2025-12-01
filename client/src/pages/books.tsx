@@ -16,6 +16,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -356,6 +357,9 @@ export default function Books() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingBook ? "Edit Book" : "Add Book"}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {editingBook ? "Edit book details" : "Add a new book to your library"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

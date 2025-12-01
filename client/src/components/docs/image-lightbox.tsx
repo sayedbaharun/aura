@@ -101,6 +101,7 @@ export function ImageLightbox({
       <DialogContent
         className="max-w-[95vw] max-h-[95vh] p-0 border-0 bg-transparent overflow-hidden"
         onPointerDownOutside={() => onOpenChange(false)}
+        aria-describedby={undefined}
       >
         {/* Close button */}
         <Button

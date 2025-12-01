@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -247,6 +248,7 @@ export default function ProjectDetailModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
+          <DialogDescription className="sr-only">View and manage project details, phases, and progress</DialogDescription>
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-xl">{project.name}</DialogTitle>

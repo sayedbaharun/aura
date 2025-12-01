@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -417,6 +418,7 @@ export default function CapturePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Convert to Task</DialogTitle>
+            <DialogDescription className="sr-only">Convert a capture item to an actionable task</DialogDescription>
           </DialogHeader>
           {selectedCapture && (
             <div className="space-y-4">
