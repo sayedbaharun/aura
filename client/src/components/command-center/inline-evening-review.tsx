@@ -33,7 +33,7 @@ interface Task {
   id: string;
   title: string;
   status: string;
-  priority: "P1" | "P2" | "P3" | null;
+  priority: "P0" | "P1" | "P2" | "P3" | null;
 }
 
 interface HealthEntry {
@@ -81,20 +81,21 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
     },
   });
 
-  // Fetch all outstanding tasks for priority picker
+  // Fetch all tasks for priority picker
   const { data: allTasks = [] } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", { status: "todo" }],
-    queryFn: async () => {
-      const res = await fetch(`/api/tasks?status=todo`, { credentials: "include" });
-      return await res.json();
-    },
+    queryKey: ["/api/tasks"],
   });
 
-  // Group tasks by priority for dropdowns
+  // Filter to incomplete tasks and group by priority for dropdowns
+  const incompleteTasks = Array.isArray(allTasks)
+    ? allTasks.filter(t => !["done", "cancelled"].includes(t.status))
+    : [];
+
   const tasksByPriority = {
-    P1: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P1") : [],
-    P2: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P2") : [],
-    P3: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P3") : [],
+    P0: incompleteTasks.filter(t => t.priority === "P0"),
+    P1: incompleteTasks.filter(t => t.priority === "P1"),
+    P2: incompleteTasks.filter(t => t.priority === "P2"),
+    P3: incompleteTasks.filter(t => t.priority === "P3"),
   };
 
   const todayHealth = Array.isArray(healthEntries) ? healthEntries[0] : null;
@@ -341,18 +342,18 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           {([
-            { index: 0, priority: "P1" as const, tasks: tasksByPriority.P1 },
-            { index: 1, priority: "P2" as const, tasks: tasksByPriority.P2 },
-            { index: 2, priority: "P3" as const, tasks: tasksByPriority.P3 },
-          ]).map(({ index, priority, tasks: priorityTasks }) => (
+            { index: 0, label: "P0/P1", tasks: [...tasksByPriority.P0, ...tasksByPriority.P1] },
+            { index: 1, label: "P2", tasks: tasksByPriority.P2 },
+            { index: 2, label: "P3", tasks: tasksByPriority.P3 },
+          ]).map(({ index, label, tasks: priorityTasks }) => (
             <div key={index} className="space-y-1">
               <div className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                <div className={`min-w-6 h-6 px-1.5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                   index === 0 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
                   index === 1 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
                   "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                 }`}>
-                  {priority}
+                  {label}
                 </div>
                 <div className="flex-1 space-y-1">
                   {priorityTasks.length > 0 && (
@@ -368,7 +369,7 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
                       }}
                     >
                       <SelectTrigger className="h-8 text-sm">
-                        <SelectValue placeholder={`Pick ${priority} task...`} />
+                        <SelectValue placeholder={`Pick ${label} task...`} />
                       </SelectTrigger>
                       <SelectContent>
                         {priorityTasks.map((task) => (
@@ -384,7 +385,7 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
                     placeholder={
                       priorityTasks.length > 0
                         ? "Or type custom..."
-                        : `No ${priority} tasks - type custom...`
+                        : `No ${label} tasks - type custom...`
                     }
                     value={review.tomorrowPriorities[index] || ""}
                     onChange={(e) => updatePriority(index, e.target.value)}
