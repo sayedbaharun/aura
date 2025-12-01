@@ -283,7 +283,7 @@ export default function ProjectDetailModal({
                   {project.priority}
                 </Badge>
                 <Badge variant="outline">{project.category}</Badge>
-                <Badge variant="secondary">{project.status.replace("_", " ")}</Badge>
+                <Badge variant="secondary">{project.status?.replace("_", " ")}</Badge>
               </div>
             </div>
             <div className="flex items-center gap-1">
