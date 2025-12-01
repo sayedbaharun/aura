@@ -8,6 +8,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Moon,
   CheckCircle2,
   Circle,
@@ -73,6 +80,22 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
       return await res.json();
     },
   });
+
+  // Fetch all outstanding tasks for priority picker
+  const { data: allTasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", { status: "todo" }],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks?status=todo`, { credentials: "include" });
+      return await res.json();
+    },
+  });
+
+  // Group tasks by priority for dropdowns
+  const tasksByPriority = {
+    P1: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P1") : [],
+    P2: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P2") : [],
+    P3: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P3") : [],
+  };
 
   const todayHealth = Array.isArray(healthEntries) ? healthEntries[0] : null;
 
@@ -313,26 +336,62 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
             Tomorrow's Top 3 Priorities
           </CardTitle>
           <CardDescription className="text-xs">
-            Set your priorities for tomorrow
+            Pick from tasks or type custom priorities
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                index === 0 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                index === 1 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
-                "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-              }`}>
-                P{index + 1}
+        <CardContent className="space-y-3">
+          {([
+            { index: 0, priority: "P1" as const, tasks: tasksByPriority.P1 },
+            { index: 1, priority: "P2" as const, tasks: tasksByPriority.P2 },
+            { index: 2, priority: "P3" as const, tasks: tasksByPriority.P3 },
+          ]).map(({ index, priority, tasks: priorityTasks }) => (
+            <div key={index} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  index === 0 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                  index === 1 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
+                  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                }`}>
+                  {priority}
+                </div>
+                <div className="flex-1 space-y-1">
+                  {priorityTasks.length > 0 && (
+                    <Select
+                      value={
+                        priorityTasks.find(t => t.title === review.tomorrowPriorities[index])?.id || ""
+                      }
+                      onValueChange={(taskId) => {
+                        const task = priorityTasks.find(t => t.id === taskId);
+                        if (task) {
+                          updatePriority(index, task.title);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder={`Pick ${priority} task...`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {priorityTasks.map((task) => (
+                          <SelectItem key={task.id} value={task.id}>
+                            {task.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <input
+                    type="text"
+                    placeholder={
+                      priorityTasks.length > 0
+                        ? "Or type custom..."
+                        : `No ${priority} tasks - type custom...`
+                    }
+                    value={review.tomorrowPriorities[index] || ""}
+                    onChange={(e) => updatePriority(index, e.target.value)}
+                    className="w-full bg-transparent border-b border-muted-foreground/20 focus:border-primary outline-none py-1 text-sm"
+                  />
+                </div>
               </div>
-              <input
-                type="text"
-                placeholder={`Priority ${index + 1}...`}
-                value={review.tomorrowPriorities[index] || ""}
-                onChange={(e) => updatePriority(index, e.target.value)}
-                className="flex-1 bg-transparent border-b border-muted-foreground/20 focus:border-primary outline-none py-1.5 text-sm"
-              />
             </div>
           ))}
         </CardContent>
