@@ -307,8 +307,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/readiness", async (req: Request, res: Response) => {
     try {
       const today = new Date().toISOString().split('T')[0];
+      console.log(`[Readiness API] Hit. Date: ${today}`);
       const entries = await storage.getHealthEntries({ dateGte: today, dateLte: today });
       const entry = entries[0];
+      console.log(`[Readiness API] Entry found:`, entry ? "Yes" : "No");
 
       if (!entry) {
         return res.json({

@@ -19,6 +19,10 @@ export default function CommandCenterV2() {
         initialData: { percentage: 0, sleep: 0, mood: "unknown" }
     });
 
+    if (readiness.status === "no_data") {
+        console.log("Readiness: No data found for today.");
+    }
+
     const [mission] = useState("Ship Aura MVP");
 
     // Update time every minute
