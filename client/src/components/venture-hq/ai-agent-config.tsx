@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Plus, X, Save, Bot } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sparkles, Plus, X, Save, Bot, Cpu } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -17,7 +18,15 @@ interface AiAgentPrompt {
   context: string | null;
   capabilities: string[];
   quickActions: { label: string; prompt: string }[];
+  preferredModel: string | null;
   enabled: boolean;
+}
+
+interface AvailableModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
 }
 
 interface AiAgentConfigProps {
@@ -30,6 +39,7 @@ export default function AiAgentConfig({ ventureId }: AiAgentConfigProps) {
   const [context, setContext] = useState("");
   const [capabilities, setCapabilities] = useState<string[]>([]);
   const [quickActions, setQuickActions] = useState<{ label: string; prompt: string }[]>([]);
+  const [preferredModel, setPreferredModel] = useState<string | null>(null);
   const [newCapability, setNewCapability] = useState("");
   const [newAction, setNewAction] = useState({ label: "", prompt: "" });
 
@@ -45,12 +55,22 @@ export default function AiAgentConfig({ ventureId }: AiAgentConfigProps) {
     },
   });
 
+  const { data: availableModels = [] } = useQuery<AvailableModel[]>({
+    queryKey: ["/api/ai-models"],
+    queryFn: async () => {
+      const res = await fetch("/api/ai-models", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch available models");
+      return await res.json();
+    },
+  });
+
   useEffect(() => {
     if (agentPrompt) {
       setSystemPrompt(agentPrompt.systemPrompt || "");
       setContext(agentPrompt.context || "");
       setCapabilities(agentPrompt.capabilities || []);
       setQuickActions(agentPrompt.quickActions || []);
+      setPreferredModel(agentPrompt.preferredModel || null);
     }
   }, [agentPrompt]);
 
@@ -103,6 +123,7 @@ export default function AiAgentConfig({ ventureId }: AiAgentConfigProps) {
       context,
       capabilities,
       quickActions,
+      preferredModel,
       enabled: true,
     };
 
@@ -167,6 +188,50 @@ export default function AiAgentConfig({ ventureId }: AiAgentConfigProps) {
             </Button>
           </div>
         </CardHeader>
+      </Card>
+
+      {/* Model Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-blue-500" />
+            AI Model
+          </CardTitle>
+          <CardDescription>
+            Choose the AI model for this venture's agent. Leave as "Auto" for smart model selection based on task complexity.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select
+            value={preferredModel || "auto"}
+            onValueChange={(value) => setPreferredModel(value === "auto" ? null : value)}
+          >
+            <SelectTrigger className="w-full md:w-[400px]">
+              <SelectValue placeholder="Select a model" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">Auto (Recommended)</span>
+                  <span className="text-xs text-muted-foreground">Automatically selects model based on task complexity</span>
+                </div>
+              </SelectItem>
+              {availableModels.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">{model.name}</span>
+                    <span className="text-xs text-muted-foreground">{model.provider} - {model.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {preferredModel && (
+            <p className="text-sm text-muted-foreground mt-2">
+              All conversations will use <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{preferredModel}</span>
+            </p>
+          )}
+        </CardContent>
       </Card>
 
       {/* System Prompt */}

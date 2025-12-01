@@ -978,6 +978,7 @@ export const aiAgentPrompts = pgTable(
     actionPermissions: jsonb("action_permissions").$type<string[]>().default(['read']), // What actions agent can take: read, create_task, create_doc, etc.
     contextRefreshHours: integer("context_refresh_hours").default(24), // Hours between context rebuilds
     maxContextTokens: integer("max_context_tokens").default(8000), // Token budget for context
+    preferredModel: text("preferred_model"), // Preferred AI model (e.g., 'openai/gpt-4o', 'anthropic/claude-3.5-sonnet')
     enabled: boolean("enabled").default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

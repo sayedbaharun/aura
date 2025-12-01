@@ -742,9 +742,12 @@ IMPORTANT INSTRUCTIONS:
     const maxTurns = 5;
 
     for (let turn = 0; turn < maxTurns; turn++) {
+      // Use preferred model from config if set, otherwise use complexity-based selection
+      const preferredModel = this.agentConfig?.preferredModel || undefined;
       const { response, metrics } = await modelManager.chatCompletion(
         { messages: conversationMessages, tools, temperature: 0.7 },
-        "complex"
+        "complex",
+        preferredModel
       );
 
       tokensUsed += metrics.tokensUsed || 0;

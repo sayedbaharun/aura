@@ -31,6 +31,7 @@ import {
   isPasswordConfigured,
   createAuditLog,
 } from "./auth";
+import { AVAILABLE_MODELS } from "./model-manager";
 import uploadRoutes from "./upload-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -2429,6 +2430,11 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
   // AI AGENT PROMPTS
   // ============================================================================
 
+  // Get available AI models for selection
+  app.get("/api/ai-models", async (_req, res) => {
+    res.json(AVAILABLE_MODELS);
+  });
+
   // Get AI agent prompt for a venture
   app.get("/api/ai-agent-prompts/venture/:ventureId", async (req, res) => {
     try {
@@ -2447,6 +2453,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
           actionPermissions: ['read'],
           contextRefreshHours: 24,
           maxContextTokens: 8000,
+          preferredModel: null,
           enabled: true,
           createdAt: null,
           updatedAt: null,
@@ -2467,6 +2474,7 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON.`
         actionPermissions: ['read'],
         contextRefreshHours: 24,
         maxContextTokens: 8000,
+        preferredModel: null,
         enabled: true,
         createdAt: null,
         updatedAt: null,
