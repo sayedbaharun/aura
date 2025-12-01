@@ -19,6 +19,26 @@ export default function CommandCenterV2() {
         refetchInterval: 5000 // Refresh every 5 seconds
     });
 
+    const { data: ventures, isLoading: isLoadingVentures } = useQuery({
+        queryKey: ["ventures"],
+        queryFn: async () => {
+            const res = await fetch("/api/dashboard/ventures");
+            if (!res.ok) throw new Error("Failed to fetch ventures");
+            return res.json();
+        },
+        initialData: []
+    });
+
+    const { data: inbox, isLoading: isLoadingInbox } = useQuery({
+        queryKey: ["inbox"],
+        queryFn: async () => {
+            const res = await fetch("/api/dashboard/inbox");
+            if (!res.ok) throw new Error("Failed to fetch inbox");
+            return res.json();
+        },
+        initialData: { count: 0 }
+    });
+
     const [mission] = useState("Ship Aura MVP");
 
     // Update time every minute
@@ -113,27 +133,21 @@ export default function CommandCenterV2() {
                             <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Ventures</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                                    <span className="font-medium">Aura</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">On Track</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                                    <span className="font-medium">Alpha</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">Waiting</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                                    <span className="font-medium">Temple</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">Active</span>
-                            </div>
+                            {isLoadingVentures ? (
+                                <div className="text-sm text-muted-foreground">Loading ventures...</div>
+                            ) : ventures.length === 0 ? (
+                                <div className="text-sm text-muted-foreground">No active ventures</div>
+                            ) : (
+                                ventures.map((v: any) => (
+                                    <div key={v.id} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`h-2 w-2 rounded-full ${v.statusColor}`} />
+                                            <span className="font-medium">{v.name}</span>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">{v.statusLabel}</span>
+                                    </div>
+                                ))
+                            )}
                         </CardContent>
                     </Card>
 
@@ -142,7 +156,11 @@ export default function CommandCenterV2() {
                             <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Inbox</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-3xl font-bold">3</div>
+                            {isLoadingInbox ? (
+                                <div className="text-sm text-muted-foreground">...</div>
+                            ) : (
+                                <div className="text-3xl font-bold">{inbox.count}</div>
+                            )}
                             <p className="text-xs text-muted-foreground">Items to process</p>
                         </CardContent>
                     </Card>

@@ -370,8 +370,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "calculated"
       });
     } catch (error) {
-      logger.error({ error }, "Error calculating readiness");
-      res.status(500).json({ error: "Failed to calculate readiness" });
+      console.error("[Readiness API] Error:", error);
+      res.status(500).json({ message: "Failed to calculate readiness" });
+    }
+  });
+
+  // ============================================================================
+  // DASHBOARD - VENTURES
+  // ============================================================================
+
+  app.get("/api/dashboard/ventures", async (req: Request, res: Response) => {
+    try {
+      const allVentures = await storage.getVentures();
+      // Filter for active ventures
+      const activeVentures = allVentures.filter(v =>
+        ['ongoing', 'building', 'planning', 'active', 'development'].includes(v.status)
+      );
+
+      const mappedVentures = activeVentures.map(v => {
+        let statusColor = "bg-gray-500";
+        let statusLabel = "Unknown";
+
+        switch (v.status) {
+          case 'ongoing':
+          case 'active': // Legacy
+            statusColor = "bg-green-500";
+            statusLabel = "On Track";
+            break;
+          case 'building':
+          case 'development': // Legacy
+            statusColor = "bg-yellow-500";
+            statusLabel = "Building";
+            break;
+          case 'planning':
+            statusColor = "bg-blue-500";
+            statusLabel = "Planning";
+            break;
+          case 'on_hold':
+          case 'paused': // Legacy
+            statusColor = "bg-orange-500";
+            statusLabel = "Paused";
+            break;
+        }
+
+        return {
+          id: v.id,
+          name: v.name,
+          statusColor,
+          statusLabel
+        };
+      });
+
+      res.json(mappedVentures);
+    } catch (error) {
+      console.error("[Dashboard Ventures] Error:", error);
+      res.status(500).json({ message: "Failed to fetch ventures" });
+    }
+  });
+
+  // ============================================================================
+  // DASHBOARD - INBOX
+  // ============================================================================
+
+  app.get("/api/dashboard/inbox", async (req: Request, res: Response) => {
+    try {
+      // Assuming getCaptures supports filtering by 'clarified' (isProcessed)
+      // Based on storage.ts interface: getCaptures(filters?: { clarified?: boolean; ventureId?: string })
+      const items = await storage.getCaptures({ clarified: false });
+      res.json({ count: items.length });
+    } catch (error) {
+      console.error("[Dashboard Inbox] Error:", error);
+      res.status(500).json({ message: "Failed to fetch inbox count" });
     }
   });
 
