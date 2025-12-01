@@ -16,8 +16,13 @@
     "db:emergency-fix": "tsx scripts/emergency-fix.ts"
   },
   "dependencies": {
+    "@blocknote/core": "^0.42.3",
+    "@blocknote/mantine": "^0.42.3",
+    "@blocknote/react": "^0.42.3",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
+    "@mantine/core": "^8.3.9",
+    "@mantine/hooks": "^8.3.9",
     "@neondatabase/serverless": "^0.10.4",
     "@notionhq/client": "^5.3.0",
     "@radix-ui/react-accordion": "^1.2.4",
