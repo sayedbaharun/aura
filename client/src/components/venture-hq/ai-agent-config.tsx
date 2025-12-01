@@ -106,7 +106,8 @@ export default function AiAgentConfig({ ventureId }: AiAgentConfigProps) {
       enabled: true,
     };
 
-    if (agentPrompt) {
+    // Check if we have an existing config with a valid ID
+    if (agentPrompt?.id) {
       updateMutation.mutate(payload);
     } else {
       createMutation.mutate(payload);
