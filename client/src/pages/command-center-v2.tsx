@@ -1,17 +1,20 @@
 // Command Center V2 - HUD Interface
-// Build version: 2025-12-02-v4
+// Build version: 2025-12-02-v5
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { HealthBattery, ContextCard, MissionStatement } from "@/components/cockpit/cockpit-components";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Circle, Clock, Inbox, ChevronRight, Flame, AlertTriangle, CheckCircle2, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Circle, Clock, Inbox, ChevronRight, Flame, AlertTriangle, CheckCircle2, Target, Calendar, Video, MapPin, Moon, Sun } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import QuickLogModal from "@/components/health-hub/quick-log-modal";
 
 export default function CommandCenterV2() {
     const [, navigate] = useLocation();
     const [time, setTime] = useState(new Date());
+    const [showHealthLog, setShowHealthLog] = useState(false);
 
     // Fetch readiness data
     const { data: readiness, isLoading: isLoadingReadiness, error: readinessError } = useQuery({
@@ -82,6 +85,17 @@ export default function CommandCenterV2() {
         }
     });
 
+    // Fetch next meeting
+    const { data: nextMeeting = { configured: false, meeting: null }, isLoading: isLoadingMeeting } = useQuery({
+        queryKey: ["dashboard-next-meeting"],
+        queryFn: async () => {
+            const res = await fetch("/api/dashboard/next-meeting");
+            if (!res.ok) throw new Error("Failed to fetch next meeting");
+            return res.json();
+        },
+        refetchInterval: 60000 // Refresh every minute
+    });
+
     // Update time every minute
     useEffect(() => {
         const timer = setInterval(() => setTime(new Date()), 60000);
@@ -142,6 +156,18 @@ export default function CommandCenterV2() {
     // Derive mission from day data
     const mission = dayData?.oneThingToShip || dayData?.title || "Define today's mission";
 
+    // Check if health needs to be logged (for morning mode prompt)
+    const needsHealthLog = readiness?.status === "no_data";
+
+    // Format time until meeting
+    const formatTimeUntil = (minutes: number) => {
+        if (minutes < 60) return `in ${minutes} min`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (mins === 0) return `in ${hours}h`;
+        return `in ${hours}h ${mins}m`;
+    };
+
     return (
         <div className="min-h-screen bg-background p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto">
             {/* ON FIRE ALERT */}
@@ -170,10 +196,33 @@ export default function CommandCenterV2() {
                 </div>
             )}
 
+            {/* MORNING MODE: Health Log Prompt */}
+            {mode === "morning" && needsHealthLog && !isLoadingReadiness && (
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex items-center gap-4">
+                    <div className="p-2 bg-orange-500/20 rounded-full">
+                        <Sun className="h-6 w-6 text-orange-500" />
+                    </div>
+                    <div className="flex-1">
+                        <div className="font-semibold text-orange-600 dark:text-orange-400">
+                            Good morning! Log your health to start the day
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                            Track sleep, energy, and mood for better planning
+                        </div>
+                    </div>
+                    <Button
+                        onClick={() => setShowHealthLog(true)}
+                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                        Log Health
+                    </Button>
+                </div>
+            )}
+
             {/* HEADER: HUD */}
             <header className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Command Center <span className="text-xs text-muted-foreground font-normal">v2.3</span></h1>
+                    <h1 className="text-2xl font-bold tracking-tight">Command Center <span className="text-xs text-muted-foreground font-normal">v2.4</span></h1>
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -213,6 +262,43 @@ export default function CommandCenterV2() {
             </header>
 
             <Separator />
+
+            {/* NEXT MEETING BANNER */}
+            {!isLoadingMeeting && nextMeeting.meeting && (
+                <Card className="border-purple-500/20 bg-purple-500/5">
+                    <CardContent className="p-4 flex items-center gap-4">
+                        <div className="p-2 bg-purple-500/20 rounded-full">
+                            <Calendar className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{nextMeeting.meeting.title}</div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                <span className={`font-semibold ${nextMeeting.meeting.minutesUntil <= 15 ? 'text-orange-500' : 'text-purple-500'}`}>
+                                    {formatTimeUntil(nextMeeting.meeting.minutesUntil)}
+                                </span>
+                                {nextMeeting.meeting.location && (
+                                    <>
+                                        <span>•</span>
+                                        <MapPin className="h-3 w-3" />
+                                        <span className="truncate">{nextMeeting.meeting.location}</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        {nextMeeting.meeting.meetLink && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-shrink-0"
+                                onClick={() => window.open(nextMeeting.meeting.meetLink, '_blank')}
+                            >
+                                <Video className="h-4 w-4 mr-2" />
+                                Join
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* MAIN CONTENT: THE COCKPIT */}
             <main className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
@@ -401,6 +487,12 @@ export default function CommandCenterV2() {
                 </div>
 
             </main>
+
+            {/* Quick Health Log Modal */}
+            <QuickLogModal
+                open={showHealthLog}
+                onOpenChange={setShowHealthLog}
+            />
         </div>
     );
 }
