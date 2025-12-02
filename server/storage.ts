@@ -211,8 +211,8 @@ export class DBStorage implements IStorage {
     try {
       // Check if password_hash column exists in users table
       const result = await this.db.execute(sql`
-        SELECT column_name 
-        FROM information_schema.columns 
+        SELECT column_name
+        FROM information_schema.columns
         WHERE table_name = 'users' AND column_name = 'password_hash'
       `);
 
@@ -220,6 +220,58 @@ export class DBStorage implements IStorage {
         console.log("🔧 Auto-Migration: Adding missing password_hash column to users table...");
         await this.db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password_hash" varchar`);
         console.log("✅ Auto-Migration: Successfully added password_hash column");
+      }
+
+      // Check and create trading_strategies table
+      const tradingStrategiesExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'trading_strategies'
+      `);
+
+      if (tradingStrategiesExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating trading_strategies table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "trading_strategies" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "name" text NOT NULL,
+            "description" text,
+            "instruments" jsonb DEFAULT '[]',
+            "is_active" boolean DEFAULT true,
+            "is_default" boolean DEFAULT false,
+            "config" jsonb NOT NULL,
+            "notes" text,
+            "created_at" timestamp DEFAULT now() NOT NULL,
+            "updated_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_trading_strategies_is_active" ON "trading_strategies" ("is_active")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_trading_strategies_is_default" ON "trading_strategies" ("is_default")`);
+        console.log("✅ Auto-Migration: Created trading_strategies table");
+      }
+
+      // Check and create daily_trading_checklists table
+      const dailyChecklistsExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'daily_trading_checklists'
+      `);
+
+      if (dailyChecklistsExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating daily_trading_checklists table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "daily_trading_checklists" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "day_id" text NOT NULL REFERENCES "days"("id") ON DELETE CASCADE,
+            "date" date NOT NULL,
+            "strategy_id" uuid REFERENCES "trading_strategies"("id") ON DELETE SET NULL,
+            "data" jsonb NOT NULL,
+            "created_at" timestamp DEFAULT now() NOT NULL,
+            "updated_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_daily_trading_checklists_day_id" ON "daily_trading_checklists" ("day_id")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_daily_trading_checklists_date" ON "daily_trading_checklists" ("date")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_daily_trading_checklists_strategy_id" ON "daily_trading_checklists" ("strategy_id")`);
+        console.log("✅ Auto-Migration: Created daily_trading_checklists table");
       }
     } catch (error) {
       console.error("❌ Auto-Migration Error:", error);
