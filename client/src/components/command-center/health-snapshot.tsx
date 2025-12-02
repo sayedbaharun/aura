@@ -121,11 +121,11 @@ export default function HealthSnapshot() {
   });
 
   const handleSave = () => {
-    // Combine workoutType with subType for storage (e.g., "strength_push", "cardio_hiit")
-    let finalWorkoutType = formData.workoutType;
-    if (formData.workoutDone && formData.workoutSubType) {
-      finalWorkoutType = `${formData.workoutType}_${formData.workoutSubType}`;
-    }
+    // Note: workoutSubType is UI-only; database enum only supports base types
+    // The subtype is stored in notes if provided
+    const workoutNotes = formData.workoutDone && formData.workoutSubType
+      ? `${formData.workoutType} - ${formData.workoutSubType}`
+      : undefined;
 
     const payload = {
       date: today,
@@ -133,8 +133,9 @@ export default function HealthSnapshot() {
       energyLevel: formData.energyLevel,
       mood: formData.mood,
       workoutDone: formData.workoutDone,
-      workoutType: formData.workoutDone ? finalWorkoutType : "none",
+      workoutType: formData.workoutDone ? formData.workoutType : "none",
       workoutDurationMin: formData.workoutDone && formData.workoutDuration ? parseInt(formData.workoutDuration) : null,
+      notes: workoutNotes,
     };
 
     if (todayEntry) {
