@@ -3561,13 +3561,19 @@ RULES:
   // Seed default trading strategies
   app.post("/api/trading-strategies/seed", async (req, res) => {
     try {
+      // Ensure tables exist first
+      await storage.ensureSchema();
+
       const { seedTradingStrategies } = await import("./seeds/trading-strategies");
       await seedTradingStrategies();
       const strategies = await storage.getTradingStrategies();
-      res.json({ message: "Trading strategies seeded successfully", count: strategies.length });
-    } catch (error) {
+      res.json({ message: "Trading strategies seeded successfully", count: strategies.length, strategies });
+    } catch (error: any) {
       logger.error({ error }, "Error seeding trading strategies");
-      res.status(500).json({ error: "Failed to seed trading strategies" });
+      res.status(500).json({
+        error: "Failed to seed trading strategies",
+        message: error?.message || "Unknown error",
+      });
     }
   });
 
