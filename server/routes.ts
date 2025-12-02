@@ -390,6 +390,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ['ongoing', 'building', 'planning', 'active', 'development'].includes(v.status)
       );
 
+      // Get projects and tasks for counts
+      const allProjects = await storage.getProjects();
+      const allTasks = await storage.getTasks();
+      const activeTasks = allTasks.filter(t => !['done', 'cancelled'].includes(t.status));
+
       const mappedVentures = activeVentures.map(v => {
         let statusColor = "bg-gray-500";
         let statusLabel = "Unknown";
@@ -416,11 +421,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
         }
 
+        // Count projects and active tasks for this venture
+        const projectCount = allProjects.filter(p => p.ventureId === v.id).length;
+        const taskCount = activeTasks.filter(t => t.ventureId === v.id).length;
+
         return {
           id: v.id,
           name: v.name,
           statusColor,
-          statusLabel
+          statusLabel,
+          projectCount,
+          taskCount
         };
       });
 
@@ -437,10 +448,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dashboard/inbox", async (req: Request, res: Response) => {
     try {
-      // Assuming getCaptures supports filtering by 'clarified' (isProcessed)
-      // Based on storage.ts interface: getCaptures(filters?: { clarified?: boolean; ventureId?: string })
+      // Get unclarified capture items
       const items = await storage.getCaptures({ clarified: false });
-      res.json({ count: items.length });
+
+      // Get top 3 items for preview (most recent first)
+      const topItems = items
+        .slice(0, 3)
+        .map(item => ({
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          source: item.source
+        }));
+
+      res.json({
+        count: items.length,
+        items: topItems
+      });
     } catch (error) {
       console.error("[Dashboard Inbox] Error:", error);
       res.status(500).json({ message: "Failed to fetch inbox count" });
@@ -485,6 +509,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[Dashboard Tasks] Error:", error);
       res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  // ============================================================================
+  // DASHBOARD - DAY (Today's summary)
+  // ============================================================================
+
+  app.get("/api/dashboard/day", async (req: Request, res: Response) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const day = await storage.getDayOrCreate(today);
+
+      // Get the primary venture name if set
+      let primaryVentureName = null;
+      if (day.primaryVentureFocus) {
+        const venture = await storage.getVenture(String(day.primaryVentureFocus));
+        primaryVentureName = venture?.name || null;
+      }
+
+      res.json({
+        id: day.id,
+        date: day.date,
+        title: day.title,
+        mood: day.mood,
+        top3Outcomes: day.top3Outcomes,
+        oneThingToShip: day.oneThingToShip,
+        reflectionAm: day.reflectionAm,
+        reflectionPm: day.reflectionPm,
+        primaryVentureFocus: day.primaryVentureFocus,
+        primaryVentureName
+      });
+    } catch (error) {
+      console.error("[Dashboard Day] Error:", error);
+      res.status(500).json({ message: "Failed to fetch day summary" });
     }
   });
 

@@ -74,27 +74,66 @@ export function ContextCard({ mode, title, description, actionLabel, onAction }:
         shutdown: "from-indigo-500/10 to-slate-500/10 border-indigo-200/20",
     };
 
+    const glowColors = {
+        morning: "shadow-orange-500/20",
+        deep_work: "shadow-purple-500/20",
+        trading: "shadow-green-500/20",
+        admin: "shadow-blue-500/20",
+        shutdown: "shadow-indigo-500/20",
+    };
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            key={mode} // Re-animate on mode change
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="h-full"
         >
-            <Card className={cn("h-full border-2 overflow-hidden bg-gradient-to-br", gradients[mode])}>
-                <CardContent className="flex flex-col items-center justify-center p-8 text-center h-full min-h-[300px]">
-                    <div className="mb-6 p-4 rounded-full bg-background/50 backdrop-blur-sm shadow-sm">
+            <Card className={cn(
+                "h-full border-2 overflow-hidden bg-gradient-to-br transition-shadow duration-500",
+                gradients[mode],
+                `shadow-lg ${glowColors[mode]}`
+            )}>
+                <CardContent className="flex flex-col items-center justify-center p-6 md:p-8 text-center h-full min-h-[300px]">
+                    <motion.div
+                        className="mb-6 p-4 rounded-full bg-background/50 backdrop-blur-sm shadow-sm"
+                        initial={{ rotate: -10, scale: 0.8 }}
+                        animate={{ rotate: 0, scale: 1 }}
+                        transition={{ duration: 0.5, delay: 0.1 }}
+                    >
                         {icons[mode]}
-                    </div>
-                    <h2 className="text-3xl font-bold tracking-tight mb-2">{title}</h2>
-                    <p className="text-muted-foreground text-lg max-w-md mb-8">{description}</p>
+                    </motion.div>
+                    <motion.h2
+                        className="text-2xl md:text-3xl font-bold tracking-tight mb-2"
+                        initial={{ y: 10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ duration: 0.4, delay: 0.2 }}
+                    >
+                        {title}
+                    </motion.h2>
+                    <motion.p
+                        className="text-muted-foreground text-base md:text-lg max-w-md mb-8"
+                        initial={{ y: 10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ duration: 0.4, delay: 0.3 }}
+                    >
+                        {description}
+                    </motion.p>
 
                     {actionLabel && (
-                        <button
+                        <motion.button
                             onClick={onAction}
-                            className="px-8 py-3 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity shadow-lg hover:shadow-xl"
+                            className="px-6 md:px-8 py-3 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105"
+                            initial={{ y: 10, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ duration: 0.4, delay: 0.4 }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.98 }}
                         >
                             {actionLabel}
-                        </button>
+                        </motion.button>
                     )}
                 </CardContent>
             </Card>
