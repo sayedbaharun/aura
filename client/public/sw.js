@@ -1,7 +1,7 @@
 // SB-OS Service Worker
-const CACHE_NAME = 'sb-os-v1';
-const STATIC_CACHE = 'sbos-static-v1';
-const DYNAMIC_CACHE = 'sbos-dynamic-v1';
+const CACHE_NAME = 'sb-os-v2';
+const STATIC_CACHE = 'sbos-static-v2';
+const DYNAMIC_CACHE = 'sbos-dynamic-v2';
 
 // Assets to cache immediately on install
 const STATIC_ASSETS = [
@@ -52,6 +52,10 @@ self.addEventListener('fetch', (event) => {
 
   // Skip Chrome extension requests
   if (url.protocol === 'chrome-extension:') return;
+
+  // Skip external font requests (Google Fonts) - let browser handle directly
+  // This avoids CSP issues with service worker fetching cross-origin fonts
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return;
 
   // API requests - network first, fallback to cache
   if (url.pathname.startsWith('/api/')) {
