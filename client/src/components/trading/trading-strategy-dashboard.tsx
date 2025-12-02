@@ -118,15 +118,25 @@ export default function TradingStrategyDashboard() {
     },
   });
 
+  // State for error messages
+  const [seedError, setSeedError] = useState<string | null>(null);
+
   // Mutation to seed strategies - defined here to follow React hooks rules
   const seedStrategiesMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/trading-strategies/seed");
+      const response = await apiRequest("POST", "/api/trading-strategies/seed");
+      return response.json();
     },
     onSuccess: () => {
+      setSeedError(null);
       queryClient.invalidateQueries({ queryKey: ["/api/trading-strategies"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trading-checklists/today"] });
     },
+    onError: (error: Error) => {
+      setSeedError(error.message || "Failed to load strategy. Please try again.");
+    },
+    retry: 2, // Retry twice on failure
+    retryDelay: 1000, // Wait 1 second between retries
   });
 
   // Handle checkbox change
@@ -295,15 +305,28 @@ export default function TradingStrategyDashboard() {
           <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Trading Strategies</h3>
           <p className="text-muted-foreground mb-4">
-            Create your first trading strategy or load the default "Golden Trap & Reverse" strategy.
+            Load the "Golden Trap & Reverse" strategy to get started.
           </p>
+          {seedError && (
+            <p className="text-red-500 text-sm mb-4">
+              {seedError}
+            </p>
+          )}
           <div className="flex gap-2 justify-center">
             <Button
-              onClick={() => seedStrategiesMutation.mutate()}
+              onClick={() => {
+                setSeedError(null);
+                seedStrategiesMutation.mutate();
+              }}
               disabled={seedStrategiesMutation.isPending}
             >
               {seedStrategiesMutation.isPending ? (
-                "Loading..."
+                "Setting up tables & loading strategy..."
+              ) : seedError ? (
+                <>
+                  <Target className="h-4 w-4 mr-2" />
+                  Retry
+                </>
               ) : (
                 <>
                   <Target className="h-4 w-4 mr-2" />
