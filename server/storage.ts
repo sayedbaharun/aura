@@ -39,6 +39,10 @@ import {
   type InsertVentureContextCache,
   type VentureAgentAction,
   type InsertVentureAgentAction,
+  type TradingStrategy,
+  type InsertTradingStrategy,
+  type DailyTradingChecklist,
+  type InsertDailyTradingChecklist,
   ventures,
   projects,
   phases,
@@ -59,6 +63,8 @@ import {
   ventureConversations,
   ventureContextCache,
   ventureAgentActions,
+  tradingStrategies,
+  dailyTradingChecklists,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
@@ -1399,6 +1405,200 @@ export class DBStorage implements IStorage {
       // Table might not exist yet if migration hasn't been run
       console.error("Error fetching venture agent actions (table may not exist):", error);
       return [];
+    }
+  }
+
+  // ============================================================================
+  // TRADING STRATEGIES
+  // ============================================================================
+
+  async getTradingStrategies(filters?: { isActive?: boolean }): Promise<TradingStrategy[]> {
+    try {
+      const conditions = [];
+
+      if (filters?.isActive !== undefined) {
+        conditions.push(eq(tradingStrategies.isActive, filters.isActive));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return await this.db
+        .select()
+        .from(tradingStrategies)
+        .where(whereClause)
+        .orderBy(desc(tradingStrategies.isDefault), desc(tradingStrategies.createdAt));
+    } catch (error) {
+      console.error("Error fetching trading strategies (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getTradingStrategy(id: string): Promise<TradingStrategy | undefined> {
+    try {
+      const [strategy] = await this.db
+        .select()
+        .from(tradingStrategies)
+        .where(eq(tradingStrategies.id, id))
+        .limit(1);
+      return strategy;
+    } catch (error) {
+      console.error("Error fetching trading strategy (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async getDefaultTradingStrategy(): Promise<TradingStrategy | undefined> {
+    try {
+      const [strategy] = await this.db
+        .select()
+        .from(tradingStrategies)
+        .where(and(eq(tradingStrategies.isDefault, true), eq(tradingStrategies.isActive, true)))
+        .limit(1);
+      return strategy;
+    } catch (error) {
+      console.error("Error fetching default trading strategy (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async createTradingStrategy(data: InsertTradingStrategy): Promise<TradingStrategy> {
+    try {
+      // If this is set as default, unset other defaults first
+      if (data.isDefault) {
+        await this.db
+          .update(tradingStrategies)
+          .set({ isDefault: false, updatedAt: new Date() });
+      }
+
+      const [strategy] = await this.db
+        .insert(tradingStrategies)
+        .values(data as any)
+        .returning();
+      return strategy;
+    } catch (error) {
+      console.error("Error creating trading strategy:", error);
+      throw error;
+    }
+  }
+
+  async updateTradingStrategy(id: string, updates: Partial<InsertTradingStrategy>): Promise<TradingStrategy | undefined> {
+    try {
+      // If setting as default, unset other defaults first
+      if (updates.isDefault) {
+        await this.db
+          .update(tradingStrategies)
+          .set({ isDefault: false, updatedAt: new Date() })
+          .where(not(eq(tradingStrategies.id, id)));
+      }
+
+      const [updated] = await this.db
+        .update(tradingStrategies)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(tradingStrategies.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating trading strategy:", error);
+      return undefined;
+    }
+  }
+
+  async deleteTradingStrategy(id: string): Promise<void> {
+    try {
+      await this.db.delete(tradingStrategies).where(eq(tradingStrategies.id, id));
+    } catch (error) {
+      console.error("Error deleting trading strategy:", error);
+    }
+  }
+
+  // ============================================================================
+  // DAILY TRADING CHECKLISTS
+  // ============================================================================
+
+  async getDailyTradingChecklists(filters?: { date?: string; strategyId?: string }): Promise<DailyTradingChecklist[]> {
+    try {
+      const conditions = [];
+
+      if (filters?.date) {
+        conditions.push(eq(dailyTradingChecklists.date, filters.date));
+      }
+      if (filters?.strategyId) {
+        conditions.push(eq(dailyTradingChecklists.strategyId, filters.strategyId));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return await this.db
+        .select()
+        .from(dailyTradingChecklists)
+        .where(whereClause)
+        .orderBy(desc(dailyTradingChecklists.date));
+    } catch (error) {
+      console.error("Error fetching daily trading checklists (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getDailyTradingChecklist(id: string): Promise<DailyTradingChecklist | undefined> {
+    try {
+      const [checklist] = await this.db
+        .select()
+        .from(dailyTradingChecklists)
+        .where(eq(dailyTradingChecklists.id, id))
+        .limit(1);
+      return checklist;
+    } catch (error) {
+      console.error("Error fetching daily trading checklist (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async getDailyTradingChecklistByDate(date: string): Promise<DailyTradingChecklist | undefined> {
+    try {
+      const [checklist] = await this.db
+        .select()
+        .from(dailyTradingChecklists)
+        .where(eq(dailyTradingChecklists.date, date))
+        .limit(1);
+      return checklist;
+    } catch (error) {
+      console.error("Error fetching daily trading checklist by date (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async createDailyTradingChecklist(data: InsertDailyTradingChecklist): Promise<DailyTradingChecklist> {
+    try {
+      const [checklist] = await this.db
+        .insert(dailyTradingChecklists)
+        .values(data as any)
+        .returning();
+      return checklist;
+    } catch (error) {
+      console.error("Error creating daily trading checklist:", error);
+      throw error;
+    }
+  }
+
+  async updateDailyTradingChecklist(id: string, updates: Partial<InsertDailyTradingChecklist>): Promise<DailyTradingChecklist | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(dailyTradingChecklists)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(dailyTradingChecklists.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating daily trading checklist:", error);
+      return undefined;
+    }
+  }
+
+  async deleteDailyTradingChecklist(id: string): Promise<void> {
+    try {
+      await this.db.delete(dailyTradingChecklists).where(eq(dailyTradingChecklists.id, id));
+    } catch (error) {
+      console.error("Error deleting daily trading checklist:", error);
     }
   }
 

@@ -1138,3 +1138,128 @@ export const insertVentureAgentActionSchema = createInsertSchema(ventureAgentAct
 
 export type VentureAgentAction = typeof ventureAgentActions.$inferSelect;
 export type InsertVentureAgentAction = z.infer<typeof insertVentureAgentActionSchema>;
+
+// ----------------------------------------------------------------------------
+// TRADING STRATEGIES
+// ----------------------------------------------------------------------------
+
+// Checklist item types for trading strategies
+export type TradingChecklistItemType = 'checkbox' | 'text' | 'number' | 'select' | 'time' | 'table';
+
+export interface TradingChecklistItem {
+  id: string;
+  label: string;
+  type: TradingChecklistItemType;
+  required: boolean;
+  category?: string; // For grouping like "A. The Setup", "B. The Trigger"
+  options?: string[]; // For select type
+  placeholder?: string;
+  description?: string;
+  tableColumns?: string[]; // For table type
+}
+
+export interface TradingChecklistSection {
+  id: string;
+  title: string;
+  icon?: string;
+  description?: string;
+  items: TradingChecklistItem[];
+}
+
+export interface TradingStrategyConfig {
+  sections: TradingChecklistSection[];
+}
+
+// Trading session type for the day
+export const tradingSessionEnum = pgEnum('trading_session', ['london', 'new_york', 'asian', 'other']);
+
+// Trading Strategies: Templates for trading checklists
+export const tradingStrategies = pgTable(
+  "trading_strategies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: text("description"),
+    instruments: jsonb("instruments").$type<string[]>().default([]), // e.g., ["XAU/USD", "XAG/USD"]
+    isActive: boolean("is_active").default(true), // Whether this strategy is currently active
+    isDefault: boolean("is_default").default(false), // Whether this is the default strategy
+    config: jsonb("config").$type<TradingStrategyConfig>().notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_trading_strategies_is_active").on(table.isActive),
+    index("idx_trading_strategies_is_default").on(table.isDefault),
+  ]
+);
+
+export const insertTradingStrategySchema = createInsertSchema(tradingStrategies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTradingStrategy = z.infer<typeof insertTradingStrategySchema>;
+export type TradingStrategy = typeof tradingStrategies.$inferSelect;
+
+// Daily Trading Checklists: Track daily completion of a strategy
+export interface TradingChecklistValue {
+  checked?: boolean;
+  value?: string | number;
+  tableData?: Record<string, string>[];
+}
+
+export interface DailyTradingChecklistData {
+  strategyId: string;
+  strategyName: string;
+  session?: 'london' | 'new_york' | 'asian' | 'other';
+  mentalState?: number; // 1-10
+  highImpactNews?: string;
+  values: Record<string, TradingChecklistValue>; // Map of item id to value
+  trades: {
+    id: string;
+    time: string;
+    pair: string;
+    direction: 'long' | 'short';
+    entryPrice: string;
+    stopLoss: string;
+    takeProfit?: string;
+    result?: 'win' | 'loss' | 'breakeven' | 'pending';
+    pnl?: number;
+    notes?: string;
+  }[];
+  endOfSessionReview?: {
+    followedPlan: boolean;
+    didWell?: string;
+    toImprove?: string;
+  };
+  completedAt?: string;
+}
+
+export const dailyTradingChecklists = pgTable(
+  "daily_trading_checklists",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dayId: text("day_id").references(() => days.id, { onDelete: "cascade" }).notNull(),
+    date: date("date").notNull(),
+    strategyId: uuid("strategy_id").references(() => tradingStrategies.id, { onDelete: "set null" }),
+    data: jsonb("data").$type<DailyTradingChecklistData>().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_daily_trading_checklists_day_id").on(table.dayId),
+    index("idx_daily_trading_checklists_date").on(table.date),
+    index("idx_daily_trading_checklists_strategy_id").on(table.strategyId),
+  ]
+);
+
+export const insertDailyTradingChecklistSchema = createInsertSchema(dailyTradingChecklists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDailyTradingChecklist = z.infer<typeof insertDailyTradingChecklistSchema>;
+export type DailyTradingChecklist = typeof dailyTradingChecklists.$inferSelect;

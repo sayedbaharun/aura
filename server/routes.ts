@@ -18,6 +18,9 @@ import {
   insertShoppingItemSchema,
   insertBookSchema,
   insertAiAgentPromptSchema,
+  insertTradingStrategySchema,
+  insertDailyTradingChecklistSchema,
+  type DailyTradingChecklistData,
 } from "@shared/schema";
 import { getAllIntegrationStatuses, getIntegrationStatus } from "./integrations";
 import { z } from "zod";
@@ -3468,6 +3471,249 @@ RULES:
     } catch (error) {
       logger.error({ error }, "Error committing project plan");
       res.status(500).json({ error: "Failed to commit project plan" });
+    }
+  });
+
+  // ============================================================================
+  // TRADING STRATEGIES
+  // ============================================================================
+
+  // Get all trading strategies
+  app.get("/api/trading-strategies", async (req, res) => {
+    try {
+      const isActive = req.query.isActive === "true" ? true : req.query.isActive === "false" ? false : undefined;
+      const strategies = await storage.getTradingStrategies({ isActive });
+      res.json(strategies);
+    } catch (error) {
+      logger.error({ error }, "Error fetching trading strategies");
+      res.status(500).json({ error: "Failed to fetch trading strategies" });
+    }
+  });
+
+  // Get a single trading strategy
+  app.get("/api/trading-strategies/:id", async (req, res) => {
+    try {
+      const strategy = await storage.getTradingStrategy(req.params.id);
+      if (!strategy) {
+        return res.status(404).json({ error: "Trading strategy not found" });
+      }
+      res.json(strategy);
+    } catch (error) {
+      logger.error({ error }, "Error fetching trading strategy");
+      res.status(500).json({ error: "Failed to fetch trading strategy" });
+    }
+  });
+
+  // Get the default trading strategy
+  app.get("/api/trading-strategies/default/active", async (req, res) => {
+    try {
+      const strategy = await storage.getDefaultTradingStrategy();
+      if (!strategy) {
+        return res.status(404).json({ error: "No default trading strategy found" });
+      }
+      res.json(strategy);
+    } catch (error) {
+      logger.error({ error }, "Error fetching default trading strategy");
+      res.status(500).json({ error: "Failed to fetch default trading strategy" });
+    }
+  });
+
+  // Create a trading strategy
+  app.post("/api/trading-strategies", async (req, res) => {
+    try {
+      const parsed = insertTradingStrategySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid data", details: parsed.error.issues });
+      }
+      const strategy = await storage.createTradingStrategy(parsed.data);
+      res.status(201).json(strategy);
+    } catch (error) {
+      logger.error({ error }, "Error creating trading strategy");
+      res.status(500).json({ error: "Failed to create trading strategy" });
+    }
+  });
+
+  // Update a trading strategy
+  app.patch("/api/trading-strategies/:id", async (req, res) => {
+    try {
+      const strategy = await storage.updateTradingStrategy(req.params.id, req.body);
+      if (!strategy) {
+        return res.status(404).json({ error: "Trading strategy not found" });
+      }
+      res.json(strategy);
+    } catch (error) {
+      logger.error({ error }, "Error updating trading strategy");
+      res.status(500).json({ error: "Failed to update trading strategy" });
+    }
+  });
+
+  // Delete a trading strategy
+  app.delete("/api/trading-strategies/:id", async (req, res) => {
+    try {
+      await storage.deleteTradingStrategy(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      logger.error({ error }, "Error deleting trading strategy");
+      res.status(500).json({ error: "Failed to delete trading strategy" });
+    }
+  });
+
+  // Seed default trading strategies
+  app.post("/api/trading-strategies/seed", async (req, res) => {
+    try {
+      const { seedTradingStrategies } = await import("./seeds/trading-strategies");
+      await seedTradingStrategies();
+      const strategies = await storage.getTradingStrategies();
+      res.json({ message: "Trading strategies seeded successfully", count: strategies.length });
+    } catch (error) {
+      logger.error({ error }, "Error seeding trading strategies");
+      res.status(500).json({ error: "Failed to seed trading strategies" });
+    }
+  });
+
+  // ============================================================================
+  // DAILY TRADING CHECKLISTS
+  // ============================================================================
+
+  // Get daily trading checklists
+  app.get("/api/trading-checklists", async (req, res) => {
+    try {
+      const { date, strategyId } = req.query;
+      const checklists = await storage.getDailyTradingChecklists({
+        date: date as string | undefined,
+        strategyId: strategyId as string | undefined,
+      });
+      res.json(checklists);
+    } catch (error) {
+      logger.error({ error }, "Error fetching daily trading checklists");
+      res.status(500).json({ error: "Failed to fetch daily trading checklists" });
+    }
+  });
+
+  // Get today's trading checklist or create one
+  app.get("/api/trading-checklists/today", async (req, res) => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      let checklist = await storage.getDailyTradingChecklistByDate(today);
+
+      if (!checklist) {
+        // Get default strategy
+        const defaultStrategy = await storage.getDefaultTradingStrategy();
+        if (!defaultStrategy) {
+          return res.status(404).json({
+            error: "No default trading strategy found",
+            message: "Please create and set a default trading strategy first",
+          });
+        }
+
+        // Ensure day record exists
+        const day = await storage.getDayOrCreate(today);
+
+        // Create checklist with empty values
+        const data: DailyTradingChecklistData = {
+          strategyId: defaultStrategy.id,
+          strategyName: defaultStrategy.name,
+          values: {},
+          trades: [],
+        };
+
+        checklist = await storage.createDailyTradingChecklist({
+          dayId: day.id,
+          date: today,
+          strategyId: defaultStrategy.id,
+          data,
+        });
+      }
+
+      res.json(checklist);
+    } catch (error) {
+      logger.error({ error }, "Error fetching today's trading checklist");
+      res.status(500).json({ error: "Failed to fetch today's trading checklist" });
+    }
+  });
+
+  // Get a specific trading checklist
+  app.get("/api/trading-checklists/:id", async (req, res) => {
+    try {
+      const checklist = await storage.getDailyTradingChecklist(req.params.id);
+      if (!checklist) {
+        return res.status(404).json({ error: "Trading checklist not found" });
+      }
+      res.json(checklist);
+    } catch (error) {
+      logger.error({ error }, "Error fetching trading checklist");
+      res.status(500).json({ error: "Failed to fetch trading checklist" });
+    }
+  });
+
+  // Create a trading checklist for a specific date
+  app.post("/api/trading-checklists", async (req, res) => {
+    try {
+      const { date, strategyId } = req.body;
+
+      if (!date || !strategyId) {
+        return res.status(400).json({ error: "date and strategyId are required" });
+      }
+
+      // Check if checklist already exists for this date
+      const existing = await storage.getDailyTradingChecklistByDate(date);
+      if (existing) {
+        return res.status(409).json({ error: "Checklist already exists for this date", checklist: existing });
+      }
+
+      // Get the strategy
+      const strategy = await storage.getTradingStrategy(strategyId);
+      if (!strategy) {
+        return res.status(404).json({ error: "Trading strategy not found" });
+      }
+
+      // Ensure day record exists
+      const day = await storage.getDayOrCreate(date);
+
+      // Create checklist
+      const data: DailyTradingChecklistData = {
+        strategyId: strategy.id,
+        strategyName: strategy.name,
+        values: {},
+        trades: [],
+      };
+
+      const checklist = await storage.createDailyTradingChecklist({
+        dayId: day.id,
+        date,
+        strategyId: strategy.id,
+        data,
+      });
+
+      res.status(201).json(checklist);
+    } catch (error) {
+      logger.error({ error }, "Error creating trading checklist");
+      res.status(500).json({ error: "Failed to create trading checklist" });
+    }
+  });
+
+  // Update a trading checklist
+  app.patch("/api/trading-checklists/:id", async (req, res) => {
+    try {
+      const checklist = await storage.updateDailyTradingChecklist(req.params.id, req.body);
+      if (!checklist) {
+        return res.status(404).json({ error: "Trading checklist not found" });
+      }
+      res.json(checklist);
+    } catch (error) {
+      logger.error({ error }, "Error updating trading checklist");
+      res.status(500).json({ error: "Failed to update trading checklist" });
+    }
+  });
+
+  // Delete a trading checklist
+  app.delete("/api/trading-checklists/:id", async (req, res) => {
+    try {
+      await storage.deleteDailyTradingChecklist(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      logger.error({ error }, "Error deleting trading checklist");
+      res.status(500).json({ error: "Failed to delete trading checklist" });
     }
   });
 
