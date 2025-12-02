@@ -384,6 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dashboard/ventures", async (req: Request, res: Response) => {
     try {
+      const today = new Date().toISOString().split('T')[0];
       const allVentures = await storage.getVentures();
       // Filter for active ventures
       const activeVentures = allVentures.filter(v =>
@@ -396,44 +397,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeTasks = allTasks.filter(t => !['done', 'cancelled'].includes(t.status));
 
       const mappedVentures = activeVentures.map(v => {
-        let statusColor = "bg-gray-500";
-        let statusLabel = "Unknown";
-
-        switch (v.status) {
-          case 'ongoing':
-          case 'active': // Legacy
-            statusColor = "bg-green-500";
-            statusLabel = "On Track";
-            break;
-          case 'building':
-          case 'development': // Legacy
-            statusColor = "bg-yellow-500";
-            statusLabel = "Building";
-            break;
-          case 'planning':
-            statusColor = "bg-blue-500";
-            statusLabel = "Planning";
-            break;
-          case 'on_hold':
-          case 'paused': // Legacy
-            statusColor = "bg-orange-500";
-            statusLabel = "Paused";
-            break;
-        }
-
         // Count projects and active tasks for this venture
         const projectCount = allProjects.filter(p => p.ventureId === v.id).length;
-        const taskCount = activeTasks.filter(t => t.ventureId === v.id).length;
+        const ventureTasks = activeTasks.filter(t => t.ventureId === v.id);
+        const taskCount = ventureTasks.length;
+
+        // Calculate urgency
+        const overdueP0 = ventureTasks.filter(t =>
+          t.priority === 'P0' && t.dueDate && t.dueDate < today
+        ).length;
+        const dueTodayP0P1 = ventureTasks.filter(t =>
+          (t.priority === 'P0' || t.priority === 'P1') && t.dueDate === today
+        ).length;
+
+        // Determine urgency level and color
+        let urgency: 'critical' | 'warning' | 'clear' = 'clear';
+        let urgencyColor = "bg-green-500";
+        let urgencyLabel = "";
+
+        if (overdueP0 > 0) {
+          urgency = 'critical';
+          urgencyColor = "bg-red-500";
+          urgencyLabel = `${overdueP0} overdue`;
+        } else if (dueTodayP0P1 > 0) {
+          urgency = 'warning';
+          urgencyColor = "bg-yellow-500";
+          urgencyLabel = `${dueTodayP0P1} due today`;
+        }
 
         return {
           id: v.id,
           name: v.name,
-          statusColor,
-          statusLabel,
           projectCount,
-          taskCount
+          taskCount,
+          urgency,
+          urgencyColor,
+          urgencyLabel,
+          overdueP0Count: overdueP0,
+          dueTodayCount: dueTodayP0P1
         };
       });
+
+      // Sort by urgency: critical first, then warning, then clear
+      const urgencyOrder = { critical: 0, warning: 1, clear: 2 };
+      mappedVentures.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency]);
 
       res.json(mappedVentures);
     } catch (error) {
@@ -509,6 +516,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[Dashboard Tasks] Error:", error);
       res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  // ============================================================================
+  // DASHBOARD - URGENT (On Fire indicator)
+  // ============================================================================
+
+  app.get("/api/dashboard/urgent", async (req: Request, res: Response) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const allTasks = await storage.getTasks();
+
+      // Filter active tasks only
+      const activeTasks = allTasks.filter(t => !['done', 'cancelled'].includes(t.status));
+
+      // Find overdue P0 tasks (dueDate < today)
+      const overdueP0 = activeTasks.filter(t =>
+        t.priority === 'P0' &&
+        t.dueDate &&
+        t.dueDate < today
+      );
+
+      // Find P0/P1 tasks due today
+      const dueTodayHighPriority = activeTasks.filter(t =>
+        (t.priority === 'P0' || t.priority === 'P1') &&
+        t.dueDate === today
+      );
+
+      // Top 3 most urgent tasks (overdue P0 first, then due today P0/P1)
+      const urgentTasks = [
+        ...overdueP0.map(t => ({ ...t, urgencyReason: 'overdue' })),
+        ...dueTodayHighPriority.map(t => ({ ...t, urgencyReason: 'due_today' }))
+      ].slice(0, 5).map(t => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        dueDate: t.dueDate,
+        ventureId: t.ventureId,
+        urgencyReason: t.urgencyReason
+      }));
+
+      res.json({
+        onFire: overdueP0.length > 0 || dueTodayHighPriority.some(t => t.priority === 'P0'),
+        overdueP0Count: overdueP0.length,
+        dueTodayCount: dueTodayHighPriority.length,
+        totalUrgent: overdueP0.length + dueTodayHighPriority.length,
+        tasks: urgentTasks
+      });
+    } catch (error) {
+      console.error("[Dashboard Urgent] Error:", error);
+      res.status(500).json({ message: "Failed to fetch urgent tasks" });
+    }
+  });
+
+  // ============================================================================
+  // DASHBOARD - TOP3 (Today's most important tasks)
+  // ============================================================================
+
+  app.get("/api/dashboard/top3", async (req: Request, res: Response) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const allTasks = await storage.getTasks();
+
+      // Filter active tasks only
+      const activeTasks = allTasks.filter(t => !['done', 'cancelled'].includes(t.status));
+
+      // Score and sort tasks by importance
+      const scoredTasks = activeTasks.map(t => {
+        let score = 0;
+
+        // Priority scoring
+        if (t.priority === 'P0') score += 100;
+        else if (t.priority === 'P1') score += 75;
+        else if (t.priority === 'P2') score += 50;
+        else score += 25;
+
+        // Overdue bonus
+        if (t.dueDate && t.dueDate < today) score += 50;
+
+        // Due today bonus
+        if (t.dueDate === today) score += 30;
+
+        // Focus date is today bonus
+        if (t.focusDate === today) score += 20;
+
+        return { ...t, importanceScore: score };
+      });
+
+      // Sort by score descending, take top 3
+      scoredTasks.sort((a, b) => b.importanceScore - a.importanceScore);
+      const top3 = scoredTasks.slice(0, 3).map(t => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        dueDate: t.dueDate,
+        focusDate: t.focusDate,
+        ventureId: t.ventureId,
+        domain: t.domain,
+        isOverdue: t.dueDate ? t.dueDate < today : false,
+        isDueToday: t.dueDate === today
+      }));
+
+      res.json({ tasks: top3 });
+    } catch (error) {
+      console.error("[Dashboard Top3] Error:", error);
+      res.status(500).json({ message: "Failed to fetch top 3 tasks" });
     }
   });
 
