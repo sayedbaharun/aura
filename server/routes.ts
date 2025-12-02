@@ -660,6 +660,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // DASHBOARD - NEXT MEETING (Calendar integration)
+  // ============================================================================
+
+  app.get("/api/dashboard/next-meeting", async (req: Request, res: Response) => {
+    try {
+      // Check if calendar is configured
+      const calendarConfigured = !!(
+        process.env.GOOGLE_CALENDAR_CLIENT_ID &&
+        process.env.GOOGLE_CALENDAR_CLIENT_SECRET &&
+        process.env.GOOGLE_CALENDAR_REFRESH_TOKEN
+      );
+
+      if (!calendarConfigured) {
+        return res.json({
+          configured: false,
+          meeting: null
+        });
+      }
+
+      // Get events from now until end of day
+      const now = new Date();
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      try {
+        const { listEvents } = await import("./google-calendar");
+        const events = await listEvents(now, endOfDay, 5);
+
+        // Find the next upcoming event (not already started)
+        const upcomingEvents = events.filter((event: any) => {
+          const eventStart = new Date(event.start?.dateTime || event.start?.date);
+          return eventStart > now;
+        });
+
+        if (upcomingEvents.length === 0) {
+          return res.json({
+            configured: true,
+            meeting: null
+          });
+        }
+
+        const nextEvent = upcomingEvents[0];
+        const eventStart = new Date(nextEvent.start?.dateTime || nextEvent.start?.date);
+        const minutesUntil = Math.round((eventStart.getTime() - now.getTime()) / 60000);
+
+        res.json({
+          configured: true,
+          meeting: {
+            id: nextEvent.id,
+            title: nextEvent.summary || "Untitled Event",
+            startTime: nextEvent.start?.dateTime || nextEvent.start?.date,
+            endTime: nextEvent.end?.dateTime || nextEvent.end?.date,
+            minutesUntil,
+            location: nextEvent.location || null,
+            meetLink: nextEvent.hangoutLink || null
+          }
+        });
+      } catch (calendarError) {
+        console.error("[Dashboard Next Meeting] Calendar error:", calendarError);
+        res.json({
+          configured: true,
+          meeting: null,
+          error: "Failed to fetch calendar events"
+        });
+      }
+    } catch (error) {
+      console.error("[Dashboard Next Meeting] Error:", error);
+      res.status(500).json({ message: "Failed to fetch next meeting" });
+    }
+  });
+
+  // ============================================================================
   // VENTURES
   // ============================================================================
 
