@@ -1,15 +1,25 @@
 import OpenAI from "openai";
 import { logger } from "./logger";
 
-// Initialize OpenRouter with OpenAI-compatible API
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: {
-    "HTTP-Referer": process.env.SITE_URL || "http://localhost:5000",
-    "X-Title": "SB-OS",
-  },
-});
+// Initialize OpenRouter with OpenAI-compatible API (lazy initialization)
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    if (!process.env.OPENROUTER_API_KEY) {
+      throw new Error("OPENROUTER_API_KEY is not set. AI features are disabled.");
+    }
+    openai = new OpenAI({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": process.env.SITE_URL || "http://localhost:5000",
+        "X-Title": "SB-OS",
+      },
+    });
+  }
+  return openai;
+}
 
 // Model configuration with fallback cascade (OpenRouter model names)
 export const MODEL_CASCADE = [
@@ -127,7 +137,7 @@ export async function chatCompletion(
           complexity,
         }, `Attempting chat completion with ${model}`);
 
-        const response = await openai.chat.completions.create({
+        const response = await getOpenAIClient().chat.completions.create({
           model,
           messages: params.messages,
           tools: params.tools,
@@ -239,7 +249,7 @@ export async function chatCompletionStream(
           complexity,
         }, `Attempting streaming completion with ${model}`);
 
-        const stream = await openai.chat.completions.create({
+        const stream = await getOpenAIClient().chat.completions.create({
           model,
           messages: params.messages,
           tools: params.tools,
