@@ -118,6 +118,17 @@ export default function TradingStrategyDashboard() {
     },
   });
 
+  // Mutation to seed strategies - defined here to follow React hooks rules
+  const seedStrategiesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/trading-strategies/seed");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trading-strategies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trading-checklists/today"] });
+    },
+  });
+
   // Handle checkbox change
   const handleCheckboxChange = (itemId: string, checked: boolean) => {
     if (!checklistData) return;
@@ -275,17 +286,6 @@ export default function TradingStrategyDashboard() {
       </div>
     );
   }
-
-  // Mutation to seed strategies
-  const seedStrategiesMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/trading-strategies/seed");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trading-strategies"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/trading-checklists/today"] });
-    },
-  });
 
   // No strategies available
   if (strategies.length === 0) {
