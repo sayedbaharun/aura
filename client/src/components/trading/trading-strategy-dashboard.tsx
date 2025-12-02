@@ -4,15 +4,16 @@ import { format } from "date-fns";
 import {
   Calendar,
   TrendingUp,
-  Brain,
   Target,
   CheckCircle2,
   AlertCircle,
-  Clock,
   Plus,
   Trash2,
   ChevronDown,
   ChevronRight,
+  Save,
+  Loader2,
+  Check,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -362,6 +363,21 @@ export default function TradingStrategyDashboard() {
   }
 
   const completionPercentage = calculateCompletion();
+  const isSaving = updateChecklistMutation.isPending;
+  const lastSaved = todayChecklist?.updatedAt ? new Date(todayChecklist.updatedAt) : null;
+
+  // Manual save function
+  const handleManualSave = () => {
+    if (!checklistData) return;
+    updateChecklistMutation.mutate({
+      values: checklistData.values,
+      trades: checklistData.trades,
+      session: checklistData.session,
+      mentalState: checklistData.mentalState,
+      highImpactNews: checklistData.highImpactNews,
+      endOfSessionReview: checklistData.endOfSessionReview,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -378,10 +394,38 @@ export default function TradingStrategyDashboard() {
                 <CardDescription>{todayFormatted}</CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* Save Status */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : lastSaved ? (
+                  <>
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span>Saved</span>
+                  </>
+                ) : null}
+              </div>
               <Badge variant={completionPercentage === 100 ? "default" : "secondary"}>
                 {completionPercentage}% Complete
               </Badge>
+              <Button
+                size="sm"
+                onClick={handleManualSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-1" />
+                    Save
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </CardHeader>
