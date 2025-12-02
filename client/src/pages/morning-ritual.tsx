@@ -34,6 +34,16 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link, useRoute, useLocation } from "wouter";
 
+interface Task {
+  id: string;
+  title: string;
+  status: 'idea' | 'next' | 'in_progress' | 'waiting' | 'done' | 'cancelled';
+  priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
+  dueDate: string | null;
+  ventureId: string | null;
+  projectId: string | null;
+}
+
 interface Venture {
   id: string;
   name: string;
@@ -148,6 +158,24 @@ export default function MorningRitual() {
   });
 
   const activeVentures = Array.isArray(ventures) ? ventures.filter(v => v.status !== "archived") : [];
+
+  // Fetch P0/P1 tasks due on selected date for "One Thing to Ship" dropdown
+  const { data: dueTasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", { dueDate: selectedDate }],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks?due_date=${selectedDate}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch tasks");
+      return await res.json();
+    },
+  });
+
+  // Filter for P0/P1 tasks that are not done or cancelled
+  const priorityTasksDueToday = dueTasks.filter(
+    (task) =>
+      (task.priority === "P0" || task.priority === "P1") &&
+      task.status !== "done" &&
+      task.status !== "cancelled"
+  );
 
   // Fetch the day before selected date for syncing priorities
   const dayBeforeSelected = format(subDays(currentDate, 1), "yyyy-MM-dd");
@@ -514,16 +542,43 @@ export default function MorningRitual() {
                 One Thing to Ship Today
               </CardTitle>
               <CardDescription>
-                What's the single most important thing you must accomplish?
+                Select a P0/P1 task due today as your main focus
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Input
-                placeholder="e.g., Launch the new feature to production"
-                value={planning.oneThingToShip}
-                onChange={(e) => setPlanning({ ...planning, oneThingToShip: e.target.value })}
-                className="text-lg"
-              />
+              {priorityTasksDueToday.length > 0 ? (
+                <Select
+                  value={planning.oneThingToShip}
+                  onValueChange={(value) => setPlanning({ ...planning, oneThingToShip: value })}
+                >
+                  <SelectTrigger className="text-lg">
+                    <SelectValue placeholder="Select your one thing to ship..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priorityTasksDueToday.map((task) => (
+                      <SelectItem key={task.id} value={task.title}>
+                        <span className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={
+                              task.priority === "P0"
+                                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300"
+                                : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300"
+                            }
+                          >
+                            {task.priority}
+                          </Badge>
+                          {task.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-muted-foreground py-3 text-center border rounded-md bg-muted/30">
+                  No P0/P1 tasks due {isViewingToday ? "today" : "on this date"}
+                </div>
+              )}
             </CardContent>
           </Card>
 
