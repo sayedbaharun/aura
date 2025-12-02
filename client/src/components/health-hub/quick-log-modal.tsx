@@ -93,10 +93,12 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Combine workoutType with subType for storage (e.g., "strength_push", "cardio_hiit")
-    let finalWorkoutType = formData.workoutType;
+    // Note: workoutSubType is UI-only; database enum only supports base types
+    // Append subtype info to notes if provided
+    let notes = formData.notes || "";
     if (formData.workoutDone && formData.workoutSubType) {
-      finalWorkoutType = `${formData.workoutType}_${formData.workoutSubType}`;
+      const subtypeInfo = `Workout: ${formData.workoutType} - ${formData.workoutSubType}`;
+      notes = notes ? `${subtypeInfo}\n${notes}` : subtypeInfo;
     }
 
     const payload = {
@@ -106,12 +108,12 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
       energyLevel: formData.energyLevel,
       mood: formData.mood,
       workoutDone: formData.workoutDone,
-      workoutType: formData.workoutDone ? finalWorkoutType : "none",
+      workoutType: formData.workoutDone ? formData.workoutType : "none",
       workoutDurationMin: formData.workoutDone && formData.workoutDuration ? parseInt(formData.workoutDuration) : undefined,
       steps: formData.steps ? parseInt(formData.steps) : undefined,
       weightKg: formData.weight ? parseFloat(formData.weight) : undefined,
       stressLevel: formData.stressLevel,
-      notes: formData.notes,
+      notes: notes || undefined,
     };
 
     // Clean data to only send non-empty values

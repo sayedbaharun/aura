@@ -70,6 +70,12 @@ export default function DayDetailModal({
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks", { focus_date: date }],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks?focus_date=${date}`, {
+        credentials: "include",
+      });
+      return res.json();
+    },
     enabled: !!date,
   });
 
