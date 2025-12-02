@@ -47,7 +47,7 @@ function Router() {
       <Route>
         <Layout>
           <Switch>
-            <Route path="/dashboard" component={CommandCenter} />
+            <Route path="/dashboard" component={CommandCenterV2} />
             <Route path="/ventures" component={VentureHQ} />
             <Route path="/ventures/:id" component={VentureDetail} />
             <Route path="/health-hub" component={HealthHub} />
@@ -58,12 +58,14 @@ function Router() {
             <Route path="/notifications" component={NotificationsPage} />
             <Route path="/settings" component={SettingsPage} />
             <Route path="/morning" component={MorningRitual} />
+            <Route path="/morning/:date" component={MorningRitual} />
             <Route path="/evening" component={EveningReview} />
+            <Route path="/evening/:date" component={EveningReview} />
             <Route path="/shopping" component={Shopping} />
             <Route path="/books" component={Books} />
             <Route path="/capture" component={CapturePage} />
             <Route path="/trading" component={TradingPage} />
-            <Route path="/command-center-v2" component={CommandCenterV2} />
+            <Route path="/command-center" component={CommandCenter} />
             <Route path="/ai-chat" component={AiChat} />
             <Route path="/tasks" component={AllTasks} />
             <Route component={NotFound} />

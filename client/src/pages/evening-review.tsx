@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, subDays, addDays, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,13 +25,15 @@ import {
   Heart,
   ListTodo,
   ChevronRight,
+  ChevronLeft,
   Trophy,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Calendar
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 
 interface Task {
   id: string;
@@ -85,7 +87,33 @@ interface HealthEntry {
 
 export default function EveningReview() {
   const { toast } = useToast();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const [, params] = useRoute("/evening/:date");
+  const [, setLocation] = useLocation();
+
+  // Use date from URL params, or default to today
+  const todayDate = format(new Date(), "yyyy-MM-dd");
+  const selectedDate = params?.date || todayDate;
+  const isViewingToday = selectedDate === todayDate;
+
+  // Parse the selected date for display and navigation
+  const currentDate = parseISO(selectedDate);
+
+  // Navigation helpers
+  const goToPreviousDay = () => {
+    const prevDate = format(subDays(currentDate, 1), "yyyy-MM-dd");
+    setLocation(`/evening/${prevDate}`);
+  };
+
+  const goToNextDay = () => {
+    const nextDate = format(addDays(currentDate, 1), "yyyy-MM-dd");
+    if (nextDate <= todayDate) {
+      setLocation(`/evening/${nextDate}`);
+    }
+  };
+
+  const goToToday = () => {
+    setLocation("/evening");
+  };
 
   const [review, setReview] = useState({
     reflectionPm: "",
@@ -100,27 +128,31 @@ export default function EveningReview() {
     },
   });
 
-  // Fetch today's day data
+  // Fetch the selected day's data
   const { data: dayData, isLoading: isDayLoading } = useQuery<Day>({
-    queryKey: ["/api/days", today],
+    queryKey: ["/api/days", selectedDate],
     queryFn: async () => {
-      const res = await fetch(`/api/days/${today}`, { credentials: "include" });
+      const res = await fetch(`/api/days/${selectedDate}`, { credentials: "include" });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch day");
       return await res.json();
     },
   });
 
-  // Fetch today's tasks
+  // Fetch tasks for the selected day
   const { data: tasks = [] } = useQuery<Task[]>({
-    queryKey: ["/api/tasks/today"],
+    queryKey: ["/api/tasks", { focusDate: selectedDate }],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks?focusDate=${selectedDate}`, { credentials: "include" });
+      return await res.json();
+    },
   });
 
-  // Fetch today's health entry
+  // Fetch health entry for the selected day
   const { data: healthEntries = [] } = useQuery<HealthEntry[]>({
-    queryKey: ["/api/health", { startDate: today, endDate: today }],
+    queryKey: ["/api/health", { startDate: selectedDate, endDate: selectedDate }],
     queryFn: async () => {
-      const res = await fetch(`/api/health?startDate=${today}&endDate=${today}`, {
+      const res = await fetch(`/api/health?startDate=${selectedDate}&endDate=${selectedDate}`, {
         credentials: "include",
       });
       return await res.json();
@@ -144,6 +176,22 @@ export default function EveningReview() {
   };
 
   const todayHealth = Array.isArray(healthEntries) ? healthEntries[0] : null;
+
+  // Reset state when navigating to a different date
+  useEffect(() => {
+    setReview({
+      reflectionPm: "",
+      gratitude: ["", "", ""],
+      tomorrowPriorities: ["", "", ""],
+      reviewCompleted: false,
+      windDown: {
+        clearInbox: false,
+        rescheduleUnfinished: false,
+        supplements: false,
+        bedBy2am: false,
+      },
+    });
+  }, [selectedDate]);
 
   // Load existing data when day data arrives
   useEffect(() => {
@@ -196,15 +244,15 @@ export default function EveningReview() {
       };
 
       const payload = {
-        id: `day_${today}`,
-        date: today,
+        id: `day_${selectedDate}`,
+        date: selectedDate,
         reflectionPm: review.reflectionPm || null,
         eveningRituals,
       };
 
       // Try PATCH first, then POST if day doesn't exist
       try {
-        const res = await apiRequest("PATCH", `/api/days/${today}`, payload);
+        const res = await apiRequest("PATCH", `/api/days/${selectedDate}`, payload);
         return await res.json();
       } catch (e) {
         const res = await apiRequest("POST", "/api/days", payload);
@@ -257,19 +305,56 @@ export default function EveningReview() {
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-full">
-            <Moon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+          <div className="p-2 sm:p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-full shrink-0">
+            <Moon className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Evening Review</h1>
-            <p className="text-muted-foreground">
-              {format(new Date(), "EEEE, MMMM d, yyyy")}
-            </p>
+            <h1 className="text-xl sm:text-2xl font-bold">Evening Review</h1>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={goToPreviousDay}
+                title="Previous day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="font-medium">
+                {format(currentDate, "EEEE, MMMM d, yyyy")}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={goToNextDay}
+                disabled={isViewingToday}
+                title="Next day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!isViewingToday && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs ml-2"
+                  onClick={goToToday}
+                >
+                  <Calendar className="h-3 w-3 mr-1" />
+                  Today
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {!isViewingToday && (
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+              Viewing Past Day
+            </Badge>
+          )}
           {review.reviewCompleted && (
             <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
               <CheckCircle2 className="h-3 w-3 mr-1" />

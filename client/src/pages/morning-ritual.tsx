@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, subDays } from "date-fns";
+import { format, subDays, addDays, parseISO, isToday } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,17 +20,19 @@ import {
   CheckCircle2,
   Sparkles,
   ChevronRight,
+  ChevronLeft,
   Droplets,
   Brain,
   Coffee,
   Bed,
   Footprints,
   Settings,
+  Calendar,
   type LucideIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 
 interface Venture {
   id: string;
@@ -85,7 +87,33 @@ const getIconComponent = (iconName: string): LucideIcon => {
 
 export default function MorningRitual() {
   const { toast } = useToast();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const [, params] = useRoute("/morning/:date");
+  const [, setLocation] = useLocation();
+
+  // Use date from URL params, or default to today
+  const todayDate = format(new Date(), "yyyy-MM-dd");
+  const selectedDate = params?.date || todayDate;
+  const isViewingToday = selectedDate === todayDate;
+
+  // Parse the selected date for display and navigation
+  const currentDate = parseISO(selectedDate);
+
+  // Navigation helpers
+  const goToPreviousDay = () => {
+    const prevDate = format(subDays(currentDate, 1), "yyyy-MM-dd");
+    setLocation(`/morning/${prevDate}`);
+  };
+
+  const goToNextDay = () => {
+    const nextDate = format(addDays(currentDate, 1), "yyyy-MM-dd");
+    if (nextDate <= todayDate) {
+      setLocation(`/morning/${nextDate}`);
+    }
+  };
+
+  const goToToday = () => {
+    setLocation("/morning");
+  };
 
   // Fetch habit configuration
   const { data: habitConfig, isLoading: isConfigLoading } = useQuery<MorningRitualConfig>({
@@ -103,11 +131,11 @@ export default function MorningRitual() {
     primaryVentureFocus: "",
   });
 
-  // Fetch today's day data
+  // Fetch the selected day's data
   const { data: dayData, isLoading: isDayLoading } = useQuery<Day>({
-    queryKey: ["/api/days", today],
+    queryKey: ["/api/days", selectedDate],
     queryFn: async () => {
-      const res = await fetch(`/api/days/${today}`, { credentials: "include" });
+      const res = await fetch(`/api/days/${selectedDate}`, { credentials: "include" });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error("Failed to fetch day");
       return await res.json();
@@ -121,21 +149,43 @@ export default function MorningRitual() {
 
   const activeVentures = Array.isArray(ventures) ? ventures.filter(v => v.status !== "archived") : [];
 
-  // Fetch yesterday's day data for syncing priorities
-  const yesterday = format(subDays(new Date(), 1), "yyyy-MM-dd");
+  // Fetch the day before selected date for syncing priorities
+  const dayBeforeSelected = format(subDays(currentDate, 1), "yyyy-MM-dd");
   const { data: yesterdayData } = useQuery<Day & {
     eveningRituals?: {
       tomorrowPriorities?: string[];
     } | null;
   }>({
-    queryKey: ["/api/days", yesterday],
+    queryKey: ["/api/days", dayBeforeSelected],
     queryFn: async () => {
-      const res = await fetch(`/api/days/${yesterday}`, { credentials: "include" });
+      const res = await fetch(`/api/days/${dayBeforeSelected}`, { credentials: "include" });
       if (res.status === 404) return null;
-      if (!res.ok) throw new Error("Failed to fetch yesterday's day");
+      if (!res.ok) throw new Error("Failed to fetch previous day");
       return await res.json();
     },
   });
+
+  // Reset state when navigating to a different date
+  useEffect(() => {
+    // Reset rituals to defaults
+    if (enabledHabits.length > 0) {
+      const initial: Record<string, { done: boolean; count?: number }> = {};
+      for (const habit of enabledHabits) {
+        initial[habit.key] = {
+          done: false,
+          count: habit.hasCount ? habit.defaultCount : undefined,
+        };
+      }
+      setRituals(initial);
+    }
+    // Reset planning
+    setPlanning({
+      top3Outcomes: "",
+      oneThingToShip: "",
+      reflectionAm: "",
+      primaryVentureFocus: "",
+    });
+  }, [selectedDate]);
 
   // Initialize rituals from habit config
   useEffect(() => {
@@ -211,7 +261,7 @@ export default function MorningRitual() {
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const dayId = `day_${today}`;
+      const dayId = `day_${selectedDate}`;
 
       // Build morningRituals dynamically from current habits
       const morningRituals: Record<string, any> = {};
@@ -231,7 +281,7 @@ export default function MorningRitual() {
 
       const payload = {
         id: dayId,
-        date: today,
+        date: selectedDate,
         morningRituals,
         top3Outcomes: planning.top3Outcomes || null,
         oneThingToShip: planning.oneThingToShip || null,
@@ -241,7 +291,7 @@ export default function MorningRitual() {
 
       // Try PATCH first, then POST if day doesn't exist
       try {
-        const res = await apiRequest("PATCH", `/api/days/${today}`, payload);
+        const res = await apiRequest("PATCH", `/api/days/${selectedDate}`, payload);
         return await res.json();
       } catch (e) {
         const res = await apiRequest("POST", "/api/days", payload);
@@ -310,12 +360,49 @@ export default function MorningRitual() {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold">Morning Ritual</h1>
-            <p className="text-sm text-muted-foreground">
-              {format(new Date(), "EEEE, MMMM d, yyyy")}
-            </p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={goToPreviousDay}
+                title="Previous day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="font-medium">
+                {format(currentDate, "EEEE, MMMM d, yyyy")}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={goToNextDay}
+                disabled={isViewingToday}
+                title="Next day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!isViewingToday && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs ml-2"
+                  onClick={goToToday}
+                >
+                  <Calendar className="h-3 w-3 mr-1" />
+                  Today
+                </Button>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {!isViewingToday && (
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+              Viewing Past Day
+            </Badge>
+          )}
           {isAllRitualsComplete() && enabledHabits.length > 0 && (
             <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
               <CheckCircle2 className="h-3 w-3 mr-1" />
