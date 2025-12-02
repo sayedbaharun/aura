@@ -1,5 +1,5 @@
 // Command Center V2 - HUD Interface
-// Last updated: 2025-12-02
+// Build version: 2025-12-02-v2
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { HealthBattery, ContextCard, MissionStatement } from "@/components/cockpit/cockpit-components";
@@ -167,7 +167,7 @@ export default function CommandCenterV2() {
             {/* HEADER: HUD */}
             <header className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Command Center</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">Command Center <span className="text-xs text-muted-foreground font-normal">v2.1</span></h1>
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <Clock className="h-4 w-4" />
                         <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -235,9 +235,9 @@ export default function CommandCenterV2() {
                                             <span className="font-medium">{v.name}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {v.taskCount > 0 && (
-                                                <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{v.taskCount}</span>
-                                            )}
+                                            <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">
+                                                {v.taskCount || 0}
+                                            </span>
                                             <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </div>
                                     </div>
