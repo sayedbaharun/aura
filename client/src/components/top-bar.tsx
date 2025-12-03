@@ -25,7 +25,7 @@ export interface TopBarProps {
  */
 export default function TopBar({ onMenuClick }: TopBarProps) {
   return (
-    <header className="sticky top-0 z-30 border-b bg-white border-gray-200">
+    <header className="sticky top-0 z-30 border-b bg-card border-border">
       <div className="flex items-center justify-between h-16 px-4">
         {/* Left side - Mobile menu + Logo */}
         <div className="flex items-center gap-3">
@@ -54,7 +54,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           {/* User status indicator */}
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-green-500" aria-label="Online status"></div>
-            <span className="text-sm text-gray-600 hidden sm:inline">Online</span>
+            <span className="text-sm text-muted-foreground hidden sm:inline">Online</span>
           </div>
         </div>
       </div>
