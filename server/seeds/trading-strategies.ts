@@ -299,15 +299,3 @@ export async function seedTradingStrategies(storageInstance: IStorage) {
   }
 }
 
-// Run the seed if this file is executed directly
-if (require.main === module) {
-  seedTradingStrategies()
-    .then(() => {
-      console.log("✅ Trading strategies seeded successfully");
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error("❌ Failed to seed trading strategies:", error);
-      process.exit(1);
-    });
-}
