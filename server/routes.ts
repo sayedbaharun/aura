@@ -36,6 +36,7 @@ import {
 } from "./auth";
 import { AVAILABLE_MODELS } from "./model-manager";
 import uploadRoutes from "./upload-routes";
+import { seedTradingStrategies } from "./seeds/trading-strategies";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -3564,7 +3565,7 @@ RULES:
       // Ensure tables exist first
       await storage.ensureSchema();
 
-      const { seedTradingStrategies } = await import("./seeds/trading-strategies");
+      // Seed strategies (skips any that already exist)
       await seedTradingStrategies();
       const strategies = await storage.getTradingStrategies();
       res.json({ message: "Trading strategies seeded successfully", count: strategies.length, strategies });
