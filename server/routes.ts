@@ -3809,7 +3809,7 @@ RULES:
       await storage.ensureSchema();
 
       // Seed strategies (skips any that already exist)
-      await seedTradingStrategies();
+      await seedTradingStrategies(storage);
       const strategies = await storage.getTradingStrategies();
       res.json({ message: "Trading strategies seeded successfully", count: strategies.length, strategies });
     } catch (error: any) {

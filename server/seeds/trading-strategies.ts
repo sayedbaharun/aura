@@ -8,8 +8,8 @@
  * Strategy configs should only contain strategy-specific checklist sections.
  */
 
-import { storage } from "../storage";
 import type { TradingStrategyConfig } from "@shared/schema";
+import type { IStorage } from "../storage";
 
 // Golden Trap & Reverse Strategy Configuration (for Gold/Silver)
 const goldenTrapStrategy: TradingStrategyConfig = {
@@ -217,17 +217,17 @@ const sp500VelocityTrapStrategy: TradingStrategyConfig = {
   ],
 };
 
-export async function seedTradingStrategies() {
+export async function seedTradingStrategies(storageInstance: IStorage) {
   console.log("🌱 Seeding trading strategies...");
 
   try {
     // Check if strategies already exist
-    const existing = await storage.getTradingStrategies();
+    const existing = await storageInstance.getTradingStrategies();
 
     // Seed Golden Trap & Reverse strategy
     const goldenTrapExists = existing.some(s => s.name === "Golden Trap & Reverse");
     if (!goldenTrapExists) {
-      const strategy = await storage.createTradingStrategy({
+      const strategy = await storageInstance.createTradingStrategy({
         name: "Golden Trap & Reverse",
         description: "A strategy for trading Gold (XAU/USD) and Silver (XAG/USD) based on liquidity sweeps and reversals during kill zones.",
         instruments: ["XAU/USD", "XAG/USD"],
@@ -258,7 +258,7 @@ export async function seedTradingStrategies() {
     // Seed S&P 500 Velocity Trap strategy
     const velocityTrapExists = existing.some(s => s.name === "S&P 500 Velocity Trap");
     if (!velocityTrapExists) {
-      const strategy = await storage.createTradingStrategy({
+      const strategy = await storageInstance.createTradingStrategy({
         name: "S&P 500 Velocity Trap",
         description: "Scalping strategy for S&P 500 (ES/SPY) based on liquidity runs during algorithmic windows.",
         instruments: ["ES", "SPY", "S&P 500"],
