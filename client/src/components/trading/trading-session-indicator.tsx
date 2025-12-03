@@ -227,6 +227,36 @@ function formatMinutes(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
+// Session times reference component
+function SessionTimesReference({ activeSessionKeys }: { activeSessionKeys: SessionKey[] }) {
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <div className={cn(
+        "flex items-center gap-1",
+        activeSessionKeys.includes("asian") ? "text-blue-600 dark:text-blue-400 font-medium" : "text-muted-foreground"
+      )}>
+        <span className="w-2 h-2 rounded-full bg-blue-500" />
+        <span>ASIA 22-09</span>
+      </div>
+      <div className={cn(
+        "flex items-center gap-1",
+        activeSessionKeys.includes("london") ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"
+      )}>
+        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+        <span>LON 07-16</span>
+      </div>
+      <div className={cn(
+        "flex items-center gap-1",
+        activeSessionKeys.includes("newYork") ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
+      )}>
+        <span className="w-2 h-2 rounded-full bg-amber-500" />
+        <span>NY 12-21</span>
+      </div>
+      <span className="text-muted-foreground/60">UTC</span>
+    </div>
+  );
+}
+
 export default function TradingSessionIndicator() {
   const [sessionInfo, setSessionInfo] = useState<SessionInfo>(() =>
     getSessionInfo(new Date())
@@ -247,18 +277,23 @@ export default function TradingSessionIndicator() {
   const { activeSessions, isOverlap, overlapType, killzone, nextSession, isWeekend } =
     sessionInfo;
 
+  const activeSessionKeys = activeSessions.map((s) => s.key);
+
   // Weekend - market closed
   if (isWeekend) {
     return (
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className="bg-gray-500/20 text-gray-600 dark:text-gray-400">
-          MARKET CLOSED
-        </Badge>
-        {nextSession && (
-          <span className="text-xs text-muted-foreground">
-            Opens in {formatMinutes(nextSession.startsInMinutes)}
-          </span>
-        )}
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-gray-500/20 text-gray-600 dark:text-gray-400">
+            MARKET CLOSED
+          </Badge>
+          {nextSession && (
+            <span className="text-xs text-muted-foreground">
+              Opens in {formatMinutes(nextSession.startsInMinutes)}
+            </span>
+          )}
+        </div>
+        <SessionTimesReference activeSessionKeys={[]} />
       </div>
     );
   }
@@ -266,16 +301,19 @@ export default function TradingSessionIndicator() {
   // No active sessions (rare, but possible in gaps)
   if (activeSessions.length === 0) {
     return (
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-muted-foreground">
-          <Clock className="h-3 w-3 mr-1" />
-          Between Sessions
-        </Badge>
-        {nextSession && (
-          <span className="text-xs text-muted-foreground">
-            {nextSession.name} in {formatMinutes(nextSession.startsInMinutes)}
-          </span>
-        )}
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-muted-foreground">
+            <Clock className="h-3 w-3 mr-1" />
+            Between Sessions
+          </Badge>
+          {nextSession && (
+            <span className="text-xs text-muted-foreground">
+              {nextSession.name} in {formatMinutes(nextSession.startsInMinutes)}
+            </span>
+          )}
+        </div>
+        <SessionTimesReference activeSessionKeys={[]} />
       </div>
     );
   }
@@ -283,27 +321,30 @@ export default function TradingSessionIndicator() {
   // London + NY overlap (most important)
   if (overlapType === "london_ny") {
     return (
-      <div className="flex items-center gap-2">
-        <Badge
-          className={cn(
-            "bg-gradient-to-r from-emerald-500/20 to-amber-500/20",
-            "text-amber-700 dark:text-amber-400",
-            "border border-amber-500/40",
-            killzone && "ring-2 ring-amber-500/50 ring-offset-1 ring-offset-background"
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <Badge
+            className={cn(
+              "bg-gradient-to-r from-emerald-500/20 to-amber-500/20",
+              "text-amber-700 dark:text-amber-400",
+              "border border-amber-500/40",
+              killzone && "ring-2 ring-amber-500/50 ring-offset-1 ring-offset-background"
+            )}
+          >
+            {killzone && <Zap className="h-3 w-3 mr-1" />}
+            LONDON + NY
+          </Badge>
+          {killzone ? (
+            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+              {killzone}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Overlap ends in {formatMinutes(Math.min(...activeSessions.map((s) => s.endsInMinutes)))}
+            </span>
           )}
-        >
-          {killzone && <Zap className="h-3 w-3 mr-1" />}
-          LONDON + NY
-        </Badge>
-        {killzone ? (
-          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-            {killzone}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            Overlap ends in {formatMinutes(Math.min(...activeSessions.map((s) => s.endsInMinutes)))}
-          </span>
-        )}
+        </div>
+        <SessionTimesReference activeSessionKeys={activeSessionKeys} />
       </div>
     );
   }
@@ -311,27 +352,30 @@ export default function TradingSessionIndicator() {
   // London + Asia overlap
   if (overlapType === "london_asia") {
     return (
-      <div className="flex items-center gap-2">
-        <Badge
-          className={cn(
-            "bg-gradient-to-r from-blue-500/20 to-emerald-500/20",
-            "text-emerald-700 dark:text-emerald-400",
-            "border border-emerald-500/40",
-            killzone && "ring-2 ring-emerald-500/50 ring-offset-1 ring-offset-background"
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <Badge
+            className={cn(
+              "bg-gradient-to-r from-blue-500/20 to-emerald-500/20",
+              "text-emerald-700 dark:text-emerald-400",
+              "border border-emerald-500/40",
+              killzone && "ring-2 ring-emerald-500/50 ring-offset-1 ring-offset-background"
+            )}
+          >
+            {killzone && <Zap className="h-3 w-3 mr-1" />}
+            LONDON + ASIA
+          </Badge>
+          {killzone ? (
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              {killzone}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Asia closes in {formatMinutes(activeSessions.find((s) => s.key === "asian")?.endsInMinutes || 0)}
+            </span>
           )}
-        >
-          {killzone && <Zap className="h-3 w-3 mr-1" />}
-          LONDON + ASIA
-        </Badge>
-        {killzone ? (
-          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            {killzone}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            Asia closes in {formatMinutes(activeSessions.find((s) => s.key === "asian")?.endsInMinutes || 0)}
-          </span>
-        )}
+        </div>
+        <SessionTimesReference activeSessionKeys={activeSessionKeys} />
       </div>
     );
   }
@@ -339,34 +383,37 @@ export default function TradingSessionIndicator() {
   // Single session active
   const session = activeSessions[0];
   return (
-    <div className="flex items-center gap-2">
-      <Badge
-        className={cn(
-          session.color,
-          "border",
-          killzone && "ring-2 ring-offset-1 ring-offset-background",
-          killzone && session.key === "london" && "ring-emerald-500/50",
-          killzone && session.key === "newYork" && "ring-amber-500/50"
-        )}
-      >
-        {killzone && <Zap className="h-3 w-3 mr-1" />}
-        {session.name}
-      </Badge>
-      {killzone ? (
-        <span
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
+        <Badge
           className={cn(
-            "text-xs font-medium",
-            session.key === "london" && "text-emerald-600 dark:text-emerald-400",
-            session.key === "newYork" && "text-amber-600 dark:text-amber-400"
+            session.color,
+            "border",
+            killzone && "ring-2 ring-offset-1 ring-offset-background",
+            killzone && session.key === "london" && "ring-emerald-500/50",
+            killzone && session.key === "newYork" && "ring-amber-500/50"
           )}
         >
-          {killzone}
-        </span>
-      ) : (
-        <span className="text-xs text-muted-foreground">
-          Ends in {formatMinutes(session.endsInMinutes)}
-        </span>
-      )}
+          {killzone && <Zap className="h-3 w-3 mr-1" />}
+          {session.name}
+        </Badge>
+        {killzone ? (
+          <span
+            className={cn(
+              "text-xs font-medium",
+              session.key === "london" && "text-emerald-600 dark:text-emerald-400",
+              session.key === "newYork" && "text-amber-600 dark:text-amber-400"
+            )}
+          >
+            {killzone}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            Ends in {formatMinutes(session.endsInMinutes)}
+          </span>
+        )}
+      </div>
+      <SessionTimesReference activeSessionKeys={activeSessionKeys} />
     </div>
   );
 }
