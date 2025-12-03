@@ -236,6 +236,13 @@ export default function TradingStrategyDashboard() {
     setChecklistData(updated);
   };
 
+  // Handle primary setup change (Pre-session intention)
+  const handlePrimarySetupChange = (value: string) => {
+    if (!checklistData) return;
+    const updated = { ...checklistData, primarySetup: value };
+    setChecklistData(updated);
+  };
+
   // Add trade
   const handleAddTrade = () => {
     if (!checklistData || !newTrade.pair || !newTrade.entryPrice || !newTrade.stopLoss) return;
@@ -444,6 +451,7 @@ export default function TradingStrategyDashboard() {
       session: checklistData.session,
       mentalState: checklistData.mentalState,
       highImpactNews: checklistData.highImpactNews,
+      primarySetup: checklistData.primarySetup,
       endOfSessionReview: checklistData.endOfSessionReview,
     });
   };
@@ -573,6 +581,23 @@ export default function TradingStrategyDashboard() {
                 placeholder="USD news, etc."
               />
             </div>
+          </div>
+          {/* Primary Setup - Pre-session intention */}
+          <div className="space-y-2 pt-2 border-t">
+            <Label className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-amber-500" />
+              Primary Setup I'm Hunting
+            </Label>
+            <Input
+              value={checklistData.primarySetup || ""}
+              onChange={(e) => handlePrimarySetupChange(e.target.value)}
+              onBlur={handleInputBlur}
+              placeholder="e.g., London session sweep of Asian low on Gold"
+              className="font-medium"
+            />
+            <p className="text-xs text-muted-foreground">
+              Be specific. This prevents chasing random setups.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -827,6 +852,29 @@ export default function TradingStrategyDashboard() {
             <Label htmlFor="followed-plan" className="font-medium">
               Did I follow the plan 100%?
             </Label>
+          </div>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+            <Checkbox
+              id="no-trade-success"
+              checked={checklistData.endOfSessionReview?.noTradeIsSuccess || false}
+              onCheckedChange={(checked) => {
+                handleReviewChange("noTradeIsSuccess", checked);
+                updateChecklistMutation.mutate({
+                  endOfSessionReview: {
+                    ...checklistData.endOfSessionReview,
+                    noTradeIsSuccess: checked as boolean,
+                  },
+                });
+              }}
+            />
+            <div>
+              <Label htmlFor="no-trade-success" className="font-medium text-green-700 dark:text-green-400">
+                I passed on setups that didn't fully qualify
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Not trading is a position. Discipline = Success.
+              </p>
+            </div>
           </div>
           <div className="space-y-2">
             <Label>One thing I did well:</Label>
