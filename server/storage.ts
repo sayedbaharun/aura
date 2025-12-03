@@ -105,12 +105,20 @@ export interface IStorage {
     focusDateGte?: string;
     focusDateLte?: string;
     dueDate?: string;
+    limit?: number;
+    offset?: number;
   }): Promise<Task[]>;
   getTasksForToday(date: string): Promise<Task[]>;
   getTask(id: string): Promise<Task | undefined>;
   createTask(data: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<void>;
+
+  // Dashboard-optimized queries
+  getActiveTaskCountsByVenture(): Promise<Map<string, { total: number; overdueP0: number; dueTodayP0P1: number }>>;
+  getUrgentTasks(today: string, limit?: number): Promise<Task[]>;
+  getTopPriorityTasks(today: string, limit?: number): Promise<Task[]>;
+  getActiveTasksCount(projectId?: string): Promise<number>;
 
   // Capture Items
   getCaptures(filters?: { clarified?: boolean; ventureId?: string }): Promise<CaptureItem[]>;
@@ -193,6 +201,9 @@ export interface IStorage {
 
   // Schema Management
   ensureSchema(): Promise<void>;
+
+  // Health Check
+  ping(): Promise<boolean>;
 }
 
 // PostgreSQL Storage Implementation
@@ -301,6 +312,19 @@ export class DBStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  // ============================================================================
+  // HEALTH CHECK
+  // ============================================================================
+
+  async ping(): Promise<boolean> {
+    try {
+      await this.db.execute(sql`SELECT 1`);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // ============================================================================
@@ -454,6 +478,8 @@ export class DBStorage implements IStorage {
     focusDateGte?: string;
     focusDateLte?: string;
     dueDate?: string;
+    limit?: number;
+    offset?: number;
   }): Promise<Task[]> {
     const conditions = [];
 
@@ -490,11 +516,17 @@ export class DBStorage implements IStorage {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+    // Apply pagination with default limit of 100 to prevent loading entire table
+    const queryLimit = filters?.limit ?? 100;
+    const queryOffset = filters?.offset ?? 0;
+
     return await this.db
       .select()
       .from(tasks)
       .where(whereClause)
-      .orderBy(tasks.priority, desc(tasks.createdAt));
+      .orderBy(tasks.priority, desc(tasks.createdAt))
+      .limit(queryLimit)
+      .offset(queryOffset);
   }
 
   async getTasksForToday(date: string): Promise<Task[]> {
@@ -512,7 +544,8 @@ export class DBStorage implements IStorage {
           eq(tasks.dayId, dayId)
         )
       )
-      .orderBy(tasks.priority, desc(tasks.createdAt));
+      .orderBy(tasks.priority, desc(tasks.createdAt))
+      .limit(100); // Reasonable limit for daily view
   }
 
   async getTask(id: string): Promise<Task | undefined> {
@@ -558,6 +591,103 @@ export class DBStorage implements IStorage {
   }
 
   // ============================================================================
+  // DASHBOARD-OPTIMIZED QUERIES
+  // ============================================================================
+
+  /**
+   * Get active task counts grouped by venture - single aggregation query
+   * Replaces loading ALL tasks and filtering in JS
+   */
+  async getActiveTaskCountsByVenture(): Promise<Map<string, { total: number; overdueP0: number; dueTodayP0P1: number }>> {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Single query with conditional aggregation
+    const results = await this.db
+      .select({
+        ventureId: tasks.ventureId,
+        total: sql<number>`count(*)::int`,
+        overdueP0: sql<number>`count(*) filter (where ${tasks.priority} = 'P0' and ${tasks.dueDate} < ${today})::int`,
+        dueTodayP0P1: sql<number>`count(*) filter (where (${tasks.priority} = 'P0' or ${tasks.priority} = 'P1') and ${tasks.dueDate} = ${today})::int`,
+      })
+      .from(tasks)
+      .where(not(inArray(tasks.status, ['done', 'cancelled'])))
+      .groupBy(tasks.ventureId);
+
+    const map = new Map<string, { total: number; overdueP0: number; dueTodayP0P1: number }>();
+    for (const row of results) {
+      if (row.ventureId) {
+        map.set(row.ventureId, {
+          total: row.total,
+          overdueP0: row.overdueP0,
+          dueTodayP0P1: row.dueTodayP0P1,
+        });
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Get urgent tasks (overdue P0 + due today P0/P1) with database-level filtering
+   */
+  async getUrgentTasks(today: string, limit: number = 10): Promise<Task[]> {
+    return await this.db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          not(inArray(tasks.status, ['done', 'cancelled'])),
+          or(
+            // Overdue P0
+            and(eq(tasks.priority, 'P0'), lte(tasks.dueDate, today)),
+            // Due today P0 or P1
+            and(
+              inArray(tasks.priority, ['P0', 'P1']),
+              eq(tasks.dueDate, today)
+            )
+          )
+        )
+      )
+      .orderBy(tasks.priority, tasks.dueDate)
+      .limit(limit);
+  }
+
+  /**
+   * Get top priority tasks - filters in database, not JS
+   */
+  async getTopPriorityTasks(today: string, limit: number = 5): Promise<Task[]> {
+    // Use SQL case for scoring to sort by priority + urgency
+    return await this.db
+      .select()
+      .from(tasks)
+      .where(not(inArray(tasks.status, ['done', 'cancelled'])))
+      .orderBy(
+        // P0 first, then P1, P2, P3
+        sql`case ${tasks.priority} when 'P0' then 0 when 'P1' then 1 when 'P2' then 2 else 3 end`,
+        // Overdue first
+        sql`case when ${tasks.dueDate} < ${today} then 0 when ${tasks.dueDate} = ${today} then 1 else 2 end`,
+        desc(tasks.createdAt)
+      )
+      .limit(limit);
+  }
+
+  /**
+   * Get count of non-done tasks for a project - for completion check
+   */
+  async getActiveTasksCount(projectId?: string): Promise<number> {
+    const conditions = [not(inArray(tasks.status, ['done', 'cancelled']))];
+    if (projectId) {
+      conditions.push(eq(tasks.projectId, projectId));
+    }
+
+    const [result] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(and(...conditions));
+
+    return result?.count ?? 0;
+  }
+
+  // ============================================================================
   // CAPTURE ITEMS
   // ============================================================================
 
@@ -577,13 +707,15 @@ export class DBStorage implements IStorage {
         .select()
         .from(captureItems)
         .where(and(...conditions))
-        .orderBy(desc(captureItems.createdAt));
+        .orderBy(desc(captureItems.createdAt))
+        .limit(100); // Reasonable limit for capture items
     }
 
     return await this.db
       .select()
       .from(captureItems)
-      .orderBy(desc(captureItems.createdAt));
+      .orderBy(desc(captureItems.createdAt))
+      .limit(100); // Reasonable limit for capture items
   }
 
   async getCapture(id: string): Promise<CaptureItem | undefined> {
@@ -861,7 +993,8 @@ export class DBStorage implements IStorage {
       .select()
       .from(docs)
       .where(whereClause)
-      .orderBy(docs.order, desc(docs.updatedAt));
+      .orderBy(docs.order, desc(docs.updatedAt))
+      .limit(200); // Reasonable limit for doc listings
   }
 
   async getDoc(id: string): Promise<Doc | undefined> {
@@ -905,7 +1038,8 @@ export class DBStorage implements IStorage {
           like(docs.body, `%${query}%`)
         )
       )
-      .orderBy(desc(docs.updatedAt));
+      .orderBy(desc(docs.updatedAt))
+      .limit(50); // Reasonable limit for search results
   }
 
   async getDocChildren(parentId: string | null, ventureId?: string): Promise<Doc[]> {
@@ -939,24 +1073,19 @@ export class DBStorage implements IStorage {
   }
 
   async deleteDocRecursive(id: string): Promise<void> {
-    // First get all children recursively
-    const getAllDescendants = async (docId: string): Promise<string[]> => {
-      const children = await this.db
-        .select({ id: docs.id })
-        .from(docs)
-        .where(eq(docs.parentId, docId));
+    // Use recursive CTE to get all descendants in a single query
+    // This replaces the N+1 recursive function calls
+    const result = await this.db.execute(sql`
+      WITH RECURSIVE doc_tree AS (
+        SELECT id FROM docs WHERE id = ${id}
+        UNION ALL
+        SELECT d.id FROM docs d
+        INNER JOIN doc_tree dt ON d.parent_id = dt.id
+      )
+      SELECT id FROM doc_tree
+    `);
 
-      let descendantIds: string[] = [];
-      for (const child of children) {
-        descendantIds.push(child.id);
-        const childDescendants = await getAllDescendants(child.id);
-        descendantIds = descendantIds.concat(childDescendants);
-      }
-      return descendantIds;
-    };
-
-    const descendantIds = await getAllDescendants(id);
-    const allIds = [id, ...descendantIds];
+    const allIds = (result.rows as { id: string }[]).map(row => row.id);
 
     // Delete all attachments for these docs
     if (allIds.length > 0) {
@@ -968,13 +1097,22 @@ export class DBStorage implements IStorage {
   }
 
   async reorderDocs(docIds: string[], parentId: string | null): Promise<void> {
-    // Update order for each doc
-    for (let i = 0; i < docIds.length; i++) {
-      await this.db
-        .update(docs)
-        .set({ order: i, parentId: parentId, updatedAt: new Date() })
-        .where(eq(docs.id, docIds[i]));
-    }
+    // Batch update using CASE/WHEN to minimize queries
+    if (docIds.length === 0) return;
+
+    // Build a single UPDATE with CASE for order values
+    const now = new Date();
+    const caseStatements = docIds.map((id, i) => `WHEN id = '${id}' THEN ${i}`).join(' ');
+    const idsStr = docIds.map(id => `'${id}'`).join(',');
+
+    await this.db.execute(sql`
+      UPDATE docs
+      SET
+        "order" = CASE ${sql.raw(caseStatements)} END,
+        parent_id = ${parentId},
+        updated_at = ${now}
+      WHERE id IN (${sql.raw(idsStr)})
+    `);
   }
 
   // ============================================================================

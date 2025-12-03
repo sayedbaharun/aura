@@ -34,9 +34,8 @@ export default function CommandCenterV2() {
             const res = await fetch("/api/dashboard/urgent");
             if (!res.ok) throw new Error("Failed to fetch urgent");
             return res.json();
-        },
-        staleTime: 0,
-        refetchOnMount: true
+        }
+        // Uses default staleTime (30s) - removed staleTime: 0 which caused constant refetches
     });
 
     // Fetch Top 3 tasks
@@ -46,9 +45,7 @@ export default function CommandCenterV2() {
             const res = await fetch("/api/dashboard/top3");
             if (!res.ok) throw new Error("Failed to fetch top3");
             return res.json();
-        },
-        staleTime: 0,
-        refetchOnMount: true
+        }
     });
 
     // Fetch ventures data
@@ -58,9 +55,7 @@ export default function CommandCenterV2() {
             const res = await fetch("/api/dashboard/ventures");
             if (!res.ok) throw new Error("Failed to fetch ventures");
             return res.json();
-        },
-        staleTime: 0,
-        refetchOnMount: true
+        }
     });
 
     // Fetch inbox data
@@ -70,9 +65,7 @@ export default function CommandCenterV2() {
             const res = await fetch("/api/dashboard/inbox");
             if (!res.ok) throw new Error("Failed to fetch inbox");
             return res.json();
-        },
-        staleTime: 0,
-        refetchOnMount: true
+        }
     });
 
     // Fetch today's day summary
