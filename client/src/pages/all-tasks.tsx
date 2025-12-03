@@ -5,6 +5,7 @@ import {
   CheckSquare,
   X,
   Calendar,
+  CalendarDays,
   Building2,
   Clock,
   MoreHorizontal,
@@ -79,7 +80,7 @@ const PRIORITY_OPTIONS = [
   { value: "P3", label: "P3 - Low", color: "bg-green-500" },
 ];
 
-type SortField = "title" | "venture" | "focusDate" | "effort" | "priority" | "status";
+type SortField = "title" | "venture" | "focusDate" | "dueDate" | "effort" | "priority" | "status";
 type SortDirection = "asc" | "desc";
 
 const getStatusIcon = (status: string) => {
@@ -280,9 +281,14 @@ export default function AllTasks() {
           comparison = ventureA.localeCompare(ventureB);
           break;
         case "focusDate":
-          const dateA = a.focusDate || "9999-12-31";
-          const dateB = b.focusDate || "9999-12-31";
-          comparison = dateA.localeCompare(dateB);
+          const focusDateA = a.focusDate || "9999-12-31";
+          const focusDateB = b.focusDate || "9999-12-31";
+          comparison = focusDateA.localeCompare(focusDateB);
+          break;
+        case "dueDate":
+          const dueDateA = a.dueDate || "9999-12-31";
+          const dueDateB = b.dueDate || "9999-12-31";
+          comparison = dueDateA.localeCompare(dueDateB);
           break;
         case "effort":
           const effortA = a.estEffort || 0;
@@ -547,6 +553,15 @@ export default function AllTasks() {
                     <TableHead>
                       <button
                         className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
+                        onClick={() => handleSort("dueDate")}
+                      >
+                        DUE DATE
+                        <SortIcon field="dueDate" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
                         onClick={() => handleSort("effort")}
                       >
                         EFFORT
@@ -627,16 +642,113 @@ export default function AllTasks() {
                           )}
                         </TableCell>
 
-                        {/* Focus Date */}
-                        <TableCell>
-                          {task.focusDate ? (
-                            <span className="text-sm flex items-center gap-1">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              {format(parseISO(task.focusDate), "MMM d")}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                        {/* Focus Date - Inline Editable */}
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "h-8 px-2 text-sm font-normal justify-start",
+                                  !task.focusDate && "text-muted-foreground"
+                                )}
+                              >
+                                <Calendar className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                                {task.focusDate
+                                  ? format(parseISO(task.focusDate), "MMM d")
+                                  : "Set date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={task.focusDate ? parseISO(task.focusDate) : undefined}
+                                onSelect={(date) => {
+                                  updateTaskMutation.mutate({
+                                    taskId: task.id,
+                                    updates: {
+                                      focusDate: date ? format(date, "yyyy-MM-dd") : null,
+                                    },
+                                  });
+                                }}
+                                initialFocus
+                              />
+                              {task.focusDate && (
+                                <div className="p-2 border-t">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full text-muted-foreground"
+                                    onClick={() => {
+                                      updateTaskMutation.mutate({
+                                        taskId: task.id,
+                                        updates: { focusDate: null },
+                                      });
+                                    }}
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Clear date
+                                  </Button>
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+
+                        {/* Due Date - Inline Editable */}
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "h-8 px-2 text-sm font-normal justify-start",
+                                  !task.dueDate && "text-muted-foreground",
+                                  task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" && "text-red-500"
+                                )}
+                              >
+                                <CalendarDays className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                                {task.dueDate
+                                  ? format(parseISO(task.dueDate), "MMM d")
+                                  : "Set due"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={task.dueDate ? parseISO(task.dueDate) : undefined}
+                                onSelect={(date) => {
+                                  updateTaskMutation.mutate({
+                                    taskId: task.id,
+                                    updates: {
+                                      dueDate: date ? format(date, "yyyy-MM-dd") : null,
+                                    },
+                                  });
+                                }}
+                                initialFocus
+                              />
+                              {task.dueDate && (
+                                <div className="p-2 border-t">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full text-muted-foreground"
+                                    onClick={() => {
+                                      updateTaskMutation.mutate({
+                                        taskId: task.id,
+                                        updates: { dueDate: null },
+                                      });
+                                    }}
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Clear date
+                                  </Button>
+                                </div>
+                              )}
+                            </PopoverContent>
+                          </Popover>
                         </TableCell>
 
                         {/* Effort */}
