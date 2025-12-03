@@ -326,20 +326,18 @@ export default function TradingStrategiesManager() {
           </p>
         </div>
         <div className="flex gap-2">
-          {strategies.length === 0 && (
-            <Button
-              variant="outline"
-              onClick={() => seedStrategiesMutation.mutate()}
-              disabled={seedStrategiesMutation.isPending}
-            >
-              {seedStrategiesMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Target className="h-4 w-4 mr-2" />
-              )}
-              Load Sample Strategy
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            onClick={() => seedStrategiesMutation.mutate()}
+            disabled={seedStrategiesMutation.isPending}
+          >
+            {seedStrategiesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Target className="h-4 w-4 mr-2" />
+            )}
+            Load Sample Strategies
+          </Button>
           <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
             New Strategy
