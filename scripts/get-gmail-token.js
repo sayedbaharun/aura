@@ -5,8 +5,8 @@
  * Run: CLIENT_ID=your_id CLIENT_SECRET=your_secret node scripts/get-gmail-token.js
  */
 
-const readline = require('readline');
-const { google } = require('googleapis');
+import readline from 'readline';
+import { google } from 'googleapis';
 
 const CLIENT_ID = process.env.CLIENT_ID || process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
