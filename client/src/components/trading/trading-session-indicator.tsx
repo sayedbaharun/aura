@@ -227,57 +227,169 @@ function formatMinutes(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-// Session times reference component
-function SessionTimesReference({ activeSessionKeys }: { activeSessionKeys: SessionKey[] }) {
+// Get current time in a specific timezone
+function getTimeInTimezone(date: Date, timezone: string): string {
+  return date.toLocaleTimeString("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+// Get hour in a specific timezone
+function getHourInTimezone(date: Date, timezone: string): number {
+  const timeStr = date.toLocaleTimeString("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    hour12: false,
+  });
+  return parseInt(timeStr, 10);
+}
+
+// Check if a city is in its killzone (based on local time)
+function isInKillzone(date: Date, city: "tokyo" | "london" | "newYork"): boolean {
+  const utcHour = date.getUTCHours();
+
+  if (city === "london") {
+    // London Killzone: 07:00 - 09:00 UTC
+    return utcHour >= 7 && utcHour < 9;
+  }
+  if (city === "newYork") {
+    // NY Killzone: 12:00 - 14:00 UTC
+    return utcHour >= 12 && utcHour < 14;
+  }
+  return false;
+}
+
+// Check if a city's session is active (based on UTC)
+function isCitySessionActive(date: Date, city: "tokyo" | "london" | "newYork"): boolean {
+  const utcHour = date.getUTCHours();
+
+  if (city === "tokyo") {
+    // Asian session: 22:00 - 09:00 UTC
+    return utcHour >= 22 || utcHour < 9;
+  }
+  if (city === "london") {
+    // London session: 07:00 - 16:00 UTC
+    return utcHour >= 7 && utcHour < 16;
+  }
+  if (city === "newYork") {
+    // NY session: 12:00 - 21:00 UTC
+    return utcHour >= 12 && utcHour < 21;
+  }
+  return false;
+}
+
+// City clocks component showing live times
+function CityClocks({ currentTime }: { currentTime: Date }) {
+  const tokyoTime = getTimeInTimezone(currentTime, "Asia/Tokyo");
+  const londonTime = getTimeInTimezone(currentTime, "Europe/London");
+  const newYorkTime = getTimeInTimezone(currentTime, "America/New_York");
+
+  const tokyoActive = isCitySessionActive(currentTime, "tokyo");
+  const londonActive = isCitySessionActive(currentTime, "london");
+  const nyActive = isCitySessionActive(currentTime, "newYork");
+
+  const londonKillzone = isInKillzone(currentTime, "london");
+  const nyKillzone = isInKillzone(currentTime, "newYork");
+
   return (
-    <div className="flex items-center gap-3 text-xs">
+    <div className="flex items-center gap-4 text-xs font-mono">
+      {/* Tokyo */}
       <div className={cn(
-        "flex items-center gap-1",
-        activeSessionKeys.includes("asian") ? "text-blue-600 dark:text-blue-400 font-medium" : "text-muted-foreground"
+        "flex items-center gap-1.5",
+        tokyoActive ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground/60"
       )}>
-        <span className="w-2 h-2 rounded-full bg-blue-500" />
-        <span>ASIA 22-09</span>
+        <span className={cn(
+          "w-2 h-2 rounded-full",
+          tokyoActive ? "bg-blue-500" : "bg-muted-foreground/30"
+        )} />
+        <span className="font-medium">TYO</span>
+        <span className={cn(tokyoActive && "font-semibold")}>{tokyoTime}</span>
       </div>
+
+      {/* London */}
       <div className={cn(
-        "flex items-center gap-1",
-        activeSessionKeys.includes("london") ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"
+        "flex items-center gap-1.5",
+        londonKillzone
+          ? "text-emerald-600 dark:text-emerald-400"
+          : londonActive
+            ? "text-emerald-600 dark:text-emerald-400"
+            : "text-muted-foreground/60"
       )}>
-        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-        <span>LON 07-16</span>
+        <span className={cn(
+          "w-2 h-2 rounded-full",
+          londonKillzone
+            ? "bg-emerald-500 ring-2 ring-emerald-500/50 ring-offset-1 ring-offset-background"
+            : londonActive
+              ? "bg-emerald-500"
+              : "bg-muted-foreground/30"
+        )} />
+        <span className="font-medium">LDN</span>
+        <span className={cn(londonActive && "font-semibold")}>{londonTime}</span>
+        {londonKillzone && (
+          <Badge variant="outline" className="h-4 px-1 text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/40">
+            <Zap className="h-2.5 w-2.5 mr-0.5" />
+            KZ
+          </Badge>
+        )}
       </div>
+
+      {/* New York */}
       <div className={cn(
-        "flex items-center gap-1",
-        activeSessionKeys.includes("newYork") ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"
+        "flex items-center gap-1.5",
+        nyKillzone
+          ? "text-amber-600 dark:text-amber-400"
+          : nyActive
+            ? "text-amber-600 dark:text-amber-400"
+            : "text-muted-foreground/60"
       )}>
-        <span className="w-2 h-2 rounded-full bg-amber-500" />
-        <span>NY 12-21</span>
+        <span className={cn(
+          "w-2 h-2 rounded-full",
+          nyKillzone
+            ? "bg-amber-500 ring-2 ring-amber-500/50 ring-offset-1 ring-offset-background"
+            : nyActive
+              ? "bg-amber-500"
+              : "bg-muted-foreground/30"
+        )} />
+        <span className="font-medium">NYC</span>
+        <span className={cn(nyActive && "font-semibold")}>{newYorkTime}</span>
+        {nyKillzone && (
+          <Badge variant="outline" className="h-4 px-1 text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/40">
+            <Zap className="h-2.5 w-2.5 mr-0.5" />
+            KZ
+          </Badge>
+        )}
       </div>
-      <span className="text-muted-foreground/60">UTC</span>
     </div>
   );
 }
 
 export default function TradingSessionIndicator() {
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
   const [sessionInfo, setSessionInfo] = useState<SessionInfo>(() =>
     getSessionInfo(new Date())
   );
 
   useEffect(() => {
-    // Update every minute
+    // Update every minute for session info and clocks
     const interval = setInterval(() => {
-      setSessionInfo(getSessionInfo(new Date()));
+      const now = new Date();
+      setCurrentTime(now);
+      setSessionInfo(getSessionInfo(now));
     }, 60000);
 
     // Also update immediately
-    setSessionInfo(getSessionInfo(new Date()));
+    const now = new Date();
+    setCurrentTime(now);
+    setSessionInfo(getSessionInfo(now));
 
     return () => clearInterval(interval);
   }, []);
 
-  const { activeSessions, isOverlap, overlapType, killzone, nextSession, isWeekend } =
+  const { activeSessions, overlapType, killzone, nextSession, isWeekend } =
     sessionInfo;
-
-  const activeSessionKeys = activeSessions.map((s) => s.key);
 
   // Weekend - market closed
   if (isWeekend) {
@@ -293,7 +405,7 @@ export default function TradingSessionIndicator() {
             </span>
           )}
         </div>
-        <SessionTimesReference activeSessionKeys={[]} />
+        <CityClocks currentTime={currentTime} />
       </div>
     );
   }
@@ -313,7 +425,7 @@ export default function TradingSessionIndicator() {
             </span>
           )}
         </div>
-        <SessionTimesReference activeSessionKeys={[]} />
+        <CityClocks currentTime={currentTime} />
       </div>
     );
   }
@@ -344,7 +456,7 @@ export default function TradingSessionIndicator() {
             </span>
           )}
         </div>
-        <SessionTimesReference activeSessionKeys={activeSessionKeys} />
+        <CityClocks currentTime={currentTime} />
       </div>
     );
   }
@@ -375,7 +487,7 @@ export default function TradingSessionIndicator() {
             </span>
           )}
         </div>
-        <SessionTimesReference activeSessionKeys={activeSessionKeys} />
+        <CityClocks currentTime={currentTime} />
       </div>
     );
   }
@@ -413,7 +525,7 @@ export default function TradingSessionIndicator() {
           </span>
         )}
       </div>
-      <SessionTimesReference activeSessionKeys={activeSessionKeys} />
+      <CityClocks currentTime={currentTime} />
     </div>
   );
 }
