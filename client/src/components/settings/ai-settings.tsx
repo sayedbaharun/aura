@@ -70,8 +70,12 @@ export default function AISettings() {
   useEffect(() => {
     if (settings) {
       setForm({
-        ...settings,
+        model: settings.model || "gpt-4-turbo",
         customInstructions: settings.customInstructions || DEFAULT_INSTRUCTIONS,
+        temperature: settings.temperature ?? 0.7,
+        maxTokens: settings.maxTokens ?? 4096,
+        streamResponses: settings.streamResponses ?? true,
+        apiKey: settings.apiKey,
       });
     }
   }, [settings]);
