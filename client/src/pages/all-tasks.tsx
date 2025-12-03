@@ -21,6 +21,8 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
+  FolderKanban,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,7 +62,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTaskDetailModal } from "@/lib/task-detail-modal-store";
 import { cn } from "@/lib/utils";
 import CreateTaskModal from "@/components/create-task-modal";
-import type { Task, Venture } from "@shared/schema";
+import type { Task, Venture, Project, Phase } from "@shared/schema";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
@@ -80,7 +82,7 @@ const PRIORITY_OPTIONS = [
   { value: "P3", label: "P3 - Low", color: "bg-green-500" },
 ];
 
-type SortField = "title" | "venture" | "focusDate" | "dueDate" | "effort" | "priority" | "status";
+type SortField = "title" | "venture" | "project" | "phase" | "focusDate" | "dueDate" | "effort" | "priority" | "status";
 type SortDirection = "asc" | "desc";
 
 const getStatusIcon = (status: string) => {
@@ -163,6 +165,8 @@ export default function AllTasks() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ventureFilter, setVentureFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [phaseFilter, setPhaseFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [focusDateFilter, setFocusDateFilter] = useState<Date | undefined>(undefined);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -179,6 +183,16 @@ export default function AllTasks() {
   // Fetch ventures for filter dropdown
   const { data: ventures = [] } = useQuery<Venture[]>({
     queryKey: ["/api/ventures"],
+  });
+
+  // Fetch projects for filter dropdown
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  // Fetch phases for filter dropdown
+  const { data: phases = [] } = useQuery<Phase[]>({
+    queryKey: ["/api/phases"],
   });
 
   // Update task mutation
@@ -230,6 +244,32 @@ export default function AllTasks() {
     return venture?.color || null;
   };
 
+  // Get project name helper
+  const getProjectName = (projectId: string | null) => {
+    if (!projectId) return null;
+    const project = projects.find((p) => p.id === projectId);
+    return project?.name || null;
+  };
+
+  // Get phase name helper
+  const getPhaseName = (phaseId: string | null) => {
+    if (!phaseId) return null;
+    const phase = phases.find((p) => p.id === phaseId);
+    return phase?.name || null;
+  };
+
+  // Filter projects by venture
+  const filteredProjects = useMemo(() => {
+    if (ventureFilter === "all") return projects;
+    return projects.filter((p) => p.ventureId === ventureFilter);
+  }, [projects, ventureFilter]);
+
+  // Filter phases by project
+  const filteredPhases = useMemo(() => {
+    if (projectFilter === "all") return phases;
+    return phases.filter((p) => p.projectId === projectFilter);
+  }, [phases, projectFilter]);
+
   // Filter and sort tasks
   const filteredAndSortedTasks = useMemo(() => {
     let result = tasks.filter((task) => {
@@ -248,6 +288,16 @@ export default function AllTasks() {
 
       // Venture filter
       if (ventureFilter !== "all" && task.ventureId !== ventureFilter) {
+        return false;
+      }
+
+      // Project filter
+      if (projectFilter !== "all" && task.projectId !== projectFilter) {
+        return false;
+      }
+
+      // Phase filter
+      if (phaseFilter !== "all" && task.phaseId !== phaseFilter) {
         return false;
       }
 
@@ -280,6 +330,16 @@ export default function AllTasks() {
           const ventureB = getVentureName(b.ventureId) || "";
           comparison = ventureA.localeCompare(ventureB);
           break;
+        case "project":
+          const projectA = getProjectName(a.projectId) || "";
+          const projectB = getProjectName(b.projectId) || "";
+          comparison = projectA.localeCompare(projectB);
+          break;
+        case "phase":
+          const phaseA = getPhaseName(a.phaseId) || "";
+          const phaseB = getPhaseName(b.phaseId) || "";
+          comparison = phaseA.localeCompare(phaseB);
+          break;
         case "focusDate":
           const focusDateA = a.focusDate || "9999-12-31";
           const focusDateB = b.focusDate || "9999-12-31";
@@ -311,7 +371,7 @@ export default function AllTasks() {
     });
 
     return result;
-  }, [tasks, searchQuery, statusFilter, ventureFilter, priorityFilter, focusDateFilter, sortField, sortDirection, ventures]);
+  }, [tasks, searchQuery, statusFilter, ventureFilter, projectFilter, phaseFilter, priorityFilter, focusDateFilter, sortField, sortDirection, ventures, projects, phases]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -326,6 +386,8 @@ export default function AllTasks() {
     setSearchQuery("");
     setStatusFilter("all");
     setVentureFilter("all");
+    setProjectFilter("all");
+    setPhaseFilter("all");
     setPriorityFilter("all");
     setFocusDateFilter(undefined);
   };
@@ -334,6 +396,8 @@ export default function AllTasks() {
     searchQuery ||
     statusFilter !== "all" ||
     ventureFilter !== "all" ||
+    projectFilter !== "all" ||
+    phaseFilter !== "all" ||
     priorityFilter !== "all" ||
     focusDateFilter;
 
@@ -419,7 +483,14 @@ export default function AllTasks() {
                 </Select>
 
                 {/* Venture Filter */}
-                <Select value={ventureFilter} onValueChange={setVentureFilter}>
+                <Select
+                  value={ventureFilter}
+                  onValueChange={(value) => {
+                    setVentureFilter(value);
+                    setProjectFilter("all");
+                    setPhaseFilter("all");
+                  }}
+                >
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="Venture" />
                   </SelectTrigger>
@@ -428,6 +499,42 @@ export default function AllTasks() {
                     {ventures.map((venture) => (
                       <SelectItem key={venture.id} value={venture.id}>
                         {venture.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Project Filter */}
+                <Select
+                  value={projectFilter}
+                  onValueChange={(value) => {
+                    setProjectFilter(value);
+                    setPhaseFilter("all");
+                  }}
+                >
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {filteredProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Phase Filter */}
+                <Select value={phaseFilter} onValueChange={setPhaseFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Phase" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Phases</SelectItem>
+                    {filteredPhases.map((phase) => (
+                      <SelectItem key={phase.id} value={phase.id}>
+                        {phase.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -544,6 +651,24 @@ export default function AllTasks() {
                     <TableHead>
                       <button
                         className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
+                        onClick={() => handleSort("project")}
+                      >
+                        PROJECT
+                        <SortIcon field="project" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
+                        onClick={() => handleSort("phase")}
+                      >
+                        PHASE
+                        <SortIcon field="phase" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        className="flex items-center hover:text-foreground transition-colors text-muted-foreground font-medium"
                         onClick={() => handleSort("focusDate")}
                       >
                         FOCUS DATE
@@ -636,6 +761,30 @@ export default function AllTasks() {
                                 <Building2 className="h-3 w-3" />
                               </div>
                               <span className="text-sm">{ventureName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+
+                        {/* Project */}
+                        <TableCell>
+                          {task.projectId ? (
+                            <div className="flex items-center gap-1.5">
+                              <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm">{getProjectName(task.projectId)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+
+                        {/* Phase */}
+                        <TableCell>
+                          {task.phaseId ? (
+                            <div className="flex items-center gap-1.5">
+                              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-sm">{getPhaseName(task.phaseId)}</span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground">-</span>
