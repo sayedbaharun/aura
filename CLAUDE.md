@@ -40,6 +40,7 @@ It is:
 - **Single-brain, multi-venture**: everything rolls up to one person across multiple businesses
 - **Today-centric**: every day is a unified view of tasks, health, nutrition, and focus
 - **Context-preserving**: relations ensure no information is orphaned
+- **Trading-aware**: built-in trading journal and session management
 
 ### Core Capabilities
 
@@ -47,8 +48,11 @@ It is:
 - **Project Management** - Time-bound initiatives with phases, budgets, and outcomes
 - **Task Execution** - Atomic work items with time blocking and effort tracking
 - **Health & Wellness** - Daily health metrics and nutrition logging
-- **Knowledge Base** - SOPs, playbooks, specs, and templates
-- **Daily Operations** - Morning planning, evening review, and reflection rituals
+- **Knowledge Base** - SOPs, playbooks, specs, and templates with hierarchical organization
+- **Daily Operations** - Morning rituals, evening reviews, and reflection workflows
+- **Trading Module** - Strategy templates, daily checklists, session tracking, and P&L journal
+- **AI Integration** - Venture-specific AI agents with context awareness
+- **Shopping & Books** - Personal life management tools
 
 ### Design Principles
 
@@ -91,8 +95,10 @@ It is:
 | **Database** | PostgreSQL (Neon serverless) |
 | **Build** | Vite (client), esbuild (server) |
 | **Validation** | Zod schemas (shared between client/server) |
-| **Auth** | Simple session-based auth (single-user system) |
+| **Auth** | Session-based authentication with password protection |
 | **Session Storage** | PostgreSQL via connect-pg-simple |
+| **Rich Text Editor** | BlockNote for document editing |
+| **AI** | OpenRouter API (multi-model support) |
 
 ---
 
@@ -101,16 +107,18 @@ It is:
 ```
 /client         React frontend (Vite + TypeScript)
   /src
-    /components   UI components (shadcn/ui)
-    /pages        Page components
+    /components   UI components (shadcn/ui + custom)
+      /ui         45+ shadcn/ui components
+    /pages        26 page components
     /lib          Utilities and helpers
     /hooks        Custom React hooks
 /server         Express backend (Node.js + TypeScript)
   index.ts        Main entry point
   routes.ts       API route definitions
-  storage.ts      Database abstraction layer
+  storage.ts      Database abstraction layer (100+ methods)
+  integrations.ts Integration configuration
 /shared         Shared Zod schemas and database types
-  schema.ts       All entity schemas
+  schema.ts       All entity schemas (24+ tables)
 /migrations     Database migrations (auto-generated)
 ```
 
@@ -151,14 +159,26 @@ ventures (saas/media/realty/trading/personal)
   └── projects (product/marketing/ops/etc)
        └── phases (Phase 1, Phase 2, etc)
             └── tasks (atomic work items)
+  └── aiAgentPrompts (venture-specific AI config)
+  └── ventureConversations (AI chat history)
 
 days (daily logs)
   └── tasks (scheduled for this day)
   └── healthEntries
   └── nutritionEntries
+  └── morningRituals (JSON: pressUps, squats, supplements, reading)
+  └── eveningRituals (JSON: review, journal, gratitude, priorities)
+  └── tradingJournal (JSON: sessions with P&L)
 
 captureItems (inbox)
   └── can convert to tasks
+
+docs (knowledge base)
+  └── hierarchical (parentId, isFolder)
+  └── attachments
+
+tradingStrategies (templates)
+  └── dailyTradingChecklists (daily instances)
 ```
 
 ---
@@ -167,7 +187,68 @@ captureItems (inbox)
 
 All schemas defined with Zod in `/shared/schema.ts` for runtime validation. Use Drizzle ORM for queries.
 
-### 6.1. ventures
+### Core Tables (24+)
+
+#### 6.1. users
+
+User profile with authentication.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `email` | string | Email address (unique) |
+| `password` | string | Hashed password |
+| `firstName` | string | First name |
+| `lastName` | string | Last name |
+| `timezone` | string | Default timezone |
+| `lastLoginAt` | timestamp | Last login timestamp |
+| `createdAt` | timestamp | Creation timestamp |
+
+#### 6.2. userPreferences
+
+User settings and configuration.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `userId` | fk → users | Parent user |
+| `theme` | string | UI theme preference |
+| `morningRitualConfig` | json | Morning ritual settings |
+| `notificationSettings` | json | Notification preferences |
+| `aiContextInstructions` | text | Custom AI instructions |
+| `updatedAt` | timestamp | Last update |
+
+#### 6.3. customCategories
+
+User-defined enum values.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `userId` | fk → users | Parent user |
+| `categoryType` | enum | `domain`, `task_type`, `focus_slot` |
+| `value` | string | Category value |
+| `label` | string | Display label |
+| `color` | string | Display color |
+| `order` | number | Sort order |
+
+#### 6.4. auditLogs
+
+Security audit trail.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `userId` | fk → users | Acting user |
+| `action` | string | Action performed |
+| `entityType` | string | Entity type affected |
+| `entityId` | string | Entity ID affected |
+| `metadata` | json | Additional context |
+| `ipAddress` | string | Client IP |
+| `userAgent` | string | Client user agent |
+| `createdAt` | timestamp | Timestamp |
+
+#### 6.5. ventures
 
 Business/personal initiatives (top level).
 
@@ -175,7 +256,7 @@ Business/personal initiatives (top level).
 |-------|------|-------------|
 | `id` | serial | Primary key |
 | `name` | string | Venture name |
-| `status` | enum | `active`, `development`, `paused`, `archived` |
+| `status` | enum | `planning`, `building`, `on_hold`, `ongoing`, `archived` |
 | `domain` | enum | `saas`, `media`, `realty`, `trading`, `personal`, `other` |
 | `oneLiner` | string | One-sentence description |
 | `primaryFocus` | text | Main strategic focus |
@@ -185,7 +266,7 @@ Business/personal initiatives (top level).
 | `createdAt` | timestamp | Creation timestamp |
 | `updatedAt` | timestamp | Last update |
 
-### 6.2. projects
+#### 6.6. projects
 
 Concrete initiatives within ventures.
 
@@ -194,8 +275,8 @@ Concrete initiatives within ventures.
 | `id` | serial | Primary key |
 | `name` | string | Project title |
 | `ventureId` | fk → ventures | Parent venture |
-| `status` | enum | `not_started`, `active`, `on_hold`, `done`, `cancelled` |
-| `category` | enum | `product`, `marketing`, `operations`, `finance`, `research` |
+| `status` | enum | `not_started`, `planning`, `in_progress`, `blocked`, `done`, `archived` |
+| `category` | enum | `marketing`, `sales_biz_dev`, `customer_success`, `product`, `tech_engineering`, `operations`, `research_dev`, `finance`, `people_hr`, `legal_compliance`, `admin_general`, `strategy_leadership` |
 | `priority` | enum | `P0`, `P1`, `P2`, `P3` |
 | `startDate` | date | Planned start |
 | `targetEndDate` | date | Target completion |
@@ -206,7 +287,7 @@ Concrete initiatives within ventures.
 | `budgetSpent` | number | Spent amount |
 | `revenueGenerated` | number | Revenue generated |
 
-### 6.3. phases
+#### 6.7. phases
 
 Project phases and key deliverables.
 
@@ -220,7 +301,7 @@ Project phases and key deliverables.
 | `targetDate` | date | Target date |
 | `notes` | text | Phase notes |
 
-### 6.4. tasks
+#### 6.8. tasks
 
 Atomic units of execution.
 
@@ -228,10 +309,10 @@ Atomic units of execution.
 |-------|------|-------------|
 | `id` | serial | Primary key |
 | `title` | string | Task title |
-| `status` | enum | `idea`, `next`, `in_progress`, `blocked`, `done`, `cancelled` |
+| `status` | enum | `idea`, `next`, `in_progress`, `waiting`, `done`, `cancelled`, `backlog` |
 | `priority` | enum | `P0`, `P1`, `P2`, `P3` |
-| `type` | enum | `business`, `deep_work`, `admin`, `personal`, `learning` |
-| `domain` | enum | `work`, `health`, `finance`, `learning`, `personal` |
+| `type` | enum | `business`, `deep_work`, `admin`, `health`, `learning`, `personal` |
+| `domain` | enum | `home`, `work`, `health`, `finance`, `travel`, `learning`, `play`, `calls`, `personal` |
 | `ventureId` | fk → ventures | Parent venture (nullable) |
 | `projectId` | fk → projects | Parent project (nullable) |
 | `phaseId` | fk → phases | Parent phase (nullable) |
@@ -245,7 +326,7 @@ Atomic units of execution.
 | `tags` | text | Comma-separated tags |
 | `completedAt` | timestamp | Completion timestamp |
 
-### 6.5. captureItems
+#### 6.9. captureItems
 
 GTD-style inbox for raw thoughts.
 
@@ -263,23 +344,26 @@ GTD-style inbox for raw thoughts.
 | `notes` | text | Additional context |
 | `clarifiedAt` | timestamp | When processed (nullable) |
 
-### 6.6. days
+#### 6.10. days
 
 Daily logs (central hub for each day).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | serial | Primary key |
+| `id` | string | Primary key (format: `day_YYYY-MM-DD`) |
 | `date` | date | YYYY-MM-DD (unique) |
 | `title` | string | Day theme/title |
 | `mood` | enum | `low`, `medium`, `high`, `peak` |
-| `top3Outcomes` | text | Three most important outcomes |
+| `top3Outcomes` | json | Three outcomes with completion status |
 | `oneThingToShip` | text | Single most leveraged deliverable |
 | `reflectionAm` | text | Morning intention |
 | `reflectionPm` | text | Evening review |
 | `primaryVentureFocus` | fk → ventures | Main venture for the day |
+| `morningRituals` | json | `{ pressUps, squats, supplements, reading }` |
+| `eveningRituals` | json | `{ reviewCompleted, journalEntry, gratitude, tomorrowPriorities, windDown }` |
+| `tradingJournal` | json | `{ sessions: [{ timestamp, sessionName, pnl, notes, lessons, emotionalState }] }` |
 
-### 6.7. healthEntries
+#### 6.11. healthEntries
 
 Daily health metrics (one per day).
 
@@ -301,7 +385,7 @@ Daily health metrics (one per day).
 | `tags` | text | Context tags |
 | `notes` | text | Subjective context |
 
-### 6.8. nutritionEntries
+#### 6.12. nutritionEntries
 
 Meal logs (multiple per day).
 
@@ -320,35 +404,183 @@ Meal logs (multiple per day).
 | `tags` | text | Meal tags |
 | `notes` | text | Additional context |
 
-### 6.9. docs
+#### 6.13. docs
 
-SOPs, prompts, playbooks, specs, templates.
+SOPs, prompts, playbooks, specs, templates with hierarchical organization.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | serial | Primary key |
 | `title` | string | Doc title |
-| `type` | enum | `sop`, `prompt`, `playbook`, `spec`, `template`, `note` |
-| `domain` | enum | `venture_ops`, `marketing`, `product`, `personal`, `finance` |
+| `type` | enum | `page`, `sop`, `prompt`, `spec`, `template`, `playbook`, `strategy`, `tech_doc`, `process`, `reference`, `meeting_notes`, `research` |
+| `domain` | enum | `venture_ops`, `marketing`, `product`, `sales`, `tech`, `trading`, `finance`, `legal`, `hr`, `personal` |
 | `status` | enum | `draft`, `active`, `archived` |
 | `ventureId` | fk → ventures | Parent venture (nullable) |
 | `projectId` | fk → projects | Parent project (nullable) |
-| `body` | text | Markdown content |
+| `parentId` | fk → docs | Parent doc for hierarchy (nullable) |
+| `isFolder` | boolean | Is this a folder? |
+| `order` | number | Sort order within parent |
+| `body` | text | Legacy markdown content |
+| `content` | json | BlockNote JSON content |
+| `metadata` | json | Additional metadata |
 | `tags` | text | Tags for search |
+| `coverImage` | string | Cover image URL |
+| `icon` | string | Display icon |
 
-### 6.10. users
+#### 6.14. attachments
 
-User profile (single-user system).
+Files and images for docs.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | serial | Primary key |
-| `email` | string | Email address |
-| `firstName` | string | First name |
-| `lastName` | string | Last name |
-| `timezone` | string | Default timezone |
+| `docId` | fk → docs | Parent document |
+| `filename` | string | Original filename |
+| `mimeType` | string | File MIME type |
+| `size` | number | File size in bytes |
+| `storageType` | enum | `url`, `base64`, `local` |
+| `storageUrl` | string | Storage location |
+| `createdAt` | timestamp | Upload timestamp |
 
-### 6.11. sessions
+#### 6.15. shoppingItems
+
+Shopping list with priorities.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `title` | string | Item name |
+| `quantity` | number | Quantity needed |
+| `unit` | string | Unit of measure |
+| `category` | enum | `groceries`, `personal`, `household`, `business` |
+| `priority` | enum | `P1`, `P2`, `P3` |
+| `status` | enum | `to_buy`, `purchased` |
+| `store` | string | Preferred store |
+| `notes` | text | Additional notes |
+| `createdAt` | timestamp | Created timestamp |
+
+#### 6.16. books
+
+Reading list management.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `title` | string | Book title |
+| `author` | string | Author name |
+| `status` | enum | `to_read`, `reading`, `finished` |
+| `platform` | string | Reading platform |
+| `rating` | number | Rating (1-5) |
+| `notes` | text | Notes and highlights |
+| `startedAt` | timestamp | Start date |
+| `finishedAt` | timestamp | Finish date |
+
+#### 6.17. tradingStrategies
+
+Trading strategy templates with dynamic checklists.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `name` | string | Strategy name |
+| `description` | text | Strategy description |
+| `isActive` | boolean | Currently active? |
+| `isDefault` | boolean | Default strategy? |
+| `sections` | json | Array of sections with checklist items |
+| `createdAt` | timestamp | Created timestamp |
+| `updatedAt` | timestamp | Last update |
+
+**Section item types**: `checkbox`, `text`, `number`, `select`, `time`, `table`
+
+#### 6.18. dailyTradingChecklists
+
+Daily instances of trading strategy checklists.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `date` | date | Trading date |
+| `strategyId` | fk → tradingStrategies | Strategy template |
+| `instrument` | string | Trading instrument |
+| `session` | enum | `london`, `new_york`, `asian`, `other` |
+| `mentalState` | number | Mental state (1-10) |
+| `highImpactNews` | json | High impact news events |
+| `primarySetup` | text | Primary setup description |
+| `completedSections` | json | Completed checklist data |
+| `trades` | json | Array of trades with entry/exit/pnl |
+| `endOfSessionReview` | json | `{ followedPlan, noTradeIsSuccess, lessons }` |
+| `createdAt` | timestamp | Created timestamp |
+
+### AI & Automation Tables
+
+#### 6.19. aiAgentPrompts
+
+Venture-specific AI agent configuration.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `ventureId` | fk → ventures | Parent venture (nullable for global) |
+| `name` | string | Agent name |
+| `systemPrompt` | text | System prompt |
+| `capabilities` | json | Agent capabilities |
+| `quickActions` | json | Quick action buttons |
+| `knowledgeSources` | json | Knowledge source config |
+| `isActive` | boolean | Currently active? |
+
+#### 6.20. chatMessages
+
+Web-based AI chat conversations.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `role` | enum | `user`, `assistant`, `system` |
+| `content` | text | Message content |
+| `metadata` | json | Additional metadata |
+| `createdAt` | timestamp | Timestamp |
+
+#### 6.21. ventureConversations
+
+Venture-scoped chat history.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `ventureId` | fk → ventures | Parent venture |
+| `role` | enum | `user`, `assistant` |
+| `content` | text | Message content |
+| `metadata` | json | Additional metadata |
+| `createdAt` | timestamp | Timestamp |
+
+#### 6.22. ventureContextCache
+
+Cached context summaries for AI agents.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `ventureId` | fk → ventures | Parent venture |
+| `contextType` | string | Type of context |
+| `content` | text | Cached content |
+| `lastUpdated` | timestamp | Last rebuild |
+| `expiresAt` | timestamp | Cache expiry |
+
+#### 6.23. ventureAgentActions
+
+Audit log for AI agent actions.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | serial | Primary key |
+| `ventureId` | fk → ventures | Parent venture |
+| `actionType` | string | Action type |
+| `input` | text | Action input |
+| `output` | text | Action output |
+| `status` | enum | `pending`, `completed`, `failed` |
+| `createdAt` | timestamp | Timestamp |
+
+#### 6.24. sessions
 
 Express session storage (managed by connect-pg-simple).
 
@@ -356,12 +588,42 @@ Express session storage (managed by connect-pg-simple).
 
 ## 7. API Reference
 
-All routes prefixed with `/api`.
+All routes prefixed with `/api`. **147+ total endpoints**.
+
+### Authentication & Settings
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | Login with email/password |
+| POST | `/api/auth/logout` | Logout and destroy session |
+| POST | `/api/auth/setup` | Initial user setup |
+| POST | `/api/auth/change-password` | Change password |
+| GET | `/api/auth/user` | Get current user |
+| GET | `/api/auth/status` | Check auth status |
+| GET | `/api/auth/csrf-token` | Get CSRF token |
+| GET | `/api/settings/preferences` | Get user preferences |
+| PATCH | `/api/settings/preferences` | Update preferences |
+| GET | `/api/settings/morning-ritual` | Get morning ritual config |
+| PATCH | `/api/settings/morning-ritual` | Update morning ritual config |
+| GET | `/api/settings/ai` | Get AI settings |
+| PATCH | `/api/settings/ai` | Update AI settings |
+
+### Dashboard (Command Center V2)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/readiness` | Health battery status |
+| GET | `/api/dashboard/ventures` | Venture overview |
+| GET | `/api/dashboard/inbox` | Capture items |
+| GET | `/api/dashboard/tasks` | Today's tasks |
+| GET | `/api/dashboard/urgent` | Urgent tasks + "On Fire" indicator |
+| GET | `/api/dashboard/top3` | Top 3 priority tasks |
+| GET | `/api/dashboard/day` | Current day data |
+| GET | `/api/dashboard/next-meeting` | Next scheduled meeting |
 
 ### Ventures
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/ventures` | List all ventures |
+| GET | `/api/ventures/:id` | Get single venture |
 | POST | `/api/ventures` | Create venture |
 | PATCH | `/api/ventures/:id` | Update venture |
 | DELETE | `/api/ventures/:id` | Delete venture |
@@ -369,7 +631,8 @@ All routes prefixed with `/api`.
 ### Projects
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/projects` | List projects (supports `?ventureId=` filter) |
+| GET | `/api/projects` | List projects (`?ventureId=` filter) |
+| GET | `/api/projects/:id` | Get single project |
 | POST | `/api/projects` | Create project |
 | PATCH | `/api/projects/:id` | Update project |
 | DELETE | `/api/projects/:id` | Delete project |
@@ -377,7 +640,8 @@ All routes prefixed with `/api`.
 ### Phases
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/phases` | List phases (supports `?projectId=` filter) |
+| GET | `/api/phases` | List phases (`?projectId=` filter) |
+| GET | `/api/phases/:id` | Get single phase |
 | POST | `/api/phases` | Create phase |
 | PATCH | `/api/phases/:id` | Update phase |
 | DELETE | `/api/phases/:id` | Delete phase |
@@ -385,7 +649,7 @@ All routes prefixed with `/api`.
 ### Tasks
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/tasks` | List tasks (supports filters: `ventureId`, `projectId`, `status`) |
+| GET | `/api/tasks` | List tasks (filters: `ventureId`, `projectId`, `status`) |
 | GET | `/api/tasks/today` | Get today's tasks |
 | POST | `/api/tasks` | Create task |
 | PATCH | `/api/tasks/:id` | Update task |
@@ -424,20 +688,106 @@ All routes prefixed with `/api`.
 | POST | `/api/nutrition` | Create nutrition entry |
 | PATCH | `/api/nutrition/:id` | Update nutrition entry |
 | DELETE | `/api/nutrition/:id` | Delete nutrition entry |
+| POST | `/api/nutrition/estimate-macros` | AI-powered macro estimation |
 
 ### Docs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/docs` | List docs (supports filters) |
+| GET | `/api/docs/tree` | Get hierarchical doc tree |
 | GET | `/api/docs/search` | Search docs by query |
+| GET | `/api/docs/:id` | Get single doc |
+| GET | `/api/docs/:id/children` | Get doc children |
 | POST | `/api/docs` | Create doc |
 | PATCH | `/api/docs/:id` | Update doc |
-| DELETE | `/api/docs/:id` | Delete doc |
+| DELETE | `/api/docs/:id` | Delete doc (recursive) |
+| POST | `/api/docs/reorder` | Reorder docs |
+| GET | `/api/docs/:docId/attachments` | List attachments |
+| POST | `/api/docs/:docId/attachments` | Upload attachment |
+| DELETE | `/api/attachments/:id` | Delete attachment |
 
-### Auth
+### Shopping
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/auth/user` | Get current user (mock for single-user) |
+| GET | `/api/shopping` | List shopping items |
+| POST | `/api/shopping` | Create shopping item |
+| PATCH | `/api/shopping/:id` | Update shopping item |
+| DELETE | `/api/shopping/:id` | Delete shopping item |
+
+### Books
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/books` | List books |
+| POST | `/api/books` | Create book |
+| PATCH | `/api/books/:id` | Update book |
+| DELETE | `/api/books/:id` | Delete book |
+
+### Custom Categories
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/categories` | List custom categories |
+| POST | `/api/categories` | Create category |
+| PATCH | `/api/categories/:id` | Update category |
+| DELETE | `/api/categories/:id` | Delete category |
+
+### AI Chat
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/ai-models` | List available AI models |
+| POST | `/api/chat` | Send chat message (rate limited) |
+| GET | `/api/chat/history` | Get chat history |
+| DELETE | `/api/chat/history` | Clear chat history |
+
+### AI Agent Prompts
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/ai-agent-prompts` | List all prompts |
+| GET | `/api/ai-agent-prompts/venture/:ventureId` | Get venture-specific prompt |
+| POST | `/api/ai-agent-prompts` | Create prompt |
+| PATCH | `/api/ai-agent-prompts/:id` | Update prompt |
+| DELETE | `/api/ai-agent-prompts/:id` | Delete prompt |
+
+### Venture AI
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/ventures/:ventureId/chat` | Venture-scoped chat |
+| GET | `/api/ventures/:ventureId/chat/history` | Get venture chat history |
+| GET | `/api/ventures/:ventureId/ai/context-status` | Get context cache status |
+| POST | `/api/ventures/:ventureId/ai/rebuild-context` | Rebuild context cache |
+| GET | `/api/ventures/:ventureId/ai/actions` | Get agent action history |
+
+### Project Scaffolding
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/project-scaffolding/options` | Get scaffolding options |
+| POST | `/api/project-scaffolding/generate` | Generate project scaffold |
+| POST | `/api/project-scaffolding/commit` | Commit generated scaffold |
+
+### Trading
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/trading-strategies` | List strategies |
+| GET | `/api/trading-strategies/:id` | Get single strategy |
+| GET | `/api/trading-strategies/default/active` | Get active default strategy |
+| POST | `/api/trading-strategies` | Create strategy |
+| POST | `/api/trading-strategies/seed` | Seed default strategies |
+| PATCH | `/api/trading-strategies/:id` | Update strategy |
+| DELETE | `/api/trading-strategies/:id` | Delete strategy |
+| GET | `/api/trading-checklists` | List daily checklists |
+| GET | `/api/trading-checklists/today` | Get today's checklist |
+| POST | `/api/trading-checklists` | Create checklist |
+| PATCH | `/api/trading-checklists/:id` | Update checklist |
+| DELETE | `/api/trading-checklists/:id` | Delete checklist |
+
+### Google Drive Integration
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/drive/status` | Get connection status |
+| GET | `/api/drive/folders` | List folders |
+| GET | `/api/drive/files` | List files |
+| GET | `/api/drive/search` | Search files |
+| POST | `/api/drive/sync` | Sync files |
+| ... | ... | 15+ additional drive endpoints |
 
 ---
 
@@ -450,56 +800,132 @@ Main entry point that:
 - Sets up Express app with Vite dev middleware (dev) or static serving (prod)
 - Configures session management with PostgreSQL storage
 - Registers API routes and error handlers
+- Sets up CSRF protection
 
 #### `server/storage.ts`
 Database abstraction layer (`DBStorage` class):
 - Implements `IStorage` interface for all database operations
 - Uses Drizzle ORM with Neon serverless PostgreSQL
-- Handles ventures, projects, tasks, phases, captures, days, health, nutrition, docs
+- 100+ methods for all entities
+- Handles ventures, projects, tasks, phases, captures, days, health, nutrition, docs, trading, shopping, books, AI
 
 #### `server/routes.ts`
-All API route definitions and handlers.
+All API route definitions and handlers (147+ routes).
+
+#### `server/integrations.ts`
+Integration configuration for external services.
 
 ### Client
 
 #### `client/src/App.tsx`
 Main router with authentication guards using Wouter and TanStack Query for user state.
 
-#### `client/src/pages/`
-| File | Description |
-|------|-------------|
-| `command-center.tsx` | Daily overview with tasks, health, nutrition snapshots |
-| `venture-hq.tsx` | Ventures grid and overview |
-| `venture-detail.tsx` | Single venture with projects, tasks, docs |
-| `health-hub.tsx` | Health metrics tracking and calendar |
-| `nutrition-dashboard.tsx` | Meal logging and nutrition goals |
-| `knowledge-hub.tsx` | Docs library with search and filters |
-| `doc-detail.tsx` | Single document view/edit |
-| `deep-work.tsx` | Weekly calendar and focus session planning |
-| `notifications.tsx` | Notification history |
+#### `client/src/pages/` (26 Pages)
+
+| File | Route | Description |
+|------|-------|-------------|
+| `landing.tsx` | `/` | Unauthenticated landing page |
+| `command-center-v2.tsx` | `/dashboard` | **Main HUD** - Readiness, health battery, top 3, urgent tasks |
+| `command-center.tsx` | `/command-center` | Legacy daily overview |
+| `venture-hq.tsx` | `/ventures` | Ventures grid and overview |
+| `venture-detail.tsx` | `/ventures/:id` | Single venture with projects, tasks, docs |
+| `health-hub.tsx` | `/health-hub` | Health metrics tracking and calendar |
+| `nutrition-dashboard.tsx` | `/nutrition` | Meal logging and macro tracking |
+| `knowledge-hub.tsx` | `/knowledge` | Docs library with search and filters |
+| `doc-detail.tsx` | `/knowledge/:id` | Single document view/edit with BlockNote |
+| `deep-work.tsx` | `/deep-work` | Weekly calendar and focus session planning |
+| `notifications.tsx` | `/notifications` | Notification history |
+| `settings.tsx` | `/settings` | Main settings page |
+| `settings-ai.tsx` | `/settings/ai` | AI assistant configuration |
+| `settings-integrations.tsx` | `/settings/integrations` | Integration status and config |
+| `settings-categories.tsx` | `/settings/categories` | Custom domain/task type/slot config |
+| `calendar.tsx` | `/calendar` | Monthly calendar with task/event overlay |
+| `morning-ritual.tsx` | `/morning`, `/morning/:date` | Morning habits tracking |
+| `evening-review.tsx` | `/evening`, `/evening/:date` | Daily reflection + tomorrow planning |
+| `shopping.tsx` | `/shopping` | Shopping list with priorities |
+| `books.tsx` | `/books` | Reading list management |
+| `capture.tsx` | `/capture` | Raw idea capture interface |
+| `trading.tsx` | `/trading` | Trading dashboard with strategies |
+| `ai-chat.tsx` | `/ai-chat` | General AI assistant chat |
+| `all-tasks.tsx` | `/tasks` | Comprehensive task list view |
 
 #### `client/src/components/ui/*`
-47 shadcn/ui components - prefer these over creating custom components.
+45+ shadcn/ui components - prefer these over creating custom components.
+
+#### `client/src/components/`
+Feature-specific components:
+- `cockpit-components.tsx` - HealthBattery, ContextCard, MissionStatement
+- `trading-strategies-manager.tsx` - Strategy CRUD
+- `trading-strategy-dashboard.tsx` - Strategy execution view
+- `trading-session-indicator.tsx` - Live trading session clocks
+- `capture-modal.tsx` - Quick capture interface
+- `task-detail-modal.tsx` - Task detail and editing
+- `create-task-modal.tsx` - Task creation interface
+- `layout.tsx` - Main layout wrapper with sidebar/topbar
+
+#### `client/src/hooks/`
+Custom React hooks:
+- `useAuth` - Authentication state
+- `useToast` - Toast notifications
+- `use-attachments` - Document attachments
+- `use-backlinks` - Document backlinks
+- `use-doc-search` - Document search
+- `use-templates` - Document templates
+- `use-mobile` - Mobile detection
+- `use-sidebar-collapsed` - Sidebar state
+
+#### `client/src/lib/`
+Utilities:
+- `queryClient.ts` - TanStack Query configuration
+- `daily-reminders.ts` - Daily reminder system
+- `notification-store.ts` - Notification management
+- `doc-templates.ts` - Document templates
+- `saved-meals.ts` - Meal templates
+- `task-celebrations.ts` - Task completion celebrations
+- `export-utils.ts` - Export functionality
+- `browser-notifications.ts` - Browser notification API
 
 ---
 
 ## 9. UX Modules & Screens
 
-### 9.1. Command Center (Home)
+### 9.1. Command Center V2 (Main Dashboard)
 
-The default screen. Unified view of today's tasks, health, nutrition, and inbox.
+The primary HUD interface at `/dashboard`.
 
 **Components:**
+- **Health Battery**: Visual readiness indicator based on sleep, energy, mood
 - **Today Overview**: Day title, date, primary venture focus
-- **Top 3 Outcomes**: `Day.top3Outcomes`
-- **One Thing to Ship**: `Day.oneThingToShip`
-- **Tasks: Today**: Filtered by `focusDate = today` OR `dueDate = today`, grouped by venture
-- **Health Snapshot**: Sleep, energy, mood, workout status
-- **Nutrition Snapshot**: Total calories, protein, carbs, fats
-- **Capture Inbox**: Unclarified items with convert-to-task action
-- **This Week Preview**: Upcoming tasks grouped by venture
+- **Top 3 Outcomes**: Priority tasks with completion status
+- **One Thing to Ship**: Single most leveraged deliverable
+- **Urgent Tasks**: "On Fire" indicator for overdue/critical items
+- **Tasks: Today**: Filtered by `focusDate = today` OR `dueDate = today`
+- **Inbox Snapshot**: Unclarified capture items
+- **Next Meeting**: Upcoming calendar event
 
-### 9.2. Venture HQ
+### 9.2. Morning Ritual Page
+
+Daily morning habits tracking at `/morning`.
+
+**Components:**
+- **Press-Ups Counter**: Daily press-up goal and tracking
+- **Squats Counter**: Daily squat goal and tracking
+- **Supplements Checklist**: Daily supplement tracking
+- **Reading Progress**: Pages/time read
+- **Day Planning**: Set top 3 outcomes and one thing to ship
+
+### 9.3. Evening Review Page
+
+Daily reflection workflow at `/evening`.
+
+**Components:**
+- **Day Review**: Completed status of outcomes
+- **Journal Entry**: Free-form reflection
+- **Gratitude**: What went well
+- **Tomorrow Priorities**: Next day planning
+- **Wind-Down Checklist**: Evening routine items
+
+### 9.4. Venture HQ
 
 High-level view of all ventures with drill-down.
 
@@ -509,18 +935,32 @@ High-level view of all ventures with drill-down.
   - Projects Board (Kanban or list by status)
   - Tasks List (grouped by project)
   - Docs & SOPs
-  - Metrics (future)
+  - AI Agent (venture-scoped chat)
+  - Metrics
 
-### 9.3. Deep Work & Planning
+### 9.5. Trading Dashboard
+
+Comprehensive trading system at `/trading`.
+
+**Components:**
+- **Trading Session Indicator**: Live clocks showing London, New York, Asian sessions with killzone highlighting
+- **Strategy Manager**: Create and manage trading strategies with dynamic checklists
+- **Daily Checklist**: Execute strategy checklist for the day
+- **Session Selector**: Choose trading session (London, NY, Asian)
+- **Trade Logger**: Log individual trades with entry/exit/pnl
+- **End of Session Review**: Lessons learned, followed plan, no-trade-is-success
+- **Trading Journal**: Historical session entries with P&L
+
+### 9.6. Deep Work & Planning
 
 Dedicated view for planning and executing deep work sessions.
 
 **Components:**
 - **Deep Work Queue**: Tasks filtered by `type = deep_work`
 - **Weekly Calendar**: 7 days × focus slots grid with drag-and-drop
-- **Focus Session Timer** (optional): Track actual effort
+- **Focus Session Timer**: Track actual effort
 
-### 9.4. Health & Performance Hub
+### 9.7. Health & Performance Hub
 
 Track health metrics and correlate with performance.
 
@@ -529,23 +969,72 @@ Track health metrics and correlate with performance.
 - **Health Table**: Last 30 entries with all metrics
 - **Weekly/Monthly Summary**: Averages and trends
 
-### 9.5. Nutrition Dashboard
+### 9.8. Nutrition Dashboard
 
 Track meals, macros, and nutrition trends.
 
 **Components:**
 - **Today's Meals**: List with macro totals
 - **Weekly Summary**: Daily calories/protein chart
-- **Add/Edit Meal**: Form for meal logging
+- **Add/Edit Meal**: Form with AI-powered macro estimation
+- **Saved Meals**: Quick-add frequent meals
 
-### 9.6. Knowledge Hub
+### 9.9. Knowledge Hub
 
 Central repository for SOPs, prompts, playbooks.
 
 **Components:**
+- **Hierarchical Tree**: Folder-based document organization
 - **Knowledge Library**: Tabs for All, SOPs, Prompts, Playbooks, Specs
 - **Search**: By title, tags, domain, venture
-- **Doc Detail View**: Rich text/markdown display with edit capability
+- **Doc Detail View**: BlockNote rich text editor with attachments
+
+### 9.10. Calendar View
+
+Monthly calendar at `/calendar`.
+
+**Components:**
+- **Month View**: Days with task/event indicators
+- **Day Detail**: Tasks scheduled for selected day
+- **Quick Add**: Create tasks for specific dates
+
+### 9.11. All Tasks View
+
+Comprehensive task list at `/tasks`.
+
+**Components:**
+- **Task List**: All tasks with filters
+- **Status Filter**: Filter by status
+- **Venture Filter**: Filter by venture
+- **Priority Sort**: Sort by priority
+
+### 9.12. Shopping List
+
+Shopping management at `/shopping`.
+
+**Components:**
+- **Item List**: Shopping items by category
+- **Priority Badges**: P1/P2/P3 indicators
+- **Quick Add**: Fast item creation
+- **Purchase Toggle**: Mark items as purchased
+
+### 9.13. Books
+
+Reading list at `/books`.
+
+**Components:**
+- **Book List**: Books by status (to-read, reading, finished)
+- **Notes**: Reading notes and highlights
+- **Progress Tracking**: Start/finish dates
+
+### 9.14. AI Chat
+
+General AI assistant at `/ai-chat`.
+
+**Components:**
+- **Chat Interface**: Message history with streaming responses
+- **Model Selector**: Choose AI model
+- **Clear History**: Reset conversation
 
 ---
 
@@ -612,31 +1101,57 @@ ORDER BY priority ASC, focus_slot ASC
 
 **Logic**: Create/get Day for selected date, link task via `dayId` and `focusDate`.
 
+### 11.7. Trading Session Detection
+
+**Trigger**: Trading page load
+
+**Logic**: Show active trading sessions based on current time:
+- London: 8am-4pm GMT
+- New York: 1pm-9pm GMT (8am-4pm EST)
+- Asian: 11pm-7am GMT
+
+### 11.8. AI Context Caching
+
+**Trigger**: Venture chat or context rebuild
+
+**Logic**: Cache venture context (projects, tasks, docs) for faster AI responses.
+
 ---
 
 ## 12. Integration Points
 
-### 12.1. Notion Integration (Future)
+### 12.1. Google Drive Integration ✅
 
-- Bidirectional sync for Ventures, Projects, Tasks, Days, Docs
-- Store `externalId` (Notion page ID) on entities
+- File sync and search
+- Folder management
+- Document import/export
 
-### 12.2. Google Calendar (Future)
+### 12.2. Google Calendar (Planned)
 
 - Map tasks with `focusDate + focusSlot` → GCal events
 - Sync task scheduling changes
 
-### 12.3. WhatsApp/Telegram Quick Capture (Future)
+### 12.3. Gmail (Planned)
+
+- Email capture to inbox
+
+### 12.4. Notion Integration (Planned)
+
+- Bidirectional sync for Ventures, Projects, Tasks, Days, Docs
+- Store `externalId` (Notion page ID) on entities
+
+### 12.5. WhatsApp/Telegram Quick Capture (Planned)
 
 - Webhook endpoints for message capture
 - Parse "Task:", "Idea:", "Note:" prefixes
 - Create Capture Items with `source = whatsapp/telegram`
 
-### 12.4. AI Integration (Future)
+### 12.6. AI Integration ✅
 
-Environment variables (optional):
-- `OPENROUTER_API_KEY` - OpenRouter API key (OpenAI-compatible)
-- `TELEGRAM_BOT_TOKEN` - Telegram bot token
+- Multi-model support via OpenRouter
+- Venture-specific AI agents
+- Context-aware responses
+- Macro estimation for nutrition
 
 ---
 
@@ -656,6 +1171,8 @@ Optional:
 |----------|-------------|
 | `OPENROUTER_API_KEY` | OpenRouter API key for AI features |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 
 ---
 
@@ -680,13 +1197,19 @@ Optional:
 ### Session Management
 - Sessions stored in PostgreSQL via `connect-pg-simple`
 - Session cookie name: `connect.sid`
-- Currently using mock auth (single-user system)
+- Password-protected authentication
 
 ### Database Migrations
 - Schema changes go in `/shared/schema.ts`
 - Run `npm run db:push` to apply changes (Drizzle Kit auto-generates migrations)
 - Migrations stored in `/migrations` directory
 - DO NOT manually edit migration files
+
+### Component Patterns
+- Use shadcn/ui components from `/components/ui/`
+- Feature components in `/components/`
+- Pages in `/pages/`
+- Custom hooks in `/hooks/`
 
 ---
 
@@ -721,37 +1244,56 @@ Components appear in `client/src/components/ui/`.
 
 ## 16. Roadmap
 
-### Phase 1: Complete Foundation ✅
+### Phase 1: Foundation ✅ COMPLETE
 - ✅ Core entities (ventures, projects, tasks, captures, docs)
 - ✅ Health & nutrition tracking
 - ✅ Daily planning hub (days table)
 - ✅ Phases for project organization
-- 🚧 Budget tracking for projects
-- 🚧 Focus slot scheduling system
+- ✅ Budget tracking for projects
+- ✅ Focus slot scheduling system
 
-### Phase 2: Daily Operations
-- Build comprehensive daily dashboard
-- Morning planning + evening review workflow
-- Focus session timer
-- Task-to-slot assignment UI
+### Phase 2: Daily Operations ✅ COMPLETE
+- ✅ Command Center V2 (HUD dashboard)
+- ✅ Morning ritual page
+- ✅ Evening review workflow
+- ✅ Task-to-slot assignment UI
+- ✅ Calendar view
+- ✅ All tasks view
 
-### Phase 3: AI Integration
-- Telegram bot for quick queries and task creation
-- GPT assistant for context-aware help
-- Natural language task creation
-- Meeting management and calendar sync
+### Phase 3: AI Integration ✅ COMPLETE
+- ✅ Multi-model AI chat (OpenRouter)
+- ✅ Venture-specific AI agents
+- ✅ Context caching for faster responses
+- ✅ AI-powered macro estimation
+- 🚧 Telegram bot for quick capture (planned)
 
-### Phase 4: Integrations
-- Notion bidirectional sync
-- Google Calendar sync
-- WhatsApp/Telegram quick capture
-- Webhook events for automation tools
+### Phase 4: Trading Module ✅ COMPLETE
+- ✅ Trading strategy templates
+- ✅ Daily trading checklists
+- ✅ Session tracking (London, NY, Asian)
+- ✅ Trade logging with P&L
+- ✅ Trading session indicator with killzones
+- ✅ End-of-session review
 
-### Phase 5: Advanced Features
-- Venture-specific dashboards (Trading P&L, content calendars)
+### Phase 5: Life Management ✅ COMPLETE
+- ✅ Shopping list with priorities
+- ✅ Books/reading list
+- ✅ Custom categories (user-defined enums)
+- ✅ User preferences and settings
+
+### Phase 6: Integrations 🚧 IN PROGRESS
+- ✅ Google Drive sync
+- 🚧 Google Calendar sync
+- 🚧 Gmail integration
+- 🚧 Notion bidirectional sync
+- 🚧 WhatsApp/Telegram quick capture
+
+### Phase 7: Advanced Features (Future)
+- Analytics and insights dashboard
 - AI-powered task prioritization
 - Smart scheduling based on energy levels
-- Analytics and insights
+- Mobile app (React Native)
+- API for third-party integrations
 
 ---
 
