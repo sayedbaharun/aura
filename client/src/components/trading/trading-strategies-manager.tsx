@@ -55,6 +55,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { apiRequest } from "@/lib/queryClient";
+import { PRE_TRADE_MENTAL_CLEARING } from "./trading-constants";
 import type {
   TradingStrategy,
   TradingStrategyConfig,
@@ -321,7 +322,7 @@ export default function TradingStrategiesManager() {
         <div>
           <h2 className="text-lg font-semibold">Trading Strategies</h2>
           <p className="text-sm text-muted-foreground">
-            Manage your trading strategy templates and checklists
+            Define strategy-specific checklists. Pre-Trade Mental Clearing is applied universally.
           </p>
         </div>
         <div className="flex gap-2">
@@ -345,6 +346,20 @@ export default function TradingStrategiesManager() {
           </Button>
         </div>
       </div>
+
+      {/* Standard Structure Info */}
+      <Card className="bg-muted/50">
+        <CardContent className="py-4">
+          <h4 className="font-medium text-sm mb-2">Standard Session Structure</h4>
+          <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+            <li>Daily Snapshot (date, session, mental state, news)</li>
+            <li><span className="font-medium text-foreground">Pre-Trade Mental Clearing</span> — universal for all strategies</li>
+            <li><span className="font-medium text-foreground">Strategy-Specific Checklist</span> — defined below per strategy</li>
+            <li>Trade Execution Log</li>
+            <li>End of Session Review</li>
+          </ol>
+        </CardContent>
+      </Card>
 
       {/* Strategies List */}
       {strategies.length === 0 ? (
@@ -488,7 +503,7 @@ export default function TradingStrategiesManager() {
               {editingStrategy ? "Edit Strategy" : "Create New Strategy"}
             </DialogTitle>
             <DialogDescription>
-              Define your trading strategy template with sections and checklist items.
+              Define the strategy-specific checklist. Pre-Trade Mental Clearing is added automatically.
             </DialogDescription>
           </DialogHeader>
 
@@ -562,10 +577,15 @@ export default function TradingStrategiesManager() {
               </div>
             </div>
 
-            {/* Checklist Sections */}
+            {/* Strategy-Specific Checklist Sections */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base">Checklist Sections</Label>
+                <div>
+                  <Label className="text-base">Strategy-Specific Checklist</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    These sections appear after Pre-Trade Mental Clearing
+                  </p>
+                </div>
                 <Button type="button" variant="outline" size="sm" onClick={addSection}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Section
@@ -574,7 +594,7 @@ export default function TradingStrategiesManager() {
 
               {formData.config.sections.length === 0 ? (
                 <div className="border border-dashed rounded-lg p-6 text-center text-muted-foreground">
-                  <p>No sections yet. Add a section to create your checklist.</p>
+                  <p>No strategy-specific sections yet. Add a section for this strategy's unique checklist items.</p>
                 </div>
               ) : (
                 <Accordion type="multiple" className="space-y-2">

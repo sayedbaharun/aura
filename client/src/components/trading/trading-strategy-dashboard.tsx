@@ -52,6 +52,7 @@ import type {
 } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import StrategySessionSelector from "./strategy-session-selector";
+import { PRE_TRADE_MENTAL_CLEARING } from "./trading-constants";
 
 interface Trade {
   id: string;
@@ -108,14 +109,16 @@ export default function TradingStrategyDashboard() {
   useEffect(() => {
     if (selectedChecklist?.data) {
       setChecklistData(selectedChecklist.data);
-      // Expand all sections by default
+      // Expand all sections by default (including Pre-Trade Mental Clearing)
+      const expanded: Record<string, boolean> = {
+        [PRE_TRADE_MENTAL_CLEARING.id]: true,
+      };
       if (currentStrategy?.config?.sections) {
-        const expanded: Record<string, boolean> = {};
         currentStrategy.config.sections.forEach((section) => {
           expanded[section.id] = true;
         });
-        setExpandedSections(expanded);
       }
+      setExpandedSections(expanded);
     } else {
       setChecklistData(null);
     }
@@ -292,22 +295,35 @@ export default function TradingStrategyDashboard() {
     }));
   };
 
-  // Calculate checklist completion percentage
+  // Calculate checklist completion percentage (includes Pre-Trade Mental Clearing + strategy sections)
   const calculateCompletion = () => {
-    if (!currentStrategy?.config?.sections || !checklistData) return 0;
+    if (!checklistData) return 0;
     let total = 0;
     let completed = 0;
 
-    currentStrategy.config.sections.forEach((section) => {
-      section.items.forEach((item) => {
-        if (item.type === "checkbox") {
-          total++;
-          if (checklistData.values[item.id]?.checked) {
-            completed++;
-          }
+    // Count Pre-Trade Mental Clearing items (universal)
+    PRE_TRADE_MENTAL_CLEARING.items.forEach((item) => {
+      if (item.type === "checkbox") {
+        total++;
+        if (checklistData.values[item.id]?.checked) {
+          completed++;
         }
-      });
+      }
     });
+
+    // Count strategy-specific items
+    if (currentStrategy?.config?.sections) {
+      currentStrategy.config.sections.forEach((section) => {
+        section.items.forEach((item) => {
+          if (item.type === "checkbox") {
+            total++;
+            if (checklistData.values[item.id]?.checked) {
+              completed++;
+            }
+          }
+        });
+      });
+    }
 
     return total > 0 ? Math.round((completed / total) * 100) : 0;
   };
@@ -561,7 +577,49 @@ export default function TradingStrategyDashboard() {
         </CardContent>
       </Card>
 
-      {/* Strategy Checklist Sections */}
+      {/* Pre-Trade Mental Clearing (Universal - same for all strategies) */}
+      <Card>
+        <Collapsible
+          open={expandedSections[PRE_TRADE_MENTAL_CLEARING.id] ?? true}
+          onOpenChange={() => toggleSection(PRE_TRADE_MENTAL_CLEARING.id)}
+        >
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span>{PRE_TRADE_MENTAL_CLEARING.icon}</span>
+                  {PRE_TRADE_MENTAL_CLEARING.title}
+                  <Badge variant="outline" className="text-xs ml-2">Universal</Badge>
+                </CardTitle>
+                {expandedSections[PRE_TRADE_MENTAL_CLEARING.id] ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </div>
+              {PRE_TRADE_MENTAL_CLEARING.description && (
+                <CardDescription>{PRE_TRADE_MENTAL_CLEARING.description}</CardDescription>
+              )}
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-3">
+              {PRE_TRADE_MENTAL_CLEARING.items.map((item) => (
+                <ChecklistItemComponent
+                  key={item.id}
+                  item={item}
+                  value={checklistData.values[item.id]}
+                  onCheckChange={handleCheckboxChange}
+                  onInputChange={handleInputChange}
+                  onBlur={handleInputBlur}
+                />
+              ))}
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
+      {/* Strategy-Specific Checklist Sections */}
       {currentStrategy.config?.sections?.map((section) => {
         const { grouped, uncategorized } = groupItemsByCategory(section.items);
         const isExpanded = expandedSections[section.id] ?? true;
