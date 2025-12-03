@@ -20,6 +20,10 @@ import {
   TrendingUp,
   Bot,
   CheckSquare,
+  Sparkles,
+  Calendar,
+  Plug,
+  Layers,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
 import NavItem from "./nav-item";
@@ -77,7 +81,7 @@ import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
  * ];
  * ```
  */
-const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
+const navigationSections: Array<{ label: string; items: NavItemConfig[]; defaultExpanded?: boolean }> = [
   {
     label: "Daily",
     items: [
@@ -90,6 +94,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
         href: "/capture",
         icon: Zap,
         label: "Capture",
+      },
+      {
+        href: "/calendar",
+        icon: Calendar,
+        label: "Calendar",
       },
       {
         href: "/morning",
@@ -139,6 +148,21 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
     ],
   },
   {
+    label: "Life",
+    items: [
+      {
+        href: "/shopping",
+        icon: ShoppingCart,
+        label: "Shopping",
+      },
+      {
+        href: "/books",
+        icon: Library,
+        label: "Books",
+      },
+    ],
+  },
+  {
     label: "Wellness",
     items: [
       {
@@ -154,27 +178,30 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[] }> = [
     ],
   },
   {
-    label: "Life",
+    label: "Settings",
+    defaultExpanded: false,
     items: [
       {
-        href: "/shopping",
-        icon: ShoppingCart,
-        label: "Shopping",
+        href: "/settings",
+        icon: User,
+        label: "Profile",
       },
       {
-        href: "/books",
-        icon: Library,
-        label: "Books",
+        href: "/settings/ai",
+        icon: Sparkles,
+        label: "AI Settings",
+      },
+      {
+        href: "/settings/integrations",
+        icon: Plug,
+        label: "Integrations",
+      },
+      {
+        href: "/settings/categories",
+        icon: Layers,
+        label: "Categories",
       },
     ],
-  },
-];
-
-const bottomNavItems: NavItemConfig[] = [
-  {
-    href: "/settings",
-    icon: Settings,
-    label: "Settings",
   },
 ];
 
@@ -309,22 +336,9 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               items={section.items}
               isCollapsed={isCollapsed}
               onItemClick={onClose} // Close mobile menu on nav
+              defaultExpanded={section.defaultExpanded}
             />
           ))}
-        </div>
-
-        {/* Bottom section */}
-        <div className="border-t border-gray-200 px-3 py-4">
-          <nav className="space-y-1" role="navigation" aria-label="Settings and profile">
-            {bottomNavItems.map((item) => (
-              <NavItem
-                key={item.href}
-                {...item}
-                isCollapsed={isCollapsed}
-                onClick={onClose}
-              />
-            ))}
-          </nav>
         </div>
 
         {/* Desktop collapse toggle */}
