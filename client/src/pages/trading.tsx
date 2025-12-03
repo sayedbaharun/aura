@@ -5,6 +5,7 @@ import { TrendingUp, Settings, History, Target } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TradingJournalEntry from "@/components/command-center/trading-journal-entry";
 import TradingStrategyDashboard from "@/components/trading/trading-strategy-dashboard";
+import TradingStrategiesManager from "@/components/trading/trading-strategies-manager";
 import type { Day } from "@shared/schema";
 
 export default function TradingPage() {
@@ -34,10 +35,14 @@ export default function TradingPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
-              Strategy Dashboard
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="strategies" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Strategies
             </TabsTrigger>
             <TabsTrigger value="journal" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -51,6 +56,10 @@ export default function TradingPage() {
 
           <TabsContent value="dashboard" className="mt-6">
             <TradingStrategyDashboard />
+          </TabsContent>
+
+          <TabsContent value="strategies" className="mt-6">
+            <TradingStrategiesManager />
           </TabsContent>
 
           <TabsContent value="journal" className="mt-6">
