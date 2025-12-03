@@ -12,6 +12,8 @@ import DayReviewSummary from "@/components/command-center/day-review-summary";
 import TodayHeader from "@/components/command-center/today-header";
 import TasksForToday from "@/components/command-center/tasks-for-today";
 import HealthSnapshot from "@/components/command-center/health-snapshot";
+import MorningHealthLog from "@/components/command-center/morning-health-log";
+import EveningHealthLog from "@/components/command-center/evening-health-log";
 import NutritionSnapshot from "@/components/command-center/nutrition-snapshot";
 import ThisWeekPreview from "@/components/command-center/this-week-preview";
 import InlineMorningRitual from "@/components/command-center/inline-morning-ritual";
@@ -69,7 +71,7 @@ function MorningMode({ day }: { day: Day | null }) {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="ritual">Morning Ritual</TabsTrigger>
-          <TabsTrigger value="workout">Workout</TabsTrigger>
+          <TabsTrigger value="workout">Health</TabsTrigger>
           <TabsTrigger value="evening">Evening Review</TabsTrigger>
         </TabsList>
 
@@ -91,17 +93,9 @@ function MorningMode({ day }: { day: Day | null }) {
           <InlineMorningRitual day={day} />
         </TabsContent>
 
-        {/* Workout Tab */}
+        {/* Health Tab */}
         <TabsContent value="workout">
-          <Card>
-            <CardHeader>
-              <CardTitle>Workout Tracker</CardTitle>
-              <CardDescription>Log today's workout session</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <HealthSnapshot />
-            </CardContent>
-          </Card>
+          <MorningHealthLog />
         </TabsContent>
 
         {/* Evening Review Tab */}
@@ -154,7 +148,7 @@ function ExecutionMode({ day }: { day: Day | null }) {
               <TasksForToday />
             </div>
             <div className="hidden lg:block space-y-4">
-              <HealthSnapshot />
+              <MorningHealthLog />
               <NutritionSnapshot />
             </div>
           </div>
@@ -179,7 +173,10 @@ function ExecutionMode({ day }: { day: Day | null }) {
         {/* Health & Nutrition Tab */}
         <TabsContent value="health">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-            <HealthSnapshot />
+            <MorningHealthLog />
+            <EveningHealthLog />
+          </div>
+          <div className="mt-4 md:mt-6">
             <NutritionSnapshot />
           </div>
         </TabsContent>
@@ -208,23 +205,24 @@ function EveningMode({ day }: { day: Day | null }) {
           <DayReviewSummary day={day} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            <EveningHealthLog />
             <Card>
               <CardContent className="pt-6">
                 <h3 className="text-sm font-medium mb-4">Incomplete Tasks</h3>
                 <TasksForToday showOnlyIncomplete />
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Today's Highlights</CardTitle>
-                <CardDescription>What went well today?</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TodayHeader showReflection />
-              </CardContent>
-            </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Today's Highlights</CardTitle>
+              <CardDescription>What went well today?</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TodayHeader showReflection />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Trading Tab */}
