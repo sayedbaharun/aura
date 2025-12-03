@@ -52,11 +52,16 @@ interface Venture {
   status: string;
 }
 
+interface Top3Outcome {
+  text: string;
+  completed: boolean;
+}
+
 interface Day {
   id: string;
   date: string;
   title: string | null;
-  top3Outcomes: string | null;
+  top3Outcomes: Top3Outcome[] | string | null;
   oneThingToShip: string | null;
   reflectionAm: string | null;
   mood: string | null;
@@ -136,8 +141,13 @@ export default function MorningRitual() {
 
   const [rituals, setRituals] = useState<Record<string, { done: boolean; count?: number }>>({});
 
+  const [top3Outcomes, setTop3Outcomes] = useState<Top3Outcome[]>([
+    { text: "", completed: false },
+    { text: "", completed: false },
+    { text: "", completed: false },
+  ]);
+
   const [planning, setPlanning] = useState({
-    top3Outcomes: "",
     oneThingToShip: "",
     reflectionAm: "",
     primaryVentureFocus: "",
@@ -209,8 +219,12 @@ export default function MorningRitual() {
       setRituals(initial);
     }
     // Reset planning
+    setTop3Outcomes([
+      { text: "", completed: false },
+      { text: "", completed: false },
+      { text: "", completed: false },
+    ]);
     setPlanning({
-      top3Outcomes: "",
       oneThingToShip: "",
       reflectionAm: "",
       primaryVentureFocus: "",
@@ -255,19 +269,39 @@ export default function MorningRitual() {
         setRituals(loaded);
       }
 
-      // Use existing top3Outcomes if available, otherwise sync from yesterday's evening priorities
-      let top3 = dayData.top3Outcomes || "";
+      // Load top3Outcomes - handle both array and legacy string format
       const tomorrowPriorities = yesterdayData?.eveningRituals?.tomorrowPriorities;
-      if (!top3 && Array.isArray(tomorrowPriorities)) {
-        const priorities = tomorrowPriorities.filter(p => p.trim());
-        if (priorities.length > 0) {
-          top3 = priorities.map((p, i) => `${i + 1}. ${p}`).join("\n");
-        }
+
+      if (Array.isArray(dayData.top3Outcomes)) {
+        // Already in array format
+        setTop3Outcomes(dayData.top3Outcomes);
+      } else if (typeof dayData.top3Outcomes === "string" && dayData.top3Outcomes) {
+        // Legacy string format - convert to array
+        const lines = dayData.top3Outcomes.split("\n").filter(l => l.trim());
+        const outcomes = lines.map(line => ({
+          text: line.replace(/^\d+\.\s*/, ""), // Remove "1. " prefix
+          completed: false,
+        }));
+        while (outcomes.length < 3) outcomes.push({ text: "", completed: false });
+        setTop3Outcomes(outcomes.slice(0, 3));
+      } else if (Array.isArray(tomorrowPriorities)) {
+        // Sync from yesterday's evening priorities
+        const outcomes = tomorrowPriorities.map(p => ({
+          text: p || "",
+          completed: false,
+        }));
+        while (outcomes.length < 3) outcomes.push({ text: "", completed: false });
+        setTop3Outcomes(outcomes.slice(0, 3));
+      }
+
+      // One Thing to Ship: use existing value, or sync Priority #1 from yesterday
+      let oneThingToShip = dayData.oneThingToShip || "";
+      if (!oneThingToShip && Array.isArray(tomorrowPriorities) && tomorrowPriorities[0]?.trim()) {
+        oneThingToShip = tomorrowPriorities[0];
       }
 
       setPlanning({
-        top3Outcomes: top3,
-        oneThingToShip: dayData.oneThingToShip || "",
+        oneThingToShip,
         reflectionAm: dayData.reflectionAm || "",
         primaryVentureFocus: dayData.primaryVentureFocus || "",
       });
@@ -279,11 +313,24 @@ export default function MorningRitual() {
     const tomorrowPriorities = yesterdayData?.eveningRituals?.tomorrowPriorities;
     if (!dayData && Array.isArray(tomorrowPriorities)) {
       const priorities = tomorrowPriorities.filter(p => p.trim());
-      if (priorities.length > 0 && !planning.top3Outcomes) {
-        setPlanning(prev => ({
-          ...prev,
-          top3Outcomes: priorities.map((p, i) => `${i + 1}. ${p}`).join("\n"),
-        }));
+      if (priorities.length > 0) {
+        // Check if outcomes are empty
+        const hasOutcomes = top3Outcomes.some(o => o.text.trim());
+        if (!hasOutcomes) {
+          const outcomes = priorities.map(p => ({
+            text: p,
+            completed: false,
+          }));
+          while (outcomes.length < 3) outcomes.push({ text: "", completed: false });
+          setTop3Outcomes(outcomes.slice(0, 3));
+        }
+        // Sync Priority #1 to One Thing to Ship
+        if (!planning.oneThingToShip && priorities[0]) {
+          setPlanning(prev => ({
+            ...prev,
+            oneThingToShip: priorities[0],
+          }));
+        }
       }
     }
   }, [dayData, yesterdayData]);
@@ -309,11 +356,14 @@ export default function MorningRitual() {
 
       morningRituals.completedAt = isAllRitualsComplete() ? new Date().toISOString() : undefined;
 
+      // Filter outcomes to only include ones with text
+      const filteredOutcomes = top3Outcomes.filter(o => o.text.trim());
+
       const payload = {
         id: dayId,
         date: selectedDate,
         morningRituals,
-        top3Outcomes: planning.top3Outcomes || null,
+        top3Outcomes: filteredOutcomes.length > 0 ? top3Outcomes : null,
         oneThingToShip: planning.oneThingToShip || null,
         reflectionAm: planning.reflectionAm || null,
         primaryVentureFocus: planning.primaryVentureFocus || null,
@@ -364,6 +414,27 @@ export default function MorningRitual() {
 
   const completedCount = enabledHabits.filter(h => rituals[h.key]?.done).length;
   const progressPercent = enabledHabits.length > 0 ? (completedCount / enabledHabits.length) * 100 : 0;
+
+  // Outcome helpers
+  const updateOutcomeText = (index: number, text: string) => {
+    setTop3Outcomes(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], text };
+      return updated;
+    });
+  };
+
+  const toggleOutcomeCompleted = (index: number) => {
+    setTop3Outcomes(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], completed: !updated[index].completed };
+      return updated;
+    });
+  };
+
+  const completedOutcomes = top3Outcomes.filter(o => o.completed && o.text.trim()).length;
+  const totalOutcomes = top3Outcomes.filter(o => o.text.trim()).length;
+  const outcomeProgressPercent = totalOutcomes > 0 ? (completedOutcomes / totalOutcomes) * 100 : 0;
 
   const handleSave = () => {
     saveMutation.mutate();
@@ -599,16 +670,50 @@ export default function MorningRitual() {
                   )}
               </CardTitle>
               <CardDescription>
-                What would make today a win?
+                What would make today a win? Check off as you complete them.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="1. Complete client proposal&#10;2. Review team PRs&#10;3. Exercise for 30 minutes"
-                value={planning.top3Outcomes}
-                onChange={(e) => setPlanning({ ...planning, top3Outcomes: e.target.value })}
-                rows={4}
-              />
+            <CardContent className="space-y-3">
+              {top3Outcomes.map((outcome, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    outcome.completed && outcome.text.trim()
+                      ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                      : "bg-muted/30"
+                  }`}
+                >
+                  <Checkbox
+                    id={`outcome-${index}`}
+                    checked={outcome.completed}
+                    onCheckedChange={() => toggleOutcomeCompleted(index)}
+                    disabled={!outcome.text.trim()}
+                    className="h-5 w-5"
+                  />
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                    index === 0 ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
+                    index === 1 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <Input
+                    placeholder={index === 0 ? "Most important outcome..." : `Outcome ${index + 1}...`}
+                    value={outcome.text}
+                    onChange={(e) => updateOutcomeText(index, e.target.value)}
+                    className={`flex-1 ${outcome.completed ? "line-through text-muted-foreground" : ""}`}
+                  />
+                </div>
+              ))}
+              {totalOutcomes > 0 && (
+                <div className="pt-2">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium">{completedOutcomes}/{totalOutcomes} complete</span>
+                  </div>
+                  <Progress value={outcomeProgressPercent} className="h-2" />
+                </div>
+              )}
             </CardContent>
           </Card>
 

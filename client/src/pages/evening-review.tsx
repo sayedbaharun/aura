@@ -39,7 +39,7 @@ interface Task {
   id: string;
   title: string;
   status: string;
-  priority: "P1" | "P2" | "P3" | null;
+  priority: "P0" | "P1" | "P2" | "P3" | null;
   focusDate: string | null;
   completedAt: string | null;
 }
@@ -166,21 +166,21 @@ export default function EveningReview() {
     },
   });
 
-  // Fetch all outstanding tasks for priority picker
+  // Fetch all outstanding P0/P1 tasks for priority picker
   const { data: allTasks = [] } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", { status: "todo" }],
+    queryKey: ["/api/tasks", { status: "outstanding" }],
     queryFn: async () => {
       const res = await fetch(`/api/tasks?status=todo`, { credentials: "include" });
-      return await res.json();
+      const tasks = await res.json();
+      // Filter for P0/P1 tasks only
+      return Array.isArray(tasks)
+        ? tasks.filter((t: Task) => (t.priority === "P0" || t.priority === "P1") && t.status !== "done" && t.status !== "cancelled")
+        : [];
     },
   });
 
-  // Group tasks by priority for dropdowns
-  const tasksByPriority = {
-    P1: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P1") : [],
-    P2: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P2") : [],
-    P3: Array.isArray(allTasks) ? allTasks.filter(t => t.priority === "P3") : [],
-  };
+  // P0/P1 tasks available for all priority slots
+  const priorityTasks = Array.isArray(allTasks) ? allTasks : [];
 
   const todayHealth = Array.isArray(healthEntries) ? healthEntries[0] : null;
 
@@ -547,25 +547,27 @@ export default function EveningReview() {
             Tomorrow's Top 3 Priorities
           </CardTitle>
           <CardDescription>
-            Pick from your outstanding tasks or type a custom priority
+            Pick from your P0/P1 tasks. Priority #1 becomes tomorrow's "One Thing to Ship"
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {([
-            { index: 0, priority: "P1" as const, label: "Urgent", tasks: tasksByPriority.P1 },
-            { index: 1, priority: "P2" as const, label: "Important", tasks: tasksByPriority.P2 },
-            { index: 2, priority: "P3" as const, label: "Normal", tasks: tasksByPriority.P3 },
-          ]).map(({ index, priority, label, tasks: priorityTasks }) => (
+          {[0, 1, 2].map((index) => (
             <div key={index} className="space-y-2">
               <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                  index === 0 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                  index === 1 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" :
-                  "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                  index === 0 ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
+                  index === 1 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                  "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
                 }`}>
-                  {priority}
+                  #{index + 1}
                 </div>
                 <div className="flex-1 space-y-2">
+                  {index === 0 && (
+                    <div className="flex items-center gap-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                      <Rocket className="h-3 w-3" />
+                      This becomes tomorrow's "One Thing to Ship"
+                    </div>
+                  )}
                   {priorityTasks.length > 0 && (
                     <Select
                       value={
@@ -578,13 +580,25 @@ export default function EveningReview() {
                         }
                       }}
                     >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={`Pick a ${priority} task...`} />
+                      <SelectTrigger className={`w-full ${index === 0 ? "border-purple-300 dark:border-purple-700" : ""}`}>
+                        <SelectValue placeholder="Pick a P0/P1 task..." />
                       </SelectTrigger>
                       <SelectContent>
                         {priorityTasks.map((task) => (
                           <SelectItem key={task.id} value={task.id}>
-                            {task.title}
+                            <span className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  task.priority === "P0"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300 text-xs"
+                                    : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300 text-xs"
+                                }
+                              >
+                                {task.priority}
+                              </Badge>
+                              {task.title}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -595,21 +609,23 @@ export default function EveningReview() {
                     placeholder={
                       priorityTasks.length > 0
                         ? "Or type a custom priority..."
-                        : `No ${priority} tasks - type a custom priority...`
+                        : "No P0/P1 tasks - type a custom priority..."
                     }
                     value={review.tomorrowPriorities[index] || ""}
                     onChange={(e) => updatePriority(index, e.target.value)}
-                    className="w-full bg-transparent border-b border-muted-foreground/20 focus:border-primary outline-none py-2"
+                    className={`w-full bg-transparent border-b focus:border-primary outline-none py-2 ${
+                      index === 0 ? "border-purple-300 dark:border-purple-700" : "border-muted-foreground/20"
+                    }`}
                   />
                 </div>
               </div>
-              {priorityTasks.length === 0 && (
-                <p className="text-xs text-muted-foreground ml-11">
-                  No outstanding {priority} tasks. Create some or type a custom priority.
-                </p>
-              )}
             </div>
           ))}
+          {priorityTasks.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              No outstanding P0/P1 tasks. Type custom priorities above.
+            </p>
+          )}
         </CardContent>
       </Card>
 
