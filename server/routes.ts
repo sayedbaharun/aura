@@ -72,10 +72,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     };
 
-    // Check database connectivity
+    // Check database connectivity with lightweight ping instead of loading all ventures
     try {
-      await storage.getVentures();
-      health.checks.database = true;
+      health.checks.database = await storage.ping();
+      if (!health.checks.database) {
+        health.status = 'degraded';
+      }
     } catch (error) {
       logger.error({ error }, 'Health check: Database connectivity failed');
       health.status = 'degraded';
@@ -385,57 +387,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dashboard/ventures", async (req: Request, res: Response) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const allVentures = await storage.getVentures();
+      // Parallel fetch: ventures, projects, and task counts (all optimized queries)
+      const [allVentures, allProjects, taskCountsByVenture] = await Promise.all([
+        storage.getVentures(),
+        storage.getProjects(),
+        storage.getActiveTaskCountsByVenture(), // Single aggregated query instead of loading ALL tasks
+      ]);
+
       // Filter for active ventures
       const activeVentures = allVentures.filter(v =>
         ['ongoing', 'building', 'planning', 'active', 'development'].includes(v.status)
       );
 
-      // Get projects and tasks for counts
-      const allProjects = await storage.getProjects();
-      const allTasks = await storage.getTasks();
-      const activeTasks = allTasks.filter(t => !['done', 'cancelled'].includes(t.status));
-
       const mappedVentures = activeVentures.map(v => {
-        // Count projects and active tasks for this venture
+        // Get project count (still need to filter projects, but projects are fewer than tasks)
         const projectCount = allProjects.filter(p => p.ventureId === v.id).length;
-        const ventureTasks = activeTasks.filter(t => t.ventureId === v.id);
-        const taskCount = ventureTasks.length;
 
-        // Calculate urgency
-        const overdueP0 = ventureTasks.filter(t =>
-          t.priority === 'P0' && t.dueDate && t.dueDate < today
-        ).length;
-        const dueTodayP0P1 = ventureTasks.filter(t =>
-          (t.priority === 'P0' || t.priority === 'P1') && t.dueDate === today
-        ).length;
+        // Get task counts from pre-aggregated map
+        const taskCounts = taskCountsByVenture.get(v.id) || { total: 0, overdueP0: 0, dueTodayP0P1: 0 };
 
         // Determine urgency level and color
         let urgency: 'critical' | 'warning' | 'clear' = 'clear';
         let urgencyColor = "bg-green-500";
         let urgencyLabel = "";
 
-        if (overdueP0 > 0) {
+        if (taskCounts.overdueP0 > 0) {
           urgency = 'critical';
           urgencyColor = "bg-red-500";
-          urgencyLabel = `${overdueP0} overdue`;
-        } else if (dueTodayP0P1 > 0) {
+          urgencyLabel = `${taskCounts.overdueP0} overdue`;
+        } else if (taskCounts.dueTodayP0P1 > 0) {
           urgency = 'warning';
           urgencyColor = "bg-yellow-500";
-          urgencyLabel = `${dueTodayP0P1} due today`;
+          urgencyLabel = `${taskCounts.dueTodayP0P1} due today`;
         }
 
         return {
           id: v.id,
           name: v.name,
           projectCount,
-          taskCount,
+          taskCount: taskCounts.total,
           urgency,
           urgencyColor,
           urgencyLabel,
-          overdueP0Count: overdueP0,
-          dueTodayCount: dueTodayP0P1
+          overdueP0Count: taskCounts.overdueP0,
+          dueTodayCount: taskCounts.dueTodayP0P1
         };
       });
 
@@ -527,35 +522,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/urgent", async (req: Request, res: Response) => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const allTasks = await storage.getTasks();
 
-      // Filter active tasks only
-      const activeTasks = allTasks.filter(t => !['done', 'cancelled'].includes(t.status));
+      // Single optimized query instead of loading ALL tasks
+      const urgentTasksRaw = await storage.getUrgentTasks(today, 10);
 
-      // Find overdue P0 tasks (dueDate < today)
-      const overdueP0 = activeTasks.filter(t =>
-        t.priority === 'P0' &&
-        t.dueDate &&
-        t.dueDate < today
+      // Separate overdue from due-today for counts
+      const overdueP0 = urgentTasksRaw.filter(t =>
+        t.priority === 'P0' && t.dueDate && t.dueDate < today
+      );
+      const dueTodayHighPriority = urgentTasksRaw.filter(t =>
+        (t.priority === 'P0' || t.priority === 'P1') && t.dueDate === today
       );
 
-      // Find P0/P1 tasks due today
-      const dueTodayHighPriority = activeTasks.filter(t =>
-        (t.priority === 'P0' || t.priority === 'P1') &&
-        t.dueDate === today
-      );
-
-      // Top 3 most urgent tasks (overdue P0 first, then due today P0/P1)
-      const urgentTasks = [
-        ...overdueP0.map(t => ({ ...t, urgencyReason: 'overdue' })),
-        ...dueTodayHighPriority.map(t => ({ ...t, urgencyReason: 'due_today' }))
-      ].slice(0, 5).map(t => ({
+      // Map to response format
+      const urgentTasks = urgentTasksRaw.slice(0, 5).map(t => ({
         id: t.id,
         title: t.title,
         priority: t.priority,
         dueDate: t.dueDate,
         ventureId: t.ventureId,
-        urgencyReason: t.urgencyReason
+        urgencyReason: t.dueDate && t.dueDate < today ? 'overdue' : 'due_today'
       }));
 
       res.json({
@@ -578,36 +564,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/top3", async (req: Request, res: Response) => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const allTasks = await storage.getTasks();
 
-      // Filter active tasks only
-      const activeTasks = allTasks.filter(t => !['done', 'cancelled'].includes(t.status));
+      // Use optimized query that sorts by priority + urgency in DB, returns only 3 rows
+      const topTasks = await storage.getTopPriorityTasks(today, 3);
 
-      // Score and sort tasks by importance
-      const scoredTasks = activeTasks.map(t => {
-        let score = 0;
-
-        // Priority scoring
-        if (t.priority === 'P0') score += 100;
-        else if (t.priority === 'P1') score += 75;
-        else if (t.priority === 'P2') score += 50;
-        else score += 25;
-
-        // Overdue bonus
-        if (t.dueDate && t.dueDate < today) score += 50;
-
-        // Due today bonus
-        if (t.dueDate === today) score += 30;
-
-        // Focus date is today bonus
-        if (t.focusDate === today) score += 20;
-
-        return { ...t, importanceScore: score };
-      });
-
-      // Sort by score descending, take top 3
-      scoredTasks.sort((a, b) => b.importanceScore - a.importanceScore);
-      const top3 = scoredTasks.slice(0, 3).map(t => ({
+      const top3 = topTasks.map(t => ({
         id: t.id,
         title: t.title,
         priority: t.priority,

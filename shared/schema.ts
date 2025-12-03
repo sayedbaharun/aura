@@ -385,6 +385,8 @@ export const ventures = pgTable(
   (table) => [
     index("idx_ventures_status").on(table.status),
     index("idx_ventures_domain").on(table.domain),
+    // Performance: ventures are sorted by createdAt
+    index("idx_ventures_created_at").on(table.createdAt),
   ]
 );
 
@@ -502,6 +504,10 @@ export const tasks = pgTable(
     index("idx_tasks_due_date").on(table.dueDate),
     index("idx_tasks_focus_date").on(table.focusDate),
     index("idx_tasks_type").on(table.type),
+    // Performance: composite indexes for common query patterns
+    index("idx_tasks_status_priority").on(table.status, table.priority),
+    index("idx_tasks_venture_status").on(table.ventureId, table.status),
+    index("idx_tasks_focus_status").on(table.focusDate, table.status),
   ]
 );
 
@@ -731,6 +737,9 @@ export const docs = pgTable(
     index("idx_docs_type").on(table.type),
     index("idx_docs_status").on(table.status),
     index("idx_docs_domain").on(table.domain),
+    // Performance: docs are frequently sorted by these timestamps
+    index("idx_docs_created_at").on(table.createdAt),
+    index("idx_docs_updated_at").on(table.updatedAt),
   ]
 );
 
@@ -752,6 +761,8 @@ export const attachments = pgTable(
   },
   (table) => [
     index("idx_attachments_doc_id").on(table.docId),
+    // Performance: attachments are sorted by createdAt
+    index("idx_attachments_created_at").on(table.createdAt),
   ]
 );
 
