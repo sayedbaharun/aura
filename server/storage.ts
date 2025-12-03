@@ -448,6 +448,7 @@ export class DBStorage implements IStorage {
   async getTasks(filters?: {
     ventureId?: string;
     projectId?: string;
+    phaseId?: string;
     status?: string;
     focusDate?: string;
     focusDateGte?: string;
@@ -461,6 +462,9 @@ export class DBStorage implements IStorage {
     }
     if (filters?.projectId) {
       conditions.push(eq(tasks.projectId, filters.projectId));
+    }
+    if (filters?.phaseId) {
+      conditions.push(eq(tasks.phaseId, filters.phaseId));
     }
     if (filters?.status) {
       // Handle comma-separated status values (e.g., "next,in_progress")

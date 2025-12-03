@@ -1001,6 +1001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filters = {
         ventureId: req.query.venture_id as string,
         projectId: req.query.project_id as string,
+        phaseId: req.query.phase_id as string,
         status: req.query.status as string,
         focusDate: req.query.focus_date as string,
         focusDateGte: req.query.focus_date_gte as string,
