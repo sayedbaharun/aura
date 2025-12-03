@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, subDays, addDays, parseISO, isToday } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -130,7 +130,9 @@ export default function MorningRitual() {
     queryKey: ["/api/settings/morning-ritual"],
   });
 
-  const enabledHabits = Array.isArray(habitConfig?.habits) ? habitConfig.habits.filter(h => h.enabled) : [];
+  const enabledHabits = useMemo(() => {
+    return Array.isArray(habitConfig?.habits) ? habitConfig.habits.filter(h => h.enabled) : [];
+  }, [habitConfig?.habits]);
 
   const [rituals, setRituals] = useState<Record<string, { done: boolean; count?: number }>>({});
 
