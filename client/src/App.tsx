@@ -19,6 +19,10 @@ import DocDetail from "@/pages/doc-detail";
 import DeepWork from "@/pages/deep-work";
 import NotificationsPage from "@/pages/notifications";
 import SettingsPage from "@/pages/settings";
+import SettingsAIPage from "@/pages/settings-ai";
+import SettingsIntegrationsPage from "@/pages/settings-integrations";
+import SettingsCategoriesPage from "@/pages/settings-categories";
+import CalendarPage from "@/pages/calendar";
 import MorningRitual from "@/pages/morning-ritual";
 import EveningReview from "@/pages/evening-review";
 import Shopping from "@/pages/shopping";
@@ -57,6 +61,10 @@ function Router() {
             <Route path="/deep-work" component={DeepWork} />
             <Route path="/notifications" component={NotificationsPage} />
             <Route path="/settings" component={SettingsPage} />
+            <Route path="/settings/ai" component={SettingsAIPage} />
+            <Route path="/settings/integrations" component={SettingsIntegrationsPage} />
+            <Route path="/settings/categories" component={SettingsCategoriesPage} />
+            <Route path="/calendar" component={CalendarPage} />
             <Route path="/morning" component={MorningRitual} />
             <Route path="/morning/:date" component={MorningRitual} />
             <Route path="/evening" component={EveningReview} />

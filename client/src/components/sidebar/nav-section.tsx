@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, ChevronDown, ChevronRight } from "lucide-react";
 import NavItem from "./nav-item";
 import { BadgeVariant } from "./nav-badge";
 
@@ -19,12 +20,13 @@ export interface NavSectionProps {
   items: NavItemConfig[];
   isCollapsed?: boolean;
   onItemClick?: () => void;
+  defaultExpanded?: boolean;
 }
 
 /**
  * NavSection Component
  *
- * A grouped section of navigation items with a label.
+ * A grouped section of navigation items with a collapsible label.
  *
  * @example
  * ```tsx
@@ -35,14 +37,16 @@ export interface NavSectionProps {
  *     { href: "/tasks", icon: CheckSquare, label: "Tasks", badge: { content: 5, variant: "alert" } }
  *   ]}
  *   isCollapsed={false}
+ *   defaultExpanded={true}
  * />
  * ```
  *
  * Props:
  * - label: Section heading text (displayed in uppercase, small, muted)
  * - items: Array of navigation item configurations
- * - isCollapsed: Whether the sidebar is collapsed
+ * - isCollapsed: Whether the sidebar is collapsed (icon-only mode)
  * - onItemClick: Optional callback when any item is clicked (useful for mobile menu)
+ * - defaultExpanded: Whether section is expanded by default (defaults to true)
  *
  * Customization:
  * To modify the navigation structure, simply update the items array:
@@ -56,27 +60,75 @@ export default function NavSection({
   items,
   isCollapsed = false,
   onItemClick,
+  defaultExpanded = true,
 }: NavSectionProps) {
   const [location] = useLocation();
+  const storageKey = `nav-section-${label.toLowerCase().replace(/\s+/g, '-')}-expanded`;
+
+  // Initialize from localStorage or default
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(storageKey);
+      if (stored !== null) {
+        return stored === 'true';
+      }
+    }
+    return defaultExpanded;
+  });
+
+  // Persist to localStorage
+  useEffect(() => {
+    localStorage.setItem(storageKey, String(isExpanded));
+  }, [isExpanded, storageKey]);
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  // Check if any item in this section is active
+  const hasActiveItem = items.some(
+    (item) => location === item.href || location.startsWith(item.href + "/")
+  );
 
   return (
-    <div className="mb-6">
+    <div className="mb-4">
       {!isCollapsed && (
-        <h3 className="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-          {label}
-        </h3>
+        <button
+          onClick={toggleExpanded}
+          className={cn(
+            "w-full flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-colors",
+            "hover:bg-gray-100",
+            hasActiveItem ? "text-gray-700" : "text-gray-500"
+          )}
+          aria-expanded={isExpanded}
+          aria-controls={`nav-section-${label}`}
+        >
+          <span>{label}</span>
+          {isExpanded ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+        </button>
       )}
-      <nav className="space-y-1" role="navigation" aria-label={label}>
-        {items.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            isActive={location === item.href || location.startsWith(item.href + "/")}
-            isCollapsed={isCollapsed}
-            onClick={onItemClick}
-          />
-        ))}
-      </nav>
+      {(isExpanded || isCollapsed) && (
+        <nav
+          id={`nav-section-${label}`}
+          className={cn("space-y-1", !isCollapsed && "mt-1")}
+          role="navigation"
+          aria-label={label}
+        >
+          {items.map((item) => (
+            <NavItem
+              key={item.href}
+              {...item}
+              isActive={location === item.href || location.startsWith(item.href + "/")}
+              isCollapsed={isCollapsed}
+              onClick={onItemClick}
+            />
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
