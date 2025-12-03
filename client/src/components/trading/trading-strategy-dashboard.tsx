@@ -51,6 +51,7 @@ import type {
   TradingChecklistItem,
 } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import StrategySessionSelector from "./strategy-session-selector";
 
 interface Trade {
   id: string;
@@ -75,13 +76,14 @@ export default function TradingStrategyDashboard() {
     queryKey: ["/api/trading-strategies"],
   });
 
-  // Fetch today's checklist
-  const { data: todayChecklist, isLoading: checklistLoading, error: checklistError } = useQuery<DailyTradingChecklist>({
+  // Fetch all of today's checklists (supports multiple strategies per day)
+  const { data: todayChecklists = [], isLoading: checklistLoading, error: checklistError } = useQuery<DailyTradingChecklist[]>({
     queryKey: ["/api/trading-checklists/today"],
     retry: false,
   });
 
-  // Local state for editing
+  // Local state for selected checklist and editing
+  const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
   const [checklistData, setChecklistData] = useState<DailyTradingChecklistData | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [newTrade, setNewTrade] = useState<Partial<Trade>>({
@@ -89,13 +91,23 @@ export default function TradingStrategyDashboard() {
     result: "pending",
   });
 
-  // Get the current strategy
-  const currentStrategy = strategies.find((s) => s.id === todayChecklist?.strategyId);
+  // Get the currently selected checklist
+  const selectedChecklist = todayChecklists.find((c) => c.id === selectedChecklistId);
 
-  // Initialize local state when checklist loads
+  // Get the current strategy
+  const currentStrategy = strategies.find((s) => s.id === selectedChecklist?.strategyId);
+
+  // Auto-select the first checklist when checklists load
   useEffect(() => {
-    if (todayChecklist?.data) {
-      setChecklistData(todayChecklist.data);
+    if (todayChecklists.length > 0 && !selectedChecklistId) {
+      setSelectedChecklistId(todayChecklists[0].id);
+    }
+  }, [todayChecklists, selectedChecklistId]);
+
+  // Initialize local state when selected checklist changes
+  useEffect(() => {
+    if (selectedChecklist?.data) {
+      setChecklistData(selectedChecklist.data);
       // Expand all sections by default
       if (currentStrategy?.config?.sections) {
         const expanded: Record<string, boolean> = {};
@@ -104,18 +116,48 @@ export default function TradingStrategyDashboard() {
         });
         setExpandedSections(expanded);
       }
+    } else {
+      setChecklistData(null);
     }
-  }, [todayChecklist, currentStrategy]);
+  }, [selectedChecklist, currentStrategy]);
 
   // Mutation to update checklist
   const updateChecklistMutation = useMutation({
     mutationFn: async (data: Partial<DailyTradingChecklistData>) => {
-      if (!todayChecklist) return;
+      if (!selectedChecklist) return;
       const updatedData = { ...checklistData, ...data };
-      return apiRequest("PATCH", `/api/trading-checklists/${todayChecklist.id}`, { data: updatedData });
+      return apiRequest("PATCH", `/api/trading-checklists/${selectedChecklist.id}`, { data: updatedData });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trading-checklists/today"] });
+    },
+  });
+
+  // Mutation to create a new checklist session
+  const createChecklistMutation = useMutation({
+    mutationFn: async ({ strategyId, instrument }: { strategyId: string; instrument?: string }) => {
+      const response = await apiRequest("POST", "/api/trading-checklists", {
+        date: today,
+        strategyId,
+        instrument,
+      });
+      return response.json();
+    },
+    onSuccess: (newChecklist: DailyTradingChecklist) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trading-checklists/today"] });
+      setSelectedChecklistId(newChecklist.id);
+    },
+  });
+
+  // Mutation to delete a checklist session
+  const deleteChecklistMutation = useMutation({
+    mutationFn: async (checklistId: string) => {
+      return apiRequest("DELETE", `/api/trading-checklists/${checklistId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trading-checklists/today"] });
+      // Select the first remaining checklist
+      setSelectedChecklistId(null);
     },
   });
 
@@ -341,16 +383,27 @@ export default function TradingStrategyDashboard() {
     );
   }
 
-  // No checklist for today (no default strategy set)
-  if (!todayChecklist && checklistError) {
+  // No checklists for today - show option to create one
+  if (todayChecklists.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <AlertCircle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Default Strategy</h3>
+          <Target className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Trading Sessions Today</h3>
           <p className="text-muted-foreground mb-4">
-            Set a default trading strategy to auto-create daily checklists.
+            Start a new trading session by selecting a strategy.
           </p>
+          <StrategySessionSelector
+            strategies={strategies}
+            todayChecklists={todayChecklists}
+            selectedChecklistId={null}
+            onSelectChecklist={() => {}}
+            onCreateSession={(strategyId, instrument) => {
+              createChecklistMutation.mutate({ strategyId, instrument });
+            }}
+            onDeleteSession={() => {}}
+            isCreating={createChecklistMutation.isPending}
+          />
         </CardContent>
       </Card>
     );
@@ -364,7 +417,7 @@ export default function TradingStrategyDashboard() {
 
   const completionPercentage = calculateCompletion();
   const isSaving = updateChecklistMutation.isPending;
-  const lastSaved = todayChecklist?.updatedAt ? new Date(todayChecklist.updatedAt) : null;
+  const lastSaved = selectedChecklist?.updatedAt ? new Date(selectedChecklist.updatedAt) : null;
 
   // Manual save function
   const handleManualSave = () => {
@@ -381,51 +434,76 @@ export default function TradingStrategyDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Strategy Info */}
+      {/* Header with Strategy Selector */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4">
+            {/* Strategy Session Selector Row */}
+            <div className="flex items-center justify-between">
+              <StrategySessionSelector
+                strategies={strategies}
+                todayChecklists={todayChecklists}
+                selectedChecklistId={selectedChecklistId}
+                onSelectChecklist={(checklist) => setSelectedChecklistId(checklist.id)}
+                onCreateSession={(strategyId, instrument) => {
+                  createChecklistMutation.mutate({ strategyId, instrument });
+                }}
+                onDeleteSession={(checklistId) => {
+                  deleteChecklistMutation.mutate(checklistId);
+                }}
+                isCreating={createChecklistMutation.isPending}
+              />
+              <div className="flex items-center gap-3">
+                {/* Save Status */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : lastSaved ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-500" />
+                      <span>Saved</span>
+                    </>
+                  ) : null}
+                </div>
+                <Badge variant={completionPercentage === 100 ? "default" : "secondary"}>
+                  {completionPercentage}% Complete
+                </Badge>
+                <Button
+                  size="sm"
+                  onClick={handleManualSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-1" />
+                      Save
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Strategy Info Row */}
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-gradient-to-r from-amber-500 to-yellow-600 flex items-center justify-center">
                 <Target className="h-5 w-5 text-white" />
               </div>
               <div>
-                <CardTitle className="text-lg">{currentStrategy.name}</CardTitle>
+                <CardTitle className="text-lg">
+                  {currentStrategy.name}
+                  {checklistData.instrument && (
+                    <span className="text-muted-foreground font-normal ml-2">
+                      ({checklistData.instrument})
+                    </span>
+                  )}
+                </CardTitle>
                 <CardDescription>{todayFormatted}</CardDescription>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Save Status */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : lastSaved ? (
-                  <>
-                    <Check className="h-4 w-4 text-green-500" />
-                    <span>Saved</span>
-                  </>
-                ) : null}
-              </div>
-              <Badge variant={completionPercentage === 100 ? "default" : "secondary"}>
-                {completionPercentage}% Complete
-              </Badge>
-              <Button
-                size="sm"
-                onClick={handleManualSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-1" />
-                    Save
-                  </>
-                )}
-              </Button>
             </div>
           </div>
         </CardHeader>
