@@ -132,6 +132,7 @@
     "drizzle-kit": "^0.31.7",
     "esbuild": "^0.25.0",
     "happy-dom": "^20.0.7",
+    "open": "^11.0.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
