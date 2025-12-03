@@ -290,7 +290,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-screen bg-white border-r border-gray-200 transition-all duration-200",
+          "fixed left-0 top-0 z-50 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-200",
           "flex flex-col",
           // Desktop: always visible, collapsible width
           "hidden md:flex",
@@ -305,7 +305,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         {/* Header */}
         <div
           className={cn(
-            "flex items-center justify-between h-16 px-4 border-b border-gray-200",
+            "flex items-center justify-between h-16 px-4 border-b border-sidebar-border",
             isCollapsed && "md:justify-center md:px-2"
           )}
         >
@@ -342,7 +342,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </div>
 
         {/* Desktop collapse toggle */}
-        <div className="hidden md:block border-t border-gray-200 p-2">
+        <div className="hidden md:block border-t border-sidebar-border p-2">
           <Button
             variant="ghost"
             size="sm"
@@ -356,7 +356,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             ) : (
               <div className="flex items-center gap-2 w-full">
                 <ChevronLeft className="h-4 w-4" />
-                <span className="text-xs text-gray-600">Collapse</span>
+                <span className="text-xs text-muted-foreground">Collapse</span>
               </div>
             )}
           </Button>

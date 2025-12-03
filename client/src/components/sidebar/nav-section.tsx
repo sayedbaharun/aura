@@ -97,8 +97,8 @@ export default function NavSection({
           onClick={toggleExpanded}
           className={cn(
             "w-full flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-colors",
-            "hover:bg-gray-100",
-            hasActiveItem ? "text-gray-700" : "text-gray-500"
+            "hover:bg-sidebar-accent",
+            hasActiveItem ? "text-sidebar-foreground" : "text-muted-foreground"
           )}
           aria-expanded={isExpanded}
           aria-controls={`nav-section-${label}`}

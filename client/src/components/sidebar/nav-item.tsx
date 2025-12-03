@@ -63,12 +63,12 @@ export default function NavItem({
         onClick={onClick}
         className={cn(
           "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
-          "hover:bg-gray-100 active:scale-95",
+          "hover:bg-sidebar-accent active:scale-95",
           isActive && [
-            "bg-blue-50 text-blue-600 font-semibold",
-            "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-blue-600 before:rounded-r",
+            "bg-primary/10 text-primary font-semibold",
+            "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r",
           ],
-          !isActive && "text-gray-700 hover:text-gray-900",
+          !isActive && "text-sidebar-foreground hover:text-sidebar-foreground",
           isCollapsed && "justify-center px-2"
         )}
         aria-label={label}
@@ -77,7 +77,7 @@ export default function NavItem({
         <Icon
           className={cn(
             "h-5 w-5 flex-shrink-0 transition-colors",
-            isActive ? "text-blue-600" : "text-gray-500 group-hover:text-gray-700"
+            isActive ? "text-primary" : "text-muted-foreground group-hover:text-sidebar-foreground"
           )}
         />
         {!isCollapsed && (

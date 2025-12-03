@@ -30,7 +30,7 @@ export default function Layout({ children }: LayoutProps) {
   const [isCollapsed] = useSidebarCollapsed();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Sidebar - handles its own desktop/mobile visibility */}
       <Sidebar
         isOpen={mobileMenuOpen}
