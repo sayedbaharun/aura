@@ -24,6 +24,7 @@ import {
   ListTodo,
   Rocket,
   Save,
+  Target,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -34,6 +35,11 @@ interface Task {
   title: string;
   status: string;
   priority: "P0" | "P1" | "P2" | "P3" | null;
+}
+
+interface Top3Outcome {
+  text: string;
+  completed: boolean;
 }
 
 interface HealthEntry {
@@ -64,6 +70,8 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
       bedBy2am: false,
     },
   });
+
+  const [top3Outcomes, setTop3Outcomes] = useState<Top3Outcome[]>([]);
 
   // Fetch today's tasks
   const { data: tasks = [] } = useQuery<Task[]>({
@@ -125,6 +133,12 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
           bedBy2am: eveningRituals?.windDown?.bedBy2am ?? false,
         },
       });
+
+      // Load top3Outcomes
+      const outcomes = day.top3Outcomes as Top3Outcome[] | null;
+      if (Array.isArray(outcomes)) {
+        setTop3Outcomes(outcomes);
+      }
     }
   }, [day]);
 
@@ -162,6 +176,7 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
         date: today,
         reflectionPm: review.reflectionPm || null,
         eveningRituals,
+        top3Outcomes: top3Outcomes.length > 0 ? top3Outcomes : null,
       };
 
       try {
@@ -199,6 +214,15 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
     const newPriorities = [...review.tomorrowPriorities];
     newPriorities[index] = value;
     setReview({ ...review, tomorrowPriorities: newPriorities });
+  };
+
+  const toggleOutcomeCompleted = (index: number) => {
+    const newOutcomes = [...top3Outcomes];
+    newOutcomes[index] = {
+      ...newOutcomes[index],
+      completed: !newOutcomes[index].completed,
+    };
+    setTop3Outcomes(newOutcomes);
   };
 
   const windDownCount = Object.values(review.windDown).filter(v => v === true).length;
@@ -274,6 +298,43 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
                 <span className="font-medium text-xs">One Thing to Ship</span>
               </div>
               <p className="text-sm text-muted-foreground">{day.oneThingToShip}</p>
+            </div>
+          )}
+
+          {/* Top 3 Outcomes */}
+          {top3Outcomes.length > 0 && (
+            <div className="mt-3 p-3 border rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-3 w-3 text-blue-500" />
+                <span className="font-medium text-xs">Top 3 Outcomes</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {top3Outcomes.filter(o => o.completed).length}/{top3Outcomes.length}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {top3Outcomes.map((outcome, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`inline-outcome-${index}`}
+                      checked={outcome.completed}
+                      onCheckedChange={() => toggleOutcomeCompleted(index)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <Label
+                      htmlFor={`inline-outcome-${index}`}
+                      className={`text-xs cursor-pointer flex-1 ${
+                        outcome.completed ? "line-through text-muted-foreground" : ""
+                      }`}
+                    >
+                      {outcome.text}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <Progress
+                value={(top3Outcomes.filter(o => o.completed).length / top3Outcomes.length) * 100}
+                className="h-1.5 mt-2"
+              />
             </div>
           )}
         </CardContent>

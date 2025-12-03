@@ -11,11 +11,16 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TaskPicker from "./task-picker";
 
+interface Top3Outcome {
+  text: string;
+  completed: boolean;
+}
+
 interface Day {
   id: string;
   date: string;
   title: string | null;
-  top3Outcomes: string | null;
+  top3Outcomes: Top3Outcome[] | null;
   oneThingToShip: string | null;
   reflectionAm: string | null;
   reflectionPm: string | null;
@@ -84,7 +89,8 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
   };
 
   const handleSaveTop3 = () => {
-    updateDayMutation.mutate({ top3Outcomes: top3Value });
+    const outcomes = parseTop3FromEditing(top3Value);
+    updateDayMutation.mutate({ top3Outcomes: outcomes });
     setIsEditingTop3(false);
   };
 
@@ -109,21 +115,41 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
     setIsEditingGratitude(false);
   };
 
-  // Parse top3Outcomes from newline-separated string to array
-  const parseTop3 = (value: string | null): string[] => {
-    if (!value) return [];
-    return value.split("\n").filter(item => item.trim());
+  // Convert Top3Outcome[] to text for textarea editing
+  const formatTop3ForEditing = (outcomes: Top3Outcome[] | null): string => {
+    if (!outcomes || outcomes.length === 0) return "";
+    return outcomes.map((item, i) => `${i + 1}. ${item.text}`).join("\n");
   };
 
-  // Convert array back to newline-separated string
-  const formatTop3 = (items: string[]): string => {
-    return items.map((item, i) => `${i + 1}. ${item}`).join("\n");
+  // Parse textarea text back to Top3Outcome[] (preserves completion status where possible)
+  const parseTop3FromEditing = (value: string): Top3Outcome[] => {
+    if (!value) return [];
+    const lines = value.split("\n").filter(line => line.trim());
+    const existingOutcomes = day?.top3Outcomes || [];
+
+    return lines.map((line, i) => {
+      const text = line.replace(/^\d+\.\s*/, "").trim();
+      // Try to match existing outcome to preserve completion status
+      const existing = existingOutcomes.find(o => o.text === text);
+      return {
+        text,
+        completed: existing?.completed ?? false,
+      };
+    });
   };
 
   // Handle task picker selection for Top 3 (Today's Focus)
   const handleTop3TaskSelect = (tasks: string[]) => {
-    const formatted = formatTop3(tasks);
-    updateDayMutation.mutate({ top3Outcomes: formatted });
+    const existingOutcomes = day?.top3Outcomes || [];
+    const outcomes: Top3Outcome[] = tasks.map(taskText => {
+      // Preserve completion status if the task was already in the list
+      const existing = existingOutcomes.find(o => o.text === taskText);
+      return {
+        text: taskText,
+        completed: existing?.completed ?? false,
+      };
+    });
+    updateDayMutation.mutate({ top3Outcomes: outcomes });
   };
 
   // Handle task picker selection for One Thing to Ship
@@ -135,10 +161,7 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
   // Get current selections for task pickers
   const getCurrentTop3Tasks = (): string[] => {
     if (!day?.top3Outcomes) return [];
-    // Remove numbering prefix if present (e.g., "1. Task name" -> "Task name")
-    return day.top3Outcomes.split("\n")
-      .map(line => line.replace(/^\d+\.\s*/, "").trim())
-      .filter(line => line);
+    return day.top3Outcomes.map(o => o.text);
   };
 
   const getCurrentOneThingTask = (): string[] => {
@@ -367,7 +390,7 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setTop3Value(day.top3Outcomes || "");
+                    setTop3Value(formatTop3ForEditing(day.top3Outcomes));
                     setIsEditingTop3(true);
                   }}
                   title="Manual entry"
@@ -397,13 +420,15 @@ export default function TodayHeader({ showReflection = false }: TodayHeaderProps
             />
           ) : (
             <div className="space-y-2">
-              {currentTop3.length > 0 ? (
-                currentTop3.map((task, i) => (
+              {day.top3Outcomes && day.top3Outcomes.length > 0 ? (
+                day.top3Outcomes.map((outcome, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <Badge variant="outline" className="text-xs">
                       {i + 1}
                     </Badge>
-                    <span className="text-sm">{task}</span>
+                    <span className={`text-sm flex-1 ${outcome.completed ? "line-through text-muted-foreground" : ""}`}>
+                      {outcome.text}
+                    </span>
                   </div>
                 ))
               ) : (
