@@ -1217,6 +1217,7 @@ export interface DailyTradingChecklistData {
   session?: 'london' | 'new_york' | 'asian' | 'other';
   mentalState?: number; // 1-10
   highImpactNews?: string;
+  primarySetup?: string; // "Primary Setup I'm Hunting" - forces specificity and prevents chasing
   values: Record<string, TradingChecklistValue>; // Map of item id to value
   trades: {
     id: string;
@@ -1232,6 +1233,7 @@ export interface DailyTradingChecklistData {
   }[];
   endOfSessionReview?: {
     followedPlan: boolean;
+    noTradeIsSuccess?: boolean; // "I passed on setups that didn't qualify" - validates discipline
     didWell?: string;
     toImprove?: string;
   };
