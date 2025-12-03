@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TradingJournalEntry from "@/components/command-center/trading-journal-entry";
 import TradingStrategyDashboard from "@/components/trading/trading-strategy-dashboard";
 import TradingStrategiesManager from "@/components/trading/trading-strategies-manager";
+import TradingSessionIndicator from "@/components/trading/trading-session-indicator";
 import type { Day } from "@shared/schema";
 
 export default function TradingPage() {
@@ -31,6 +32,7 @@ export default function TradingPage() {
               <p className="text-sm text-muted-foreground">{today}</p>
             </div>
           </div>
+          <TradingSessionIndicator />
         </div>
 
         {/* Tabs */}
