@@ -3596,45 +3596,17 @@ RULES:
     }
   });
 
-  // Get today's trading checklist or create one
+  // Get ALL trading checklists for today (supports multiple strategies per day)
   app.get("/api/trading-checklists/today", async (req, res) => {
     try {
       const today = new Date().toISOString().split("T")[0];
-      let checklist = await storage.getDailyTradingChecklistByDate(today);
+      const checklists = await storage.getDailyTradingChecklists({ date: today });
 
-      if (!checklist) {
-        // Get default strategy
-        const defaultStrategy = await storage.getDefaultTradingStrategy();
-        if (!defaultStrategy) {
-          return res.status(404).json({
-            error: "No default trading strategy found",
-            message: "Please create and set a default trading strategy first",
-          });
-        }
-
-        // Ensure day record exists
-        const day = await storage.getDayOrCreate(today);
-
-        // Create checklist with empty values
-        const data: DailyTradingChecklistData = {
-          strategyId: defaultStrategy.id,
-          strategyName: defaultStrategy.name,
-          values: {},
-          trades: [],
-        };
-
-        checklist = await storage.createDailyTradingChecklist({
-          dayId: day.id,
-          date: today,
-          strategyId: defaultStrategy.id,
-          data,
-        });
-      }
-
-      res.json(checklist);
+      // Return all checklists for today (can be empty array)
+      res.json(checklists);
     } catch (error) {
-      logger.error({ error }, "Error fetching today's trading checklist");
-      res.status(500).json({ error: "Failed to fetch today's trading checklist" });
+      logger.error({ error }, "Error fetching today's trading checklists");
+      res.status(500).json({ error: "Failed to fetch today's trading checklists" });
     }
   });
 
@@ -3652,19 +3624,23 @@ RULES:
     }
   });
 
-  // Create a trading checklist for a specific date
+  // Create a trading checklist for a specific date and strategy
+  // Allows multiple checklists per day (one per strategy)
   app.post("/api/trading-checklists", async (req, res) => {
     try {
-      const { date, strategyId } = req.body;
+      const { date, strategyId, instrument } = req.body;
 
       if (!date || !strategyId) {
         return res.status(400).json({ error: "date and strategyId are required" });
       }
 
-      // Check if checklist already exists for this date
-      const existing = await storage.getDailyTradingChecklistByDate(date);
-      if (existing) {
-        return res.status(409).json({ error: "Checklist already exists for this date", checklist: existing });
+      // Check if checklist already exists for this date AND strategy
+      const existingChecklists = await storage.getDailyTradingChecklists({ date, strategyId });
+      if (existingChecklists.length > 0) {
+        return res.status(409).json({
+          error: "Checklist already exists for this strategy on this date",
+          checklist: existingChecklists[0]
+        });
       }
 
       // Get the strategy
@@ -3676,10 +3652,11 @@ RULES:
       // Ensure day record exists
       const day = await storage.getDayOrCreate(date);
 
-      // Create checklist
+      // Create checklist with optional instrument
       const data: DailyTradingChecklistData = {
         strategyId: strategy.id,
         strategyName: strategy.name,
+        instrument: instrument || undefined, // Optional: specify which instrument (e.g., "XAU/USD")
         values: {},
         trades: [],
       };

@@ -1213,6 +1213,7 @@ export interface TradingChecklistValue {
 export interface DailyTradingChecklistData {
   strategyId: string;
   strategyName: string;
+  instrument?: string; // Optional: specific instrument like "XAU/USD", "XAG/USD"
   session?: 'london' | 'new_york' | 'asian' | 'other';
   mentalState?: number; // 1-10
   highImpactNews?: string;
