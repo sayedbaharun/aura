@@ -556,7 +556,10 @@ export const days = pgTable(
     id: text("id").primaryKey(), // Format: "day_YYYY-MM-DD"
     date: date("date").notNull().unique(),
     title: text("title"),
-    top3Outcomes: text("top_3_outcomes"),
+    top3Outcomes: jsonb("top_3_outcomes").$type<{
+      text: string;
+      completed: boolean;
+    }[]>(),
     oneThingToShip: text("one_thing_to_ship"),
     reflectionAm: text("reflection_am"),
     reflectionPm: text("reflection_pm"),

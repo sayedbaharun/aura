@@ -44,11 +44,16 @@ interface Task {
   completedAt: string | null;
 }
 
+interface Top3Outcome {
+  text: string;
+  completed: boolean;
+}
+
 interface Day {
   id: string;
   date: string;
   title: string | null;
-  top3Outcomes: string | null;
+  top3Outcomes: Top3Outcome[] | null;
   oneThingToShip: string | null;
   reflectionAm: string | null;
   reflectionPm: string | null;
@@ -128,6 +133,8 @@ export default function EveningReview() {
     },
   });
 
+  const [top3Outcomes, setTop3Outcomes] = useState<Top3Outcome[]>([]);
+
   // Fetch the selected day's data
   const { data: dayData, isLoading: isDayLoading } = useQuery<Day>({
     queryKey: ["/api/days", selectedDate],
@@ -191,6 +198,7 @@ export default function EveningReview() {
         bedBy2am: false,
       },
     });
+    setTop3Outcomes([]);
   }, [selectedDate]);
 
   // Load existing data when day data arrives
@@ -212,6 +220,11 @@ export default function EveningReview() {
           bedBy2am: dayData.eveningRituals?.windDown?.bedBy2am ?? false,
         },
       });
+
+      // Load top3Outcomes
+      if (Array.isArray(dayData.top3Outcomes)) {
+        setTop3Outcomes(dayData.top3Outcomes);
+      }
     }
   }, [dayData]);
 
@@ -248,6 +261,7 @@ export default function EveningReview() {
         date: selectedDate,
         reflectionPm: review.reflectionPm || null,
         eveningRituals,
+        top3Outcomes: top3Outcomes.length > 0 ? top3Outcomes : null,
       };
 
       // Try PATCH first, then POST if day doesn't exist
@@ -289,6 +303,15 @@ export default function EveningReview() {
     const newPriorities = [...review.tomorrowPriorities];
     newPriorities[index] = value;
     setReview({ ...review, tomorrowPriorities: newPriorities });
+  };
+
+  const toggleOutcomeCompleted = (index: number) => {
+    const newOutcomes = [...top3Outcomes];
+    newOutcomes[index] = {
+      ...newOutcomes[index],
+      completed: !newOutcomes[index].completed,
+    };
+    setTop3Outcomes(newOutcomes);
   };
 
   if (isDayLoading) {
@@ -425,6 +448,42 @@ export default function EveningReview() {
                 <span className="font-medium text-sm">One Thing to Ship</span>
               </div>
               <p className="text-muted-foreground">{dayData.oneThingToShip}</p>
+            </div>
+          )}
+
+          {/* Top 3 Outcomes */}
+          {top3Outcomes.length > 0 && (
+            <div className="mt-4 p-4 border rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="h-4 w-4 text-blue-500" />
+                <span className="font-medium text-sm">Today's Top 3 Outcomes</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {top3Outcomes.filter(o => o.completed).length}/{top3Outcomes.length} completed
+                </span>
+              </div>
+              <div className="space-y-2">
+                {top3Outcomes.map((outcome, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <Checkbox
+                      id={`outcome-${index}`}
+                      checked={outcome.completed}
+                      onCheckedChange={() => toggleOutcomeCompleted(index)}
+                    />
+                    <Label
+                      htmlFor={`outcome-${index}`}
+                      className={`text-sm cursor-pointer flex-1 ${
+                        outcome.completed ? "line-through text-muted-foreground" : ""
+                      }`}
+                    >
+                      {outcome.text}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <Progress
+                value={(top3Outcomes.filter(o => o.completed).length / top3Outcomes.length) * 100}
+                className="h-2 mt-3"
+              />
             </div>
           )}
         </CardContent>

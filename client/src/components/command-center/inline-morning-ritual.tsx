@@ -102,8 +102,14 @@ export default function InlineMorningRitual({ day }: InlineMorningRitualProps) {
         setRituals(loaded);
       }
 
+      // Convert top3Outcomes from array format to string for editing
+      let top3String = "";
+      if (Array.isArray(day.top3Outcomes) && day.top3Outcomes.length > 0) {
+        top3String = day.top3Outcomes.map((o, i) => `${i + 1}. ${o.text}`).join("\n");
+      }
+
       setPlanning({
-        top3Outcomes: day.top3Outcomes || "",
+        top3Outcomes: top3String,
         oneThingToShip: day.oneThingToShip || "",
         reflectionAm: day.reflectionAm || "",
         primaryVentureFocus: day.primaryVentureFocus || "",
@@ -131,11 +137,23 @@ export default function InlineMorningRitual({ day }: InlineMorningRitualProps) {
 
       morningRituals.completedAt = isAllRitualsComplete() ? new Date().toISOString() : undefined;
 
+      // Convert top3Outcomes from string to array format
+      let top3OutcomesArray = null;
+      if (planning.top3Outcomes) {
+        const lines = planning.top3Outcomes.split("\n").filter(line => line.trim());
+        if (lines.length > 0) {
+          top3OutcomesArray = lines.map(line => ({
+            text: line.replace(/^\d+\.\s*/, "").trim(),
+            completed: false,
+          }));
+        }
+      }
+
       const payload = {
         id: dayId,
         date: today,
         morningRituals,
-        top3Outcomes: planning.top3Outcomes || null,
+        top3Outcomes: top3OutcomesArray,
         oneThingToShip: planning.oneThingToShip || null,
         reflectionAm: planning.reflectionAm || null,
         primaryVentureFocus: planning.primaryVentureFocus || null,
