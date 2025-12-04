@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { differenceInDays, parseISO } from "date-fns";
-import { Calendar, Filter, AlertCircle, Clock } from "lucide-react";
+import { differenceInDays, parseISO, format } from "date-fns";
+import { Calendar, Filter, AlertCircle, Clock, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { apiRequest } from "@/lib/queryClient";
 
 interface Task {
   id: string;
@@ -35,49 +34,70 @@ interface Venture {
   icon: string | null;
 }
 
-interface DeepWorkQueueProps {
+interface NeedsSchedulingQueueProps {
   onScheduleTask: (taskId: string) => void;
 }
 
-export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
+/**
+ * "Needs Scheduling" Queue - Tim Ferriss style
+ * Shows tasks with dueDate but NO focusDate - committed but not planned
+ * These are "ticking bombs" that need time blocked
+ */
+export default function DeepWorkQueue({ onScheduleTask }: NeedsSchedulingQueueProps) {
   const [filterVenture, setFilterVenture] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"priority" | "effort">("priority");
+  const [sortBy, setSortBy] = useState<"urgency" | "priority">("urgency");
 
-  // Fetch unscheduled deep work tasks
-  const { data: tasks = [], isLoading } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", "deep-work", "unscheduled"],
+  // Fetch ALL tasks, then filter for those with dueDate but no focusDate
+  const { data: allTasks = [], isLoading } = useQuery<Task[]>({
+    queryKey: ["/api/tasks"],
     queryFn: async () => {
-      const res = await apiRequest(
-        "GET",
-        `/api/tasks?type=deep_work&status=next,in_progress`
-      );
-      const allTasks = await res.json();
-      // Filter out tasks that already have focus_date
-      return Array.isArray(allTasks) ? allTasks.filter((task: Task) => !task.focusDate) : [];
+      const res = await fetch("/api/tasks?status=next,in_progress", {
+        credentials: "include",
+      });
+      return await res.json();
     },
   });
+
+  // Filter: has dueDate but NO focusDate (committed but not scheduled)
+  const needsSchedulingTasks = allTasks.filter(
+    (task) => task.dueDate && !task.focusDate
+  );
 
   const { data: ventures = [] } = useQuery<Venture[]>({
     queryKey: ["/api/ventures"],
   });
 
+  // Get days until due for sorting
+  const getDaysUntilDue = (dueDate: string | null): number => {
+    if (!dueDate) return 999;
+    return differenceInDays(parseISO(dueDate), new Date());
+  };
+
   // Filter and sort tasks
-  const filteredTasks = tasks
+  const filteredTasks = needsSchedulingTasks
     .filter((task) => {
       if (filterVenture === "all") return true;
       return task.ventureId === filterVenture;
     })
     .sort((a, b) => {
-      if (sortBy === "priority") {
+      if (sortBy === "urgency") {
+        // Sort by due date (most urgent first)
+        return getDaysUntilDue(a.dueDate) - getDaysUntilDue(b.dueDate);
+      } else {
+        // Sort by priority
         const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3 };
         return (
           priorityOrder[a.priority || "P3"] -
           priorityOrder[b.priority || "P3"]
         );
-      } else {
-        return (b.estEffort || 0) - (a.estEffort || 0);
       }
     });
+
+  // Count urgent items (due within 3 days or overdue)
+  const urgentCount = filteredTasks.filter((task) => {
+    const days = getDaysUntilDue(task.dueDate);
+    return days <= 3;
+  }).length;
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -99,7 +119,7 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
     return ventures.find((v) => v.id === ventureId);
   };
 
-  // Get due date urgency - Tim Ferriss style pressure indicator
+  // Get due date urgency display
   const getDueDateUrgency = (dueDate: string | null) => {
     if (!dueDate) return null;
     const date = parseISO(dueDate);
@@ -108,16 +128,16 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
     if (daysUntil < 0) return { text: `${Math.abs(daysUntil)}d overdue`, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", urgent: true };
     if (daysUntil === 0) return { text: "Due today", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", urgent: true };
     if (daysUntil === 1) return { text: "Due tomorrow", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", urgent: true };
-    if (daysUntil <= 3) return { text: `Due in ${daysUntil}d`, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", urgent: false };
+    if (daysUntil <= 3) return { text: `Due in ${daysUntil}d`, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", urgent: true };
     if (daysUntil <= 7) return { text: `Due in ${daysUntil}d`, color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400", urgent: false };
-    return null;
+    return { text: format(date, "MMM d"), color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400", urgent: false };
   };
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Deep Work Queue</CardTitle>
+          <CardTitle>Needs Scheduling</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -132,14 +152,24 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
 
   return (
     <Card className="h-fit sticky top-6">
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
-          <span>Deep Work Queue</span>
-          <Badge variant="secondary">{filteredTasks.length}</Badge>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            <span>Needs Scheduling</span>
+          </div>
+          <Badge variant={urgentCount > 0 ? "destructive" : "secondary"}>
+            {filteredTasks.length}
+          </Badge>
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Unscheduled deep work tasks
+        <p className="text-xs text-muted-foreground">
+          Tasks with due dates but no focus date set
         </p>
+        {urgentCount > 0 && (
+          <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+            {urgentCount} urgent (due within 3 days)
+          </p>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -162,14 +192,14 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
 
           <Select
             value={sortBy}
-            onValueChange={(value) => setSortBy(value as "priority" | "effort")}
+            onValueChange={(value) => setSortBy(value as "urgency" | "priority")}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="urgency">Sort by Urgency (Due Date)</SelectItem>
               <SelectItem value="priority">Sort by Priority</SelectItem>
-              <SelectItem value="effort">Sort by Effort</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -179,8 +209,8 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
           {filteredTasks.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Calendar className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">No unscheduled deep work tasks</p>
-              <p className="text-xs mt-1">All tasks are scheduled!</p>
+              <p className="text-sm font-medium text-green-600 dark:text-green-400">All clear!</p>
+              <p className="text-xs mt-1">Every task with a due date has been scheduled</p>
             </div>
           ) : (
             filteredTasks.map((task) => {
@@ -214,7 +244,7 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
                       )}
                     </div>
 
-                    {/* Due Date Badge - Tim Ferriss pressure indicator */}
+                    {/* Due Date Badge */}
                     {dueDateInfo && (
                       <div className="flex items-center gap-1">
                         <Badge className={cn("text-xs", dueDateInfo.color)}>
