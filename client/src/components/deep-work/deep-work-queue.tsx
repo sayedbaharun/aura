@@ -47,11 +47,11 @@ export default function DeepWorkQueue({ onScheduleTask }: NeedsSchedulingQueuePr
   const [filterVenture, setFilterVenture] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"urgency" | "priority">("urgency");
 
-  // Fetch ALL tasks, then filter for those with dueDate but no focusDate
+  // Fetch ALL tasks (consistent query key with other components)
   const { data: allTasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks?status=next,in_progress", {
+      const res = await fetch("/api/tasks", {
         credentials: "include",
       });
       return await res.json();
@@ -59,8 +59,9 @@ export default function DeepWorkQueue({ onScheduleTask }: NeedsSchedulingQueuePr
   });
 
   // Filter: has dueDate but NO focusDate (committed but not scheduled)
+  // Also filter out done/cancelled tasks
   const needsSchedulingTasks = allTasks.filter(
-    (task) => task.dueDate && !task.focusDate
+    (task) => task.dueDate && !task.focusDate && task.status !== "done" && task.status !== "cancelled"
   );
 
   const { data: ventures = [] } = useQuery<Venture[]>({

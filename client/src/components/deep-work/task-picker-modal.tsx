@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { Search, X } from "lucide-react";
+import { format, differenceInDays, parseISO } from "date-fns";
+import { Search, X, Clock, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ interface Task {
   ventureId: string | null;
   estEffort: number | null;
   focusDate: string | null;
+  dueDate: string | null;
 }
 
 interface Venture {
@@ -48,6 +49,7 @@ interface TaskPickerModalProps {
   onClose: () => void;
   date: Date | null;
   slot: string | null;
+  preSelectedTaskId?: string | null;
 }
 
 const SLOT_INFO = {
@@ -67,6 +69,7 @@ export default function TaskPickerModal({
   onClose,
   date,
   slot,
+  preSelectedTaskId,
 }: TaskPickerModalProps) {
   const { toast } = useToast();
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
@@ -75,61 +78,102 @@ export default function TaskPickerModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterVenture, setFilterVenture] = useState<string>("all");
-  const [filterType, setFilterType] = useState<string>("all");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(date);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(slot);
 
-  const dateStr = date ? format(date, "yyyy-MM-dd") : null;
-  const slotInfo = slot ? SLOT_INFO[slot as keyof typeof SLOT_INFO] : null;
+  // Update selected date/slot when props change
+  useEffect(() => {
+    setSelectedDate(date);
+    setSelectedSlot(slot);
+  }, [date, slot]);
 
-  // Fetch all unscheduled tasks
+  // Pre-select task if provided
+  useEffect(() => {
+    if (preSelectedTaskId && isOpen) {
+      setSelectedTaskIds(new Set([preSelectedTaskId]));
+    }
+  }, [preSelectedTaskId, isOpen]);
+
+  const dateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
+  const slotInfo = selectedSlot ? SLOT_INFO[selectedSlot as keyof typeof SLOT_INFO] : null;
+
+  // Fetch ALL tasks (consistent query key with other components)
   const { data: allTasks = [], isLoading } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", "unscheduled"],
+    queryKey: ["/api/tasks"],
     queryFn: async () => {
-      const res = await apiRequest(
-        "GET",
-        `/api/tasks?status=next,in_progress`
-      );
-      const tasks = await res.json();
-      // Filter out tasks that already have focus_date
-      return Array.isArray(tasks) ? tasks.filter((task: Task) => !task.focusDate) : [];
+      const res = await fetch("/api/tasks", { credentials: "include" });
+      return await res.json();
     },
     enabled: isOpen,
+  });
+
+  // Filter to show tasks that need scheduling:
+  // - No focusDate set (not yet scheduled)
+  // - Status is actionable (not done, cancelled)
+  const needsSchedulingTasks = allTasks.filter((task) => {
+    if (task.focusDate) return false; // Already scheduled
+    if (task.status === "done" || task.status === "cancelled") return false;
+    return true;
+  });
+
+  // Sort: tasks with dueDate first (by urgency), then by priority
+  const sortedTasks = [...needsSchedulingTasks].sort((a, b) => {
+    // Tasks with due dates come first
+    const aHasDue = !!a.dueDate;
+    const bHasDue = !!b.dueDate;
+    if (aHasDue && !bHasDue) return -1;
+    if (!aHasDue && bHasDue) return 1;
+
+    // If both have due dates, sort by urgency
+    if (aHasDue && bHasDue) {
+      const aDays = differenceInDays(parseISO(a.dueDate!), new Date());
+      const bDays = differenceInDays(parseISO(b.dueDate!), new Date());
+      if (aDays !== bDays) return aDays - bDays;
+    }
+
+    // Then by priority
+    const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3 };
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
   });
 
   const { data: ventures = [] } = useQuery<Venture[]>({
     queryKey: ["/api/ventures"],
   });
 
-  // Filter tasks
-  const filteredTasks = allTasks.filter((task) => {
-    // Search filter
+  // Filter tasks by search and filters
+  const filteredTasks = sortedTasks.filter((task) => {
     if (
       searchQuery &&
       !task.title.toLowerCase().includes(searchQuery.toLowerCase())
     ) {
       return false;
     }
-
-    // Priority filter
     if (filterPriority !== "all" && task.priority !== filterPriority) {
       return false;
     }
-
-    // Venture filter
     if (filterVenture !== "all" && task.ventureId !== filterVenture) {
       return false;
     }
-
-    // Type filter
-    if (filterType !== "all" && task.type !== filterType) {
-      return false;
-    }
-
     return true;
   });
 
+  // Get due date urgency display
+  const getDueDateUrgency = (dueDate: string | null) => {
+    if (!dueDate) return null;
+    const d = parseISO(dueDate);
+    const daysUntil = differenceInDays(d, new Date());
+
+    if (daysUntil < 0) return { text: `${Math.abs(daysUntil)}d overdue`, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", urgent: true };
+    if (daysUntil === 0) return { text: "Due today", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", urgent: true };
+    if (daysUntil === 1) return { text: "Due tomorrow", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", urgent: true };
+    if (daysUntil <= 3) return { text: `Due in ${daysUntil}d`, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", urgent: false };
+    if (daysUntil <= 7) return { text: `Due in ${daysUntil}d`, color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400", urgent: false };
+    return { text: format(d, "MMM d"), color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400", urgent: false };
+  };
+
   const scheduleMutation = useMutation({
     mutationFn: async () => {
-      if (!dateStr || !slot) throw new Error("Invalid date or slot");
+      if (!dateStr || !selectedSlot) throw new Error("Please select a date and time slot");
 
       const dayId = `day_${dateStr}`;
 
@@ -137,7 +181,7 @@ export default function TaskPickerModal({
         Array.from(selectedTaskIds).map((taskId) =>
           apiRequest("PATCH", `/api/tasks/${taskId}`, {
             focusDate: dateStr,
-            focusSlot: slot,
+            focusSlot: selectedSlot,
             dayId,
           })
         )
@@ -145,17 +189,17 @@ export default function TaskPickerModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/days/today"] });
       toast({
         title: "Success",
         description: `${selectedTaskIds.size} task(s) scheduled!`,
       });
-      setSelectedTaskIds(new Set());
-      onClose();
+      handleClose();
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to schedule tasks",
+        description: error.message || "Failed to schedule tasks",
         variant: "destructive",
       });
     },
@@ -176,6 +220,14 @@ export default function TaskPickerModal({
       toast({
         title: "No tasks selected",
         description: "Please select at least one task to schedule",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!selectedDate || !selectedSlot) {
+      toast({
+        title: "Select date and slot",
+        description: "Please select a date and time slot first",
         variant: "destructive",
       });
       return;
@@ -216,11 +268,14 @@ export default function TaskPickerModal({
     setSearchQuery("");
     setFilterPriority("all");
     setFilterVenture("all");
-    setFilterType("all");
+    setSelectedDate(null);
+    setSelectedSlot(null);
     onClose();
   };
 
-  if (!date || !slot || !slotInfo) return null;
+  // Count tasks with due dates
+  const tasksWithDueDates = filteredTasks.filter(t => t.dueDate).length;
+  const tasksWithoutDueDates = filteredTasks.filter(t => !t.dueDate).length;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -229,9 +284,15 @@ export default function TaskPickerModal({
           <DialogTitle className="flex items-center justify-between">
             <div>
               <div className="text-xl font-bold">Schedule Tasks</div>
-              <div className="text-sm font-normal text-muted-foreground mt-1">
-                {format(date, "EEEE, MMM d")} - {slotInfo.label} ({slotInfo.time})
-              </div>
+              {selectedDate && slotInfo ? (
+                <div className="text-sm font-normal text-muted-foreground mt-1">
+                  {format(selectedDate, "EEEE, MMM d")} - {slotInfo.label} ({slotInfo.time})
+                </div>
+              ) : (
+                <div className="text-sm font-normal text-muted-foreground mt-1">
+                  Select tasks and choose a time slot
+                </div>
+              )}
             </div>
             <Button variant="ghost" size="sm" onClick={handleClose}>
               <X className="h-4 w-4" />
@@ -239,6 +300,36 @@ export default function TaskPickerModal({
           </DialogTitle>
           <DialogDescription className="sr-only">Select tasks to schedule for this time slot</DialogDescription>
         </DialogHeader>
+
+        {/* Date/Slot Selection (if not provided) */}
+        {(!date || !slot) && (
+          <div className="grid grid-cols-2 gap-3 p-3 bg-muted/50 rounded-lg">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Date</label>
+              <Input
+                type="date"
+                value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
+                onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Time Slot</label>
+              <Select value={selectedSlot || ""} onValueChange={setSelectedSlot}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select slot" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SLOT_INFO).map(([key, info]) => (
+                    <SelectItem key={key} value={key}>
+                      {info.label} ({info.time})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="space-y-3">
@@ -252,7 +343,7 @@ export default function TaskPickerModal({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Select value={filterPriority} onValueChange={setFilterPriority}>
               <SelectTrigger>
                 <SelectValue placeholder="Priority" />
@@ -279,20 +370,20 @@ export default function TaskPickerModal({
                 ))}
               </SelectContent>
             </Select>
+          </div>
 
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="business">Business</SelectItem>
-                <SelectItem value="deep_work">Deep Work</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="personal">Personal</SelectItem>
-                <SelectItem value="learning">Learning</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Task counts */}
+          <div className="flex gap-2 text-xs text-muted-foreground">
+            {tasksWithDueDates > 0 && (
+              <Badge variant="outline" className="text-orange-600">
+                {tasksWithDueDates} with due dates
+              </Badge>
+            )}
+            {tasksWithoutDueDates > 0 && (
+              <Badge variant="outline">
+                {tasksWithoutDueDates} without due dates
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -307,12 +398,13 @@ export default function TaskPickerModal({
           ) : filteredTasks.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <p className="text-sm">No unscheduled tasks found</p>
-              <p className="text-xs mt-1">Try adjusting your filters</p>
+              <p className="text-xs mt-1">All tasks have been scheduled!</p>
             </div>
           ) : (
             filteredTasks.map((task) => {
               const venture = getVentureInfo(task.ventureId);
               const isSelected = selectedTaskIds.has(task.id);
+              const dueDateInfo = getDueDateUrgency(task.dueDate);
 
               return (
                 <div
@@ -320,7 +412,8 @@ export default function TaskPickerModal({
                   onClick={() => handleToggleTask(task.id)}
                   className={cn(
                     "p-3 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50",
-                    isSelected && "bg-accent border-primary"
+                    isSelected && "bg-accent border-primary",
+                    dueDateInfo?.urgent && !isSelected && "ring-1 ring-orange-400/50 bg-orange-50/30 dark:bg-orange-950/10"
                   )}
                   style={{
                     borderLeftColor: venture?.color || "#6b7280",
@@ -335,7 +428,12 @@ export default function TaskPickerModal({
                     />
 
                     <div className="flex-1 space-y-1">
-                      <h4 className="font-medium text-sm">{task.title}</h4>
+                      <div className="flex items-start gap-2">
+                        <h4 className="font-medium text-sm flex-1">{task.title}</h4>
+                        {dueDateInfo?.urgent && (
+                          <AlertCircle className="h-4 w-4 text-orange-500 shrink-0" />
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge
@@ -344,9 +442,12 @@ export default function TaskPickerModal({
                         >
                           {task.priority}
                         </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {task.type.replace("_", " ")}
-                        </Badge>
+                        {dueDateInfo && (
+                          <Badge className={cn("text-xs", dueDateInfo.color)}>
+                            <Clock className="h-3 w-3 mr-1" />
+                            {dueDateInfo.text}
+                          </Badge>
+                        )}
                         {venture && (
                           <Badge variant="outline" className="text-xs">
                             {venture.icon} {venture.name}
@@ -386,7 +487,7 @@ export default function TaskPickerModal({
           </Button>
           <Button
             onClick={handleSchedule}
-            disabled={selectedTaskIds.size === 0 || scheduleMutation.isPending}
+            disabled={selectedTaskIds.size === 0 || !selectedDate || !selectedSlot || scheduleMutation.isPending}
           >
             Schedule {selectedTaskIds.size > 0 && `(${selectedTaskIds.size})`}
           </Button>
