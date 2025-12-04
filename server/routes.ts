@@ -1054,6 +1054,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Slot time mapping for calendar sync
+  const SLOT_TIMES: Record<string, { startHour: number; endHour: number }> = {
+    morning_routine: { startHour: 7, endHour: 10 },
+    gym: { startHour: 10, endHour: 12 },
+    admin: { startHour: 12, endHour: 13.5 },
+    lunch: { startHour: 13.5, endHour: 15 },
+    walk: { startHour: 15, endHour: 16 },
+    deep_work: { startHour: 16, endHour: 20 },
+    evening: { startHour: 20, endHour: 23 },
+    meetings: { startHour: 9, endHour: 17 },
+    buffer: { startHour: 9, endHour: 17 },
+    // Legacy slots
+    deep_work_1: { startHour: 9, endHour: 11 },
+    deep_work_2: { startHour: 14, endHour: 16 },
+    admin_block_1: { startHour: 11, endHour: 12 },
+    admin_block_2: { startHour: 16, endHour: 17 },
+    evening_review: { startHour: 17, endHour: 18 },
+  };
+
   // Update task
   app.patch("/api/tasks/:id", async (req, res) => {
     try {
@@ -1061,15 +1080,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Sanitize data - convert empty strings to null for optional fields
       const sanitizedBody = { ...req.body };
-      const nullableFields = ['dueDate', 'focusDate', 'notes', 'ventureId', 'projectId', 'phaseId', 'dayId'];
+      const nullableFields = ['dueDate', 'focusDate', 'notes', 'ventureId', 'projectId', 'phaseId', 'dayId', 'focusSlot'];
       for (const field of nullableFields) {
         if (sanitizedBody[field] === '') {
           sanitizedBody[field] = null;
         }
       }
 
+      // Get existing task for calendar sync
+      const existingTask = await storage.getTask(req.params.id);
+      if (!existingTask) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
       const updates = insertTaskSchema.partial().parse(sanitizedBody);
       logger.info({ taskId: req.params.id, updates }, "Validated task updates");
+
+      // Calendar sync logic
+      const isCalendarConfigured = !!(
+        process.env.GOOGLE_CALENDAR_CLIENT_ID &&
+        process.env.GOOGLE_CALENDAR_CLIENT_SECRET &&
+        process.env.GOOGLE_CALENDAR_REFRESH_TOKEN
+      );
+
+      let calendarEventId = existingTask.calendarEventId;
+
+      if (isCalendarConfigured) {
+        try {
+          const { createFocusTimeBlock, updateEvent, deleteEvent } = await import("./google-calendar");
+
+          const newFocusDate = updates.focusDate ?? existingTask.focusDate;
+          const newFocusSlot = updates.focusSlot ?? existingTask.focusSlot;
+          const hadSchedule = existingTask.focusDate && existingTask.focusSlot;
+          const hasSchedule = newFocusDate && newFocusSlot;
+
+          // If schedule is being removed, delete calendar event
+          if (hadSchedule && !hasSchedule && existingTask.calendarEventId) {
+            try {
+              await deleteEvent(existingTask.calendarEventId);
+              calendarEventId = null;
+              logger.info({ taskId: req.params.id, eventId: existingTask.calendarEventId }, "Deleted calendar event for unscheduled task");
+            } catch (calError) {
+              logger.warn({ error: calError, taskId: req.params.id }, "Failed to delete calendar event");
+            }
+          }
+          // If schedule is being added or changed
+          else if (hasSchedule) {
+            const slotTimes = SLOT_TIMES[newFocusSlot as string];
+            if (slotTimes) {
+              const [year, month, day] = (newFocusDate as string).split('-').map(Number);
+              const startTime = new Date(year, month - 1, day, Math.floor(slotTimes.startHour), (slotTimes.startHour % 1) * 60);
+              const endTime = new Date(year, month - 1, day, Math.floor(slotTimes.endHour), (slotTimes.endHour % 1) * 60);
+
+              const eventTitle = `📋 ${existingTask.title}`;
+              const eventDescription = existingTask.notes || `Task: ${existingTask.title}\nPriority: ${existingTask.priority || 'P2'}`;
+
+              // Update existing event or create new one
+              if (existingTask.calendarEventId) {
+                try {
+                  await updateEvent(existingTask.calendarEventId, {
+                    summary: eventTitle,
+                    startTime,
+                    endTime,
+                    description: eventDescription,
+                  });
+                  logger.info({ taskId: req.params.id, eventId: existingTask.calendarEventId }, "Updated calendar event");
+                } catch (updateError) {
+                  // If update fails (event deleted externally), create new one
+                  logger.warn({ error: updateError }, "Failed to update event, creating new one");
+                  const newEvent = await createFocusTimeBlock(eventTitle, startTime, endTime, eventDescription);
+                  calendarEventId = newEvent.id || null;
+                }
+              } else {
+                // Create new calendar event
+                const newEvent = await createFocusTimeBlock(eventTitle, startTime, endTime, eventDescription);
+                calendarEventId = newEvent.id || null;
+                logger.info({ taskId: req.params.id, eventId: calendarEventId }, "Created calendar event for scheduled task");
+              }
+            }
+          }
+        } catch (calendarError) {
+          logger.warn({ error: calendarError, taskId: req.params.id }, "Calendar sync failed, continuing with task update");
+        }
+      }
+
+      // Include calendar event ID in updates if changed
+      if (calendarEventId !== existingTask.calendarEventId) {
+        (updates as any).calendarEventId = calendarEventId;
+      }
+
       const task = await storage.updateTask(req.params.id, updates);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
@@ -1093,7 +1192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json({ task });
+      res.json({ task, calendarSynced: isCalendarConfigured && !!calendarEventId });
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid task data", details: error.errors });
@@ -1109,6 +1208,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete task
   app.delete("/api/tasks/:id", async (req, res) => {
     try {
+      // Get task first to check for calendar event
+      const task = await storage.getTask(req.params.id);
+
+      // Delete calendar event if exists
+      if (task?.calendarEventId) {
+        const isCalendarConfigured = !!(
+          process.env.GOOGLE_CALENDAR_CLIENT_ID &&
+          process.env.GOOGLE_CALENDAR_CLIENT_SECRET &&
+          process.env.GOOGLE_CALENDAR_REFRESH_TOKEN
+        );
+
+        if (isCalendarConfigured) {
+          try {
+            const { deleteEvent } = await import("./google-calendar");
+            await deleteEvent(task.calendarEventId);
+            logger.info({ taskId: req.params.id, eventId: task.calendarEventId }, "Deleted calendar event for deleted task");
+          } catch (calError) {
+            logger.warn({ error: calError, taskId: req.params.id }, "Failed to delete calendar event");
+          }
+        }
+      }
+
       await storage.deleteTask(req.params.id);
       res.json({ success: true });
     } catch (error) {
