@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { Trash2, Plus, X } from "lucide-react";
+import { format, differenceInDays, parseISO } from "date-fns";
+import { Trash2, Plus, X, Clock, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,7 @@ interface Task {
   estEffort: number | null;
   notes: string | null;
   focusDate: string | null;
+  dueDate: string | null;
   focusSlot: string | null;
 }
 
@@ -170,6 +171,19 @@ export default function SlotDetailModal({
     return ventures.find((v) => v.id === ventureId);
   };
 
+  // Get due date urgency indicator
+  const getDueDateUrgency = (dueDate: string | null) => {
+    if (!dueDate) return null;
+    const d = parseISO(dueDate);
+    const daysUntil = differenceInDays(d, new Date());
+
+    if (daysUntil < 0) return { text: `${Math.abs(daysUntil)}d overdue`, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", urgent: true };
+    if (daysUntil === 0) return { text: "Due today", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", urgent: true };
+    if (daysUntil === 1) return { text: "Due tomorrow", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", urgent: true };
+    if (daysUntil <= 3) return { text: `Due in ${daysUntil}d`, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", urgent: false };
+    return { text: format(d, "MMM d"), color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400", urgent: false };
+  };
+
   const totalEffort = slotTasks.reduce(
     (sum, task) => sum + (task.estEffort || 0),
     0
@@ -252,10 +266,14 @@ export default function SlotDetailModal({
             <div className="space-y-2">
               {slotTasks.map((task) => {
                 const venture = getVentureInfo(task.ventureId);
+                const dueDateInfo = getDueDateUrgency(task.dueDate);
                 return (
                   <div
                     key={task.id}
-                    className="p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                    className={cn(
+                      "p-3 border rounded-lg hover:bg-accent/50 transition-colors",
+                      dueDateInfo?.urgent && "ring-1 ring-orange-400/50 bg-orange-50/30 dark:bg-orange-950/20"
+                    )}
                     style={{
                       borderLeftColor: venture?.color || "#6b7280",
                       borderLeftWidth: "3px",
@@ -264,12 +282,17 @@ export default function SlotDetailModal({
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 space-y-1">
-                          <h4
-                            className="font-medium text-sm cursor-pointer hover:underline"
-                            onClick={() => openTaskDetail(task.id)}
-                          >
-                            {task.title}
-                          </h4>
+                          <div className="flex items-start gap-2">
+                            <h4
+                              className="font-medium text-sm cursor-pointer hover:underline flex-1"
+                              onClick={() => openTaskDetail(task.id)}
+                            >
+                              {task.title}
+                            </h4>
+                            {dueDateInfo?.urgent && (
+                              <AlertCircle className="h-4 w-4 text-orange-500 shrink-0" />
+                            )}
+                          </div>
 
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge
@@ -286,6 +309,12 @@ export default function SlotDetailModal({
                             {task.estEffort && (
                               <Badge variant="secondary" className="text-xs">
                                 {task.estEffort}h
+                              </Badge>
+                            )}
+                            {dueDateInfo && (
+                              <Badge className={cn("text-xs", dueDateInfo.color)}>
+                                <Clock className="h-3 w-3 mr-1" />
+                                {dueDateInfo.text}
                               </Badge>
                             )}
                           </div>

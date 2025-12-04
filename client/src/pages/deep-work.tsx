@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { addDays, subDays } from "date-fns";
 import DeepWorkHeader from "@/components/deep-work/deep-work-header";
+import TodaysFocus from "@/components/deep-work/todays-focus";
 import WeeklyCalendar from "@/components/deep-work/weekly-calendar";
 import DeepWorkQueue from "@/components/deep-work/deep-work-queue";
 import SlotDetailModal from "@/components/deep-work/slot-detail-modal";
@@ -110,6 +111,9 @@ export default function DeepWork() {
         onThisWeek={goToThisWeek}
         onScheduleTask={() => handleScheduleTask()}
       />
+
+      {/* Today's Focus - Tim Ferriss inspired ONE THING view */}
+      <TodaysFocus />
 
       {/* Main Content: Calendar + Queue */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

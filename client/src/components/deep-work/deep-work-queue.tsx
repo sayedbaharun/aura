@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, Filter } from "lucide-react";
+import { differenceInDays, parseISO } from "date-fns";
+import { Calendar, Filter, AlertCircle, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface Task {
   ventureId: string | null;
   estEffort: number | null;
   focusDate: string | null;
+  dueDate: string | null;
   focusSlot: string | null;
 }
 
@@ -97,6 +99,20 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
     return ventures.find((v) => v.id === ventureId);
   };
 
+  // Get due date urgency - Tim Ferriss style pressure indicator
+  const getDueDateUrgency = (dueDate: string | null) => {
+    if (!dueDate) return null;
+    const date = parseISO(dueDate);
+    const daysUntil = differenceInDays(date, new Date());
+
+    if (daysUntil < 0) return { text: `${Math.abs(daysUntil)}d overdue`, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", urgent: true };
+    if (daysUntil === 0) return { text: "Due today", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", urgent: true };
+    if (daysUntil === 1) return { text: "Due tomorrow", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", urgent: true };
+    if (daysUntil <= 3) return { text: `Due in ${daysUntil}d`, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", urgent: false };
+    if (daysUntil <= 7) return { text: `Due in ${daysUntil}d`, color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400", urgent: false };
+    return null;
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -169,10 +185,14 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
           ) : (
             filteredTasks.map((task) => {
               const venture = getVentureInfo(task.ventureId);
+              const dueDateInfo = getDueDateUrgency(task.dueDate);
               return (
                 <div
                   key={task.id}
-                  className="p-3 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                  className={cn(
+                    "p-3 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer",
+                    dueDateInfo?.urgent && "ring-1 ring-orange-400/50 bg-orange-50/50 dark:bg-orange-950/20"
+                  )}
                   style={{
                     borderLeftColor: venture?.color || "#6b7280",
                     borderLeftWidth: "3px",
@@ -189,7 +209,20 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
                       <h4 className="text-sm font-medium flex-1 leading-tight">
                         {task.title}
                       </h4>
+                      {dueDateInfo?.urgent && (
+                        <AlertCircle className="h-4 w-4 text-orange-500 shrink-0" />
+                      )}
                     </div>
+
+                    {/* Due Date Badge - Tim Ferriss pressure indicator */}
+                    {dueDateInfo && (
+                      <div className="flex items-center gap-1">
+                        <Badge className={cn("text-xs", dueDateInfo.color)}>
+                          <Clock className="h-3 w-3 mr-1" />
+                          {dueDateInfo.text}
+                        </Badge>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       {venture && (
@@ -207,12 +240,15 @@ export default function DeepWorkQueue({ onScheduleTask }: DeepWorkQueueProps) {
 
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="w-full"
+                      variant={dueDateInfo?.urgent ? "default" : "outline"}
+                      className={cn(
+                        "w-full",
+                        dueDateInfo?.urgent && "bg-orange-600 hover:bg-orange-700"
+                      )}
                       onClick={() => onScheduleTask(task.id)}
                     >
                       <Calendar className="h-3 w-3 mr-1" />
-                      Schedule
+                      {dueDateInfo?.urgent ? "Schedule Now" : "Schedule"}
                     </Button>
                   </div>
                 </div>
