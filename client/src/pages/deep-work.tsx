@@ -145,6 +145,7 @@ export default function DeepWork() {
         onClose={handleCloseTaskPicker}
         date={taskPickerState.date}
         slot={taskPickerState.slot}
+        preSelectedTaskId={taskPickerState.preSelectedTaskId}
       />
     </div>
   );
