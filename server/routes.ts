@@ -1096,14 +1096,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = insertTaskSchema.partial().parse(sanitizedBody);
       logger.info({ taskId: req.params.id, updates }, "Validated task updates");
 
-      // Calendar sync logic
+      // Calendar sync logic - wrapped in try/catch to prevent breaking task updates
       const isCalendarConfigured = !!(
         process.env.GOOGLE_CALENDAR_CLIENT_ID &&
         process.env.GOOGLE_CALENDAR_CLIENT_SECRET &&
         process.env.GOOGLE_CALENDAR_REFRESH_TOKEN
       );
 
-      let calendarEventId = existingTask.calendarEventId;
+      let calendarEventId: string | null | undefined = (existingTask as any).calendarEventId;
 
       if (isCalendarConfigured) {
         try {
@@ -1115,11 +1115,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const hasSchedule = newFocusDate && newFocusSlot;
 
           // If schedule is being removed, delete calendar event
-          if (hadSchedule && !hasSchedule && existingTask.calendarEventId) {
+          if (hadSchedule && !hasSchedule && calendarEventId) {
             try {
-              await deleteEvent(existingTask.calendarEventId);
+              await deleteEvent(calendarEventId);
               calendarEventId = null;
-              logger.info({ taskId: req.params.id, eventId: existingTask.calendarEventId }, "Deleted calendar event for unscheduled task");
+              logger.info({ taskId: req.params.id, eventId: calendarEventId }, "Deleted calendar event for unscheduled task");
             } catch (calError) {
               logger.warn({ error: calError, taskId: req.params.id }, "Failed to delete calendar event");
             }
@@ -1136,15 +1136,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const eventDescription = existingTask.notes || `Task: ${existingTask.title}\nPriority: ${existingTask.priority || 'P2'}`;
 
               // Update existing event or create new one
-              if (existingTask.calendarEventId) {
+              if (calendarEventId) {
                 try {
-                  await updateEvent(existingTask.calendarEventId, {
+                  await updateEvent(calendarEventId, {
                     summary: eventTitle,
                     startTime,
                     endTime,
                     description: eventDescription,
                   });
-                  logger.info({ taskId: req.params.id, eventId: existingTask.calendarEventId }, "Updated calendar event");
+                  logger.info({ taskId: req.params.id, eventId: calendarEventId }, "Updated calendar event");
                 } catch (updateError) {
                   // If update fails (event deleted externally), create new one
                   logger.warn({ error: updateError }, "Failed to update event, creating new one");
@@ -1161,11 +1161,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (calendarError) {
           logger.warn({ error: calendarError, taskId: req.params.id }, "Calendar sync failed, continuing with task update");
+          // Don't modify calendarEventId on error
         }
       }
 
-      // Include calendar event ID in updates if changed
-      if (calendarEventId !== existingTask.calendarEventId) {
+      // Include calendar event ID in updates if changed (only if column exists)
+      const existingCalendarId = (existingTask as any).calendarEventId;
+      if (calendarEventId !== existingCalendarId && calendarEventId !== undefined) {
         (updates as any).calendarEventId = calendarEventId;
       }
 
