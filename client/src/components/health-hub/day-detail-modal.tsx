@@ -30,11 +30,16 @@ interface HealthEntry {
   notes: string | null;
 }
 
+interface Top3Outcome {
+  text: string;
+  completed: boolean;
+}
+
 interface Day {
   id: string;
   date: string;
   title: string | null;
-  top3Outcomes: string | null;
+  top3Outcomes: Top3Outcome[] | null;
   oneThingToShip: string | null;
   reflectionAm: string | null;
   reflectionPm: string | null;
@@ -235,11 +240,20 @@ export default function DayDetailModal({
                   </div>
                 )}
 
-                {day.top3Outcomes && (
+                {day.top3Outcomes && day.top3Outcomes.length > 0 && (
                   <div>
                     <div className="text-sm text-muted-foreground mb-1">Top 3 Outcomes</div>
-                    <div className="text-sm whitespace-pre-wrap bg-muted/50 p-3 rounded-lg">
-                      {day.top3Outcomes}
+                    <div className="bg-muted/50 p-3 rounded-lg space-y-2">
+                      {day.top3Outcomes.map((outcome, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <span className={outcome.completed ? "text-emerald-600" : "text-muted-foreground"}>
+                            {outcome.completed ? "✓" : "○"}
+                          </span>
+                          <span className={outcome.completed ? "line-through text-muted-foreground" : ""}>
+                            {outcome.text}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
