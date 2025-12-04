@@ -10,8 +10,9 @@ import {
   isPast,
   parseISO,
   getHours,
+  differenceInDays,
 } from "date-fns";
-import { Plus, Calendar, Video, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Calendar, Video, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ interface Task {
   ventureId: string | null;
   estEffort: number | null;
   focusDate: string | null;
+  dueDate: string | null;
   focusSlot: "morning_routine" | "gym" | "admin" | "lunch" | "walk" | "deep_work" | "evening" | "meetings" | "buffer" | null;
 }
 
@@ -243,6 +245,19 @@ export default function WeeklyCalendar({
     return venture?.color || "#6b7280";
   };
 
+  // Get due date urgency indicator
+  const getDueDateUrgency = (dueDate: string | null) => {
+    if (!dueDate) return null;
+    const date = parseISO(dueDate);
+    const daysUntil = differenceInDays(date, new Date());
+
+    if (daysUntil < 0) return { text: `${Math.abs(daysUntil)}d late`, color: "bg-red-500 text-white", urgent: true };
+    if (daysUntil === 0) return { text: "Today", color: "bg-orange-500 text-white", urgent: true };
+    if (daysUntil === 1) return { text: "Tomorrow", color: "bg-yellow-500 text-black", urgent: true };
+    if (daysUntil <= 3) return { text: `${daysUntil}d`, color: "bg-blue-500/20 text-blue-700 dark:text-blue-300", urgent: false };
+    return null; // Don't show for dates more than 3 days out
+  };
+
   if (isLoading) {
     return (
       <Card className="p-6">
@@ -397,33 +412,49 @@ export default function WeeklyCalendar({
                         ))}
 
                         {/* Tasks */}
-                        {cellTasks.map((task) => (
-                          <div
-                            key={task.id}
-                            className="text-xs p-1.5 rounded border bg-card hover:bg-accent/50 transition-colors"
-                            style={{
-                              borderLeftColor: getVentureColor(task.ventureId),
-                              borderLeftWidth: "3px",
-                            }}
-                          >
-                            <div className="flex items-start gap-1 mb-1">
-                              <div
-                                className={cn(
-                                  "w-1.5 h-1.5 rounded-full mt-1",
-                                  getPriorityColor(task.priority)
+                        {cellTasks.map((task) => {
+                          const dueDateInfo = getDueDateUrgency(task.dueDate);
+                          return (
+                            <div
+                              key={task.id}
+                              className={cn(
+                                "text-xs p-1.5 rounded border bg-card hover:bg-accent/50 transition-colors",
+                                dueDateInfo?.urgent && "ring-1 ring-orange-400/50"
+                              )}
+                              style={{
+                                borderLeftColor: getVentureColor(task.ventureId),
+                                borderLeftWidth: "3px",
+                              }}
+                            >
+                              <div className="flex items-start gap-1 mb-1">
+                                <div
+                                  className={cn(
+                                    "w-1.5 h-1.5 rounded-full mt-1 shrink-0",
+                                    getPriorityColor(task.priority)
+                                  )}
+                                />
+                                <div className="flex-1 truncate font-medium">
+                                  {task.title}
+                                </div>
+                                {dueDateInfo?.urgent && (
+                                  <AlertCircle className="h-3 w-3 text-orange-500 shrink-0" />
                                 )}
-                              />
-                              <div className="flex-1 truncate font-medium">
-                                {task.title}
+                              </div>
+                              <div className="flex items-center justify-between gap-1">
+                                {dueDateInfo && (
+                                  <span className={cn("text-[9px] px-1 py-0.5 rounded font-medium", dueDateInfo.color)}>
+                                    {dueDateInfo.text}
+                                  </span>
+                                )}
+                                {task.estEffort && (
+                                  <span className="text-[10px] text-muted-foreground ml-auto">
+                                    {task.estEffort}h
+                                  </span>
+                                )}
                               </div>
                             </div>
-                            {task.estEffort && (
-                              <div className="text-[10px] text-muted-foreground text-right">
-                                {task.estEffort}h
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </>
                     )}
                   </div>
