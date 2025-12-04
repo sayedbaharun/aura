@@ -106,6 +106,7 @@ export default function TaskPickerModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterVenture, setFilterVenture] = useState<string>("all");
+  const [showScheduled, setShowScheduled] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(date);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(slot);
 
@@ -180,15 +181,22 @@ export default function TaskPickerModal({
   const projectedUsage = currentUsage + selectedTasksEffort;
   const isOverCapacity = projectedUsage > capacity;
 
-  // Filter tasks that need scheduling (no focusDate, actionable status)
-  const needsSchedulingTasks = allTasks.filter((task) => {
-    if (task.focusDate) return false;
+  // Filter tasks: show unscheduled + optionally scheduled tasks
+  const availableTasks = allTasks.filter((task) => {
     if (task.status === "done" || task.status === "cancelled") return false;
+    // If showScheduled is true, show all actionable tasks
+    // Otherwise, only show tasks without focusDate
+    if (!showScheduled && task.focusDate) return false;
     return true;
   });
 
+  // Count tasks with due dates that are already scheduled (hidden by default)
+  const scheduledWithDueDates = allTasks.filter(
+    (task) => task.dueDate && task.focusDate && task.status !== "done" && task.status !== "cancelled"
+  ).length;
+
   // Sort: tasks with dueDate first (by urgency), then by priority
-  const sortedTasks = [...needsSchedulingTasks].sort((a, b) => {
+  const sortedTasks = [...availableTasks].sort((a, b) => {
     const aHasDue = !!a.dueDate;
     const bHasDue = !!b.dueDate;
     if (aHasDue && !bHasDue) return -1;
@@ -279,6 +287,7 @@ export default function TaskPickerModal({
     setSearchQuery("");
     setFilterPriority("all");
     setFilterVenture("all");
+    setShowScheduled(false);
     setSelectedDate(null);
     setSelectedSlot(null);
     onClose();
@@ -422,9 +431,31 @@ export default function TaskPickerModal({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex gap-2 text-xs">
-            {tasksWithDueDates > 0 && <Badge variant="outline" className="text-orange-600">{tasksWithDueDates} with due dates</Badge>}
-            {tasksWithoutDueDates > 0 && <Badge variant="outline">{tasksWithoutDueDates} without due dates</Badge>}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2 text-xs">
+              {tasksWithDueDates > 0 && <Badge variant="outline" className="text-orange-600">{tasksWithDueDates} with due dates</Badge>}
+              {tasksWithoutDueDates > 0 && <Badge variant="outline">{tasksWithoutDueDates} without due dates</Badge>}
+            </div>
+            {scheduledWithDueDates > 0 && !showScheduled && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => setShowScheduled(true)}
+              >
+                +{scheduledWithDueDates} scheduled with due dates
+              </Button>
+            )}
+            {showScheduled && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => setShowScheduled(false)}
+              >
+                Hide scheduled tasks
+              </Button>
+            )}
           </div>
         </div>
 
@@ -442,6 +473,8 @@ export default function TaskPickerModal({
               const venture = getVentureInfo(task.ventureId);
               const isSelected = selectedTaskIds.has(task.id);
               const dueDateInfo = getDueDateUrgency(task.dueDate);
+              const isAlreadyScheduled = !!task.focusDate;
+              const scheduledSlotInfo = task.focusSlot ? SLOT_INFO[task.focusSlot as keyof typeof SLOT_INFO] : null;
               return (
                 <div
                   key={task.id}
@@ -449,7 +482,8 @@ export default function TaskPickerModal({
                   className={cn(
                     "p-3 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50",
                     isSelected && "bg-accent border-primary",
-                    dueDateInfo?.urgent && !isSelected && "ring-1 ring-orange-400/50 bg-orange-50/30 dark:bg-orange-950/10"
+                    dueDateInfo?.urgent && !isSelected && "ring-1 ring-orange-400/50 bg-orange-50/30 dark:bg-orange-950/10",
+                    isAlreadyScheduled && !isSelected && "opacity-70"
                   )}
                   style={{ borderLeftColor: venture?.color || "#6b7280", borderLeftWidth: "3px" }}
                 >
@@ -463,6 +497,13 @@ export default function TaskPickerModal({
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge className={getPriorityColor(task.priority)} variant="secondary">{task.priority}</Badge>
                         {dueDateInfo && <Badge className={cn("text-xs", dueDateInfo.color)}><Clock className="h-3 w-3 mr-1" />{dueDateInfo.text}</Badge>}
+                        {isAlreadyScheduled && task.focusDate && (
+                          <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {format(parseISO(task.focusDate), "MMM d")}
+                            {scheduledSlotInfo && ` · ${scheduledSlotInfo.label}`}
+                          </Badge>
+                        )}
                         {venture && <Badge variant="outline" className="text-xs">{venture.icon} {venture.name}</Badge>}
                         {task.estEffort && <Badge variant="secondary" className="text-xs">{task.estEffort}h</Badge>}
                       </div>
