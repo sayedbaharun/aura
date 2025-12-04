@@ -429,11 +429,18 @@ export const projects = pgTable(
   ]
 );
 
-export const insertProjectSchema = createInsertSchema(projects).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertProjectSchema = createInsertSchema(projects)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Coerce string dates to Date objects for proper validation
+    startDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+    targetEndDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+    actualEndDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+  });
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
@@ -459,11 +466,16 @@ export const phases = pgTable(
   ]
 );
 
-export const insertPhaseSchema = createInsertSchema(phases).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertPhaseSchema = createInsertSchema(phases)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Coerce string dates to Date objects for proper validation
+    targetDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+  });
 
 export type InsertPhase = z.infer<typeof insertPhaseSchema>;
 export type Phase = typeof phases.$inferSelect;
@@ -511,11 +523,18 @@ export const tasks = pgTable(
   ]
 );
 
-export const insertTaskSchema = createInsertSchema(tasks).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertTaskSchema = createInsertSchema(tasks)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Coerce string dates to Date objects for proper validation
+    dueDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+    focusDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+    completedAt: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+  });
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
@@ -612,10 +631,15 @@ export const days = pgTable(
   ]
 );
 
-export const insertDaySchema = createInsertSchema(days).omit({
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertDaySchema = createInsertSchema(days)
+  .omit({
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Coerce string dates to Date objects for proper validation
+    date: z.union([z.string(), z.date()]).pipe(z.coerce.date()),
+  });
 
 export type InsertDay = z.infer<typeof insertDaySchema>;
 export type Day = typeof days.$inferSelect;
@@ -1272,11 +1296,16 @@ export const dailyTradingChecklists = pgTable(
   ]
 );
 
-export const insertDailyTradingChecklistSchema = createInsertSchema(dailyTradingChecklists).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const insertDailyTradingChecklistSchema = createInsertSchema(dailyTradingChecklists)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Coerce string dates to Date objects for proper validation
+    date: z.union([z.string(), z.date()]).pipe(z.coerce.date()),
+  });
 
 export type InsertDailyTradingChecklist = z.infer<typeof insertDailyTradingChecklistSchema>;
 export type DailyTradingChecklist = typeof dailyTradingChecklists.$inferSelect;
