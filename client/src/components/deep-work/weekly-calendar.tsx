@@ -122,7 +122,7 @@ export default function WeeklyCalendar({
     if (canGoForward) setMobileStartIndex(mobileStartIndex + 1);
   };
 
-  // Fetch tasks for the week
+  // Fetch tasks for the week - include all statuses except done/cancelled
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: [
       "/api/tasks",
@@ -130,15 +130,16 @@ export default function WeeklyCalendar({
       {
         focus_date_gte: format(weekStart, "yyyy-MM-dd"),
         focus_date_lte: format(weekEnd, "yyyy-MM-dd"),
-        status: "next,in_progress",
       },
     ],
     queryFn: async () => {
       const res = await apiRequest(
         "GET",
-        `/api/tasks?focus_date_gte=${format(weekStart, "yyyy-MM-dd")}&focus_date_lte=${format(weekEnd, "yyyy-MM-dd")}&status=next,in_progress`
+        `/api/tasks?focus_date_gte=${format(weekStart, "yyyy-MM-dd")}&focus_date_lte=${format(weekEnd, "yyyy-MM-dd")}`
       );
-      return await res.json();
+      const allTasks = await res.json();
+      // Filter out done and cancelled tasks on the client side
+      return allTasks.filter((t: Task) => t.status !== "done" && t.status !== "cancelled");
     },
   });
 
