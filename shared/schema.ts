@@ -111,14 +111,20 @@ export const domainEnum = pgEnum('domain', [
 ]);
 
 export const focusSlotEnum = pgEnum('focus_slot', [
-  'deep_work_1',      // 9-11am: Deep strategic/creative work
-  'deep_work_2',      // 2-4pm: Deep execution work
-  'admin_block_1',    // 11am-12pm: Email, admin, quick tasks
-  'admin_block_2',    // 4-5pm: Wrap up, admin
-  'meetings',         // Anytime: Meetings, calls
-  'buffer',           // Anytime: Flex time, unexpected
-  'morning_routine',  // 6-9am: Health, planning, breakfast
-  'evening_review'    // 5-6pm: Review, reflection, planning
+  'deep_work_1',      // Legacy: 9-11am
+  'deep_work_2',      // Legacy: 2-4pm
+  'admin_block_1',    // Legacy: 11am-12pm
+  'admin_block_2',    // Legacy: 4-5pm
+  'meetings',         // Flexible: Meetings, calls
+  'buffer',           // Flexible: Flex time, unexpected
+  'morning_routine',  // 7:00-10:00 AM: Health, planning, breakfast
+  'evening_review',   // Legacy: 5-6pm
+  'gym',              // 10:00 AM-12:00 PM: Exercise
+  'admin',            // 12:00-1:30 PM: Admin block
+  'lunch',            // 1:30-3:00 PM: Lunch break
+  'walk',             // 3:00-4:00 PM: Walking/movement
+  'deep_work',        // 4:00-8:00 PM: Deep work session
+  'evening'           // 8:00 PM-1:00 AM: Evening activities
 ]);
 
 export const captureTypeEnum = pgEnum('capture_type', [
@@ -502,6 +508,7 @@ export const tasks = pgTable(
     notes: text("notes"),
     tags: jsonb("tags").$type<string[]>().default([]),
     externalId: text("external_id"),
+    calendarEventId: text("calendar_event_id"), // Google Calendar event ID for two-way sync
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
