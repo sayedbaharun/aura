@@ -55,20 +55,33 @@ export default function TodaysFocus() {
     },
   });
 
-  // Fetch ALL tasks, then filter client-side for focusDate=today OR dueDate=today
+  // Fetch ALL tasks (no status filter), then filter client-side
   const { data: allTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks?status=next,in_progress,done", { credentials: "include" });
+      const res = await fetch("/api/tasks", { credentials: "include" });
       return await res.json();
     },
   });
 
-  // Filter tasks: focusDate = today OR dueDate = today
+  // Filter tasks: focusDate = today OR dueDate = today OR overdue
+  // Use startsWith for date comparison to handle any timezone suffix issues
   const todaysTasks = allTasks.filter(task => {
-    const hasFocusToday = task.focusDate === todayStr;
-    const hasDueToday = task.dueDate && isToday(parseISO(task.dueDate));
-    const isOverdue = task.dueDate && isPast(parseISO(task.dueDate)) && task.status !== "done";
+    // Skip cancelled tasks
+    if (task.status === "cancelled") return false;
+
+    // Check focusDate - compare as strings (both should be YYYY-MM-DD format)
+    const hasFocusToday = task.focusDate?.startsWith(todayStr);
+
+    // Check dueDate
+    const hasDueToday = task.dueDate?.startsWith(todayStr);
+
+    // Check if overdue (past due date, not done)
+    const isOverdue = task.dueDate &&
+      !task.dueDate.startsWith(todayStr) &&
+      isPast(parseISO(task.dueDate)) &&
+      task.status !== "done";
+
     return hasFocusToday || hasDueToday || isOverdue;
   });
 
@@ -90,16 +103,17 @@ export default function TodaysFocus() {
     return priorityOrder[a.priority] - priorityOrder[b.priority];
   });
 
-  // Find overdue tasks (past due date, not done)
+  // Find overdue tasks (past due date, not done, not cancelled)
   const overdueTasks = allTasks.filter(task => {
-    if (!task.dueDate || task.status === "done") return false;
-    return isPast(parseISO(task.dueDate)) && !isToday(parseISO(task.dueDate));
+    if (!task.dueDate || task.status === "done" || task.status === "cancelled") return false;
+    const isDueToday = task.dueDate.startsWith(todayStr);
+    return !isDueToday && isPast(parseISO(task.dueDate));
   });
 
-  // Find tasks due today
+  // Find tasks due today (not done, not cancelled)
   const dueTodayTasks = todaysTasks.filter(task => {
-    if (!task.dueDate) return false;
-    return isToday(parseISO(task.dueDate)) && task.status !== "done";
+    if (!task.dueDate || task.status === "done" || task.status === "cancelled") return false;
+    return task.dueDate.startsWith(todayStr);
   });
 
   const getVenture = (ventureId: string | null) => {
