@@ -20,6 +20,23 @@ import { z } from "zod";
 // ============================================================================
 // SB-OS DATABASE SCHEMA
 // ============================================================================
+
+// Helper schema for date columns - keeps as string (YYYY-MM-DD format)
+// Drizzle's date() type expects strings, not Date objects
+const dateStringSchema = z.string().refine(
+  (val) => /^\d{4}-\d{2}-\d{2}$/.test(val),
+  { message: "Invalid date format, expected YYYY-MM-DD" }
+).optional().nullable();
+
+// Required version for non-nullable date columns
+const dateStringRequiredSchema = z.string().refine(
+  (val) => /^\d{4}-\d{2}-\d{2}$/.test(val),
+  { message: "Invalid date format, expected YYYY-MM-DD" }
+);
+
+// Helper schema for timestamp columns - coerces to Date objects
+const timestampSchema = z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable();
+
 // This schema defines the data model for SB-OS: The Sayed Baharun
 // Productivity Engine. It replaces the previous Aura schema.
 // ============================================================================
@@ -442,10 +459,10 @@ export const insertProjectSchema = createInsertSchema(projects)
     updatedAt: true,
   })
   .extend({
-    // Coerce string dates to Date objects for proper validation
-    startDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
-    targetEndDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
-    actualEndDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+    // Keep dates as strings for drizzle date() columns
+    startDate: dateStringSchema,
+    targetEndDate: dateStringSchema,
+    actualEndDate: dateStringSchema,
   });
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
@@ -479,8 +496,8 @@ export const insertPhaseSchema = createInsertSchema(phases)
     updatedAt: true,
   })
   .extend({
-    // Coerce string dates to Date objects for proper validation
-    targetDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+    // Keep dates as strings for drizzle date() columns
+    targetDate: dateStringSchema,
   });
 
 export type InsertPhase = z.infer<typeof insertPhaseSchema>;
@@ -537,10 +554,11 @@ export const insertTaskSchema = createInsertSchema(tasks)
     updatedAt: true,
   })
   .extend({
-    // Coerce string dates to Date objects for proper validation
-    dueDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
-    focusDate: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
-    completedAt: z.union([z.string(), z.date()]).pipe(z.coerce.date()).optional().nullable(),
+    // Keep dates as strings for drizzle date() columns
+    dueDate: dateStringSchema,
+    focusDate: dateStringSchema,
+    // Timestamp column can accept Date objects
+    completedAt: timestampSchema,
   });
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
@@ -644,8 +662,8 @@ export const insertDaySchema = createInsertSchema(days)
     updatedAt: true,
   })
   .extend({
-    // Coerce string dates to Date objects for proper validation
-    date: z.union([z.string(), z.date()]).pipe(z.coerce.date()),
+    // Keep dates as strings for drizzle date() columns
+    date: dateStringRequiredSchema,
   });
 
 export type InsertDay = z.infer<typeof insertDaySchema>;
@@ -690,7 +708,8 @@ export const insertHealthEntrySchema = createInsertSchema(healthEntries)
     updatedAt: true,
   })
   .extend({
-    date: z.union([z.string(), z.date()]).pipe(z.coerce.date()),
+    // Keep dates as strings for drizzle date() columns
+    date: dateStringRequiredSchema,
   });
 
 export type InsertHealthEntry = z.infer<typeof insertHealthEntrySchema>;

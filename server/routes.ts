@@ -664,7 +664,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const nextEvent = upcomingEvents[0];
-        const eventStart = new Date(nextEvent.start?.dateTime || nextEvent.start?.date);
+        const startTimeStr = nextEvent.start?.dateTime || nextEvent.start?.date;
+        if (!startTimeStr) {
+          return res.json({
+            configured: true,
+            meeting: null
+          });
+        }
+        const eventStart = new Date(startTimeStr);
         const minutesUntil = Math.round((eventStart.getTime() - now.getTime()) / 60000);
 
         res.json({
@@ -1477,11 +1484,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, ...healthData } = insertHealthEntrySchema.parse(req.body);
 
-      // Format date as string for day lookup
-      const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : String(date);
-
-      // Ensure Day exists for this date
-      const day = await storage.getDayOrCreate(dateStr);
+      // Ensure Day exists for this date (date is already a string in YYYY-MM-DD format)
+      const day = await storage.getDayOrCreate(date);
 
       // Create health entry with dayId
       const entry = await storage.createHealthEntry({
