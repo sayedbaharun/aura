@@ -2,6 +2,21 @@ import { google } from 'googleapis';
 import { retryGoogleAPI } from './retry-utils';
 import { logger } from './logger';
 
+// Default timezone for calendar events
+const DEFAULT_TIMEZONE = 'Asia/Dubai';
+
+// Format date as local datetime string without timezone suffix
+// This allows Google Calendar to interpret it in the specified timeZone
+function formatLocalDateTime(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
 // OAuth2 client with refresh token
 function createOAuth2Client() {
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
@@ -119,12 +134,12 @@ export async function createEvent(
       summary,
       description,
       start: {
-        dateTime: startTime.toISOString(),
-        timeZone: 'Asia/Dubai',
+        dateTime: formatLocalDateTime(startTime),
+        timeZone: DEFAULT_TIMEZONE,
       },
       end: {
-        dateTime: endTime.toISOString(),
-        timeZone: 'Asia/Dubai',
+        dateTime: formatLocalDateTime(endTime),
+        timeZone: DEFAULT_TIMEZONE,
       },
       conferenceData: {
         createRequest: {
@@ -190,14 +205,14 @@ export async function updateEvent(eventId: string, updates: {
     if (updates.description) event.description = updates.description;
     if (updates.startTime) {
       event.start = {
-        dateTime: updates.startTime.toISOString(),
-        timeZone: 'Asia/Dubai',
+        dateTime: formatLocalDateTime(updates.startTime),
+        timeZone: DEFAULT_TIMEZONE,
       };
     }
     if (updates.endTime) {
       event.end = {
-        dateTime: updates.endTime.toISOString(),
-        timeZone: 'Asia/Dubai',
+        dateTime: formatLocalDateTime(updates.endTime),
+        timeZone: DEFAULT_TIMEZONE,
       };
     }
 
@@ -287,12 +302,12 @@ export async function createFocusTimeBlock(
       summary: title || 'Focus Time',
       description: description || 'Deep work session - Do Not Disturb',
       start: {
-        dateTime: startTime.toISOString(),
-        timeZone: 'Asia/Dubai',
+        dateTime: formatLocalDateTime(startTime),
+        timeZone: DEFAULT_TIMEZONE,
       },
       end: {
-        dateTime: endTime.toISOString(),
-        timeZone: 'Asia/Dubai',
+        dateTime: formatLocalDateTime(endTime),
+        timeZone: DEFAULT_TIMEZONE,
       },
       eventType: 'focusTime', // Special event type that enables auto-decline
       focusTime: {
