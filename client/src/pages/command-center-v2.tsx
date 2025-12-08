@@ -112,7 +112,7 @@ export default function CommandCenterV2() {
             title: "Ignition Sequence",
             description: "Hydrate. Move. Plan. Do not check email.",
             action: "Start Ritual",
-            navigateTo: "/health"
+            navigateTo: "/morning"
         },
         deep_work: {
             title: "Deep Work Protocol",
