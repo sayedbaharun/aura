@@ -520,8 +520,8 @@ export const tasks = pgTable(
     type: taskTypeEnum("type"),
     domain: domainEnum("domain"),
     ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
-    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
-    phaseId: uuid("milestone_id").references(() => phases.id, { onDelete: "set null" }), // Keep SQL column name for backward compatibility
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    phaseId: uuid("milestone_id").references(() => phases.id, { onDelete: "cascade" }), // Keep SQL column name for backward compatibility
     dayId: text("day_id").references(() => days.id, { onDelete: "set null" }),
     dueDate: date("due_date"),
     focusDate: date("focus_date"),
