@@ -20,6 +20,7 @@ interface Task {
   domain: string;
   ventureId: string | null;
   projectId: string | null;
+  phaseId: string | null;
   dueDate: string | null;
   focusDate: string | null;
   completedAt: string | null;
@@ -29,6 +30,14 @@ interface Project {
   id: string;
   name: string;
   ventureId: string;
+}
+
+interface Phase {
+  id: string;
+  name: string;
+  projectId: string;
+  status: string;
+  order: number;
 }
 
 interface TasksListProps {
@@ -42,6 +51,7 @@ export default function TasksList({ ventureId }: TasksListProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [phaseFilter, setPhaseFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("priority");
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
@@ -62,6 +72,24 @@ export default function TasksList({ ventureId }: TasksListProps) {
       });
       return await res.json();
     },
+  });
+
+  // Fetch phases for all projects in this venture
+  const { data: phases = [] } = useQuery<Phase[]>({
+    queryKey: ["/api/phases", "venture", ventureId],
+    queryFn: async () => {
+      // Fetch phases for each project and combine them
+      const allPhases: Phase[] = [];
+      for (const project of projects) {
+        const res = await fetch(`/api/phases?project_id=${project.id}`, {
+          credentials: "include",
+        });
+        const projectPhases = await res.json();
+        allPhases.push(...projectPhases);
+      }
+      return allPhases;
+    },
+    enabled: projects.length > 0,
   });
 
   const updateTaskMutation = useMutation({
@@ -153,6 +181,12 @@ export default function TasksList({ ventureId }: TasksListProps) {
     return project?.name || "Unknown Project";
   };
 
+  const getPhaseName = (phaseId: string | null) => {
+    if (!phaseId) return null;
+    const phase = phases.find((p) => p.id === phaseId);
+    return phase?.name || null;
+  };
+
   // Apply filters
   let filteredTasks = tasks;
 
@@ -166,6 +200,10 @@ export default function TasksList({ ventureId }: TasksListProps) {
 
   if (projectFilter !== "all") {
     filteredTasks = filteredTasks.filter((t) => t.projectId === projectFilter);
+  }
+
+  if (phaseFilter !== "all") {
+    filteredTasks = filteredTasks.filter((t) => t.phaseId === phaseFilter);
   }
 
   // Apply sorting
@@ -253,6 +291,23 @@ export default function TasksList({ ventureId }: TasksListProps) {
               </SelectContent>
             </Select>
 
+            <Select value={phaseFilter} onValueChange={setPhaseFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Phase" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Phases</SelectItem>
+                {phases.map((phase) => {
+                  const project = projects.find((p) => p.id === phase.projectId);
+                  return (
+                    <SelectItem key={phase.id} value={phase.id}>
+                      {phase.name} {project ? `(${project.name})` : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Sort by" />
@@ -298,6 +353,11 @@ export default function TasksList({ ventureId }: TasksListProps) {
                       {task.projectId && (
                         <Badge variant="outline" className="text-xs">
                           {getProjectName(task.projectId)}
+                        </Badge>
+                      )}
+                      {task.phaseId && getPhaseName(task.phaseId) && (
+                        <Badge variant="outline" className="text-xs bg-muted">
+                          {getPhaseName(task.phaseId)}
                         </Badge>
                       )}
                     </div>
