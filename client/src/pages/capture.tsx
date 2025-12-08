@@ -9,6 +9,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -172,6 +173,40 @@ export default function CapturePage() {
     },
   });
 
+  // TickTick sync mutation
+  const syncTickTickMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/ticktick/sync");
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/captures?clarified=false"] });
+      if (data.synced > 0) {
+        toast({
+          title: "TickTick Synced!",
+          description: `${data.synced} new item${data.synced > 1 ? "s" : ""} added to inbox.`,
+        });
+      } else if (data.skipped > 0) {
+        toast({
+          title: "Already synced",
+          description: `${data.skipped} item${data.skipped > 1 ? "s" : ""} already in inbox.`,
+        });
+      } else {
+        toast({
+          title: "No new items",
+          description: "Your TickTick inbox is empty.",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync failed",
+        description: error.message || "Could not sync from TickTick",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleQuickCapture = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -325,12 +360,24 @@ export default function CapturePage() {
 
         {/* Inbox */}
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Inbox className="h-5 w-5 text-muted-foreground" />
-            <h2 className="font-medium">Inbox</h2>
-            {captures.length > 0 && (
-              <Badge variant="secondary">{captures.length}</Badge>
-            )}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Inbox className="h-5 w-5 text-muted-foreground" />
+              <h2 className="font-medium">Inbox</h2>
+              {captures.length > 0 && (
+                <Badge variant="secondary">{captures.length}</Badge>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncTickTickMutation.mutate()}
+              disabled={syncTickTickMutation.isPending}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncTickTickMutation.isPending ? "animate-spin" : ""}`} />
+              {syncTickTickMutation.isPending ? "Syncing..." : "Sync TickTick"}
+            </Button>
           </div>
 
           {capturesLoading ? (
