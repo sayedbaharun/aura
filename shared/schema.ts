@@ -161,7 +161,8 @@ export const captureSourceEnum = pgEnum('capture_source', [
   'email',
   'chat',
   'meeting',
-  'web'
+  'web',
+  'ticktick'
 ]);
 
 export const moodEnum = pgEnum('mood', ['low', 'medium', 'high', 'peak']);
