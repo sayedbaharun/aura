@@ -775,7 +775,7 @@ export default function EveningReview() {
           </Link>
         </Button>
         <Button variant="outline" asChild>
-          <Link href="/health">
+          <Link href="/health-hub">
             <ChevronRight className="h-4 w-4 mr-2" />
             Log Health
           </Link>
