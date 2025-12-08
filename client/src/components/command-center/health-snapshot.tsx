@@ -297,6 +297,7 @@ export default function HealthSnapshot() {
                     <SelectItem value="yoga">Yoga</SelectItem>
                     <SelectItem value="sport">Sport</SelectItem>
                     <SelectItem value="walk">Walk</SelectItem>
+                    <SelectItem value="at_home">At Home</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

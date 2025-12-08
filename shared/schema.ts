@@ -179,6 +179,7 @@ export const workoutTypeEnum = pgEnum('workout_type', [
   'yoga',
   'sport',
   'walk',
+  'at_home',
   'none'
 ]);
 
