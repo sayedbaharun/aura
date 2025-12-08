@@ -31,7 +31,7 @@ interface Task {
   estEffort: number | null;
   focusDate: string | null;
   dueDate: string | null;
-  focusSlot: "morning_routine" | "gym" | "admin" | "lunch" | "walk" | "deep_work" | "evening" | "meetings" | "buffer" | null;
+  focusSlot: "morning_routine" | "deep_work_1" | "admin_block" | "lunch" | "gym" | "afternoon" | "evening_review" | "meetings" | "buffer" | null;
 }
 
 interface Venture {
@@ -63,13 +63,13 @@ interface WeeklyCalendarProps {
 }
 
 const FOCUS_SLOTS = [
-  { key: "morning_routine", label: "Morning Routine", time: "7:00-10:00 AM", capacity: 3, color: "bg-amber-100 dark:bg-amber-900/30", startHour: 7, endHour: 10 },
-  { key: "gym", label: "Gym", time: "10:00 AM-12:00 PM", capacity: 2, color: "bg-red-100 dark:bg-red-900/30", startHour: 10, endHour: 12 },
-  { key: "admin", label: "Admin Block", time: "12:00-1:30 PM", capacity: 1.5, color: "bg-purple-100 dark:bg-purple-900/30", startHour: 12, endHour: 13.5 },
-  { key: "lunch", label: "Lunch", time: "1:30-3:00 PM", capacity: 1.5, color: "bg-green-100 dark:bg-green-900/30", startHour: 13.5, endHour: 15 },
-  { key: "walk", label: "Walk", time: "3:00-4:00 PM", capacity: 1, color: "bg-cyan-100 dark:bg-cyan-900/30", startHour: 15, endHour: 16 },
-  { key: "deep_work", label: "Deep Work ⭐", time: "4:00-8:00 PM", capacity: 4, color: "bg-blue-200 dark:bg-blue-900/40 border-2 border-blue-400", startHour: 16, endHour: 20 },
-  { key: "evening", label: "Evening", time: "8:00 PM-1:00 AM", capacity: 5, color: "bg-indigo-100 dark:bg-indigo-900/30", startHour: 20, endHour: 25 },
+  { key: "morning_routine", label: "Morning Routine", time: "7:00-9:00 AM", capacity: 2, color: "bg-amber-100 dark:bg-amber-900/30", startHour: 7, endHour: 9 },
+  { key: "deep_work_1", label: "Deep Work 1 ⭐", time: "9:00-11:00 AM", capacity: 2, color: "bg-blue-200 dark:bg-blue-900/40 border-2 border-blue-400", startHour: 9, endHour: 11 },
+  { key: "admin_block", label: "Admin Block", time: "11:00 AM-12:00 PM", capacity: 1, color: "bg-purple-100 dark:bg-purple-900/30", startHour: 11, endHour: 12 },
+  { key: "lunch", label: "Lunch", time: "12:00-1:00 PM", capacity: 1, color: "bg-green-100 dark:bg-green-900/30", startHour: 12, endHour: 13 },
+  { key: "gym", label: "Gym / Workout", time: "1:00-3:00 PM", capacity: 2, color: "bg-red-100 dark:bg-red-900/30", startHour: 13, endHour: 15 },
+  { key: "afternoon", label: "Afternoon", time: "3:00-11:00 PM", capacity: 8, color: "bg-cyan-100 dark:bg-cyan-900/30", startHour: 15, endHour: 23 },
+  { key: "evening_review", label: "Evening Review", time: "11:00 PM-12:00 AM", capacity: 1, color: "bg-indigo-100 dark:bg-indigo-900/30", startHour: 23, endHour: 24 },
   { key: "meetings", label: "Meetings", time: "Flexible", capacity: 4, color: "bg-emerald-100 dark:bg-emerald-900/30", startHour: 0, endHour: 24 },
   { key: "buffer", label: "Buffer", time: "Flexible", capacity: 2, color: "bg-slate-100 dark:bg-slate-800/50", startHour: 0, endHour: 24 },
 ] as const;

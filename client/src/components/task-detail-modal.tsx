@@ -54,7 +54,7 @@ interface Task {
   dayId: string | null;
   dueDate: string | null;
   focusDate: string | null;
-  focusSlot: 'morning_routine' | 'deep_work_1' | 'admin_block_1' | 'deep_work_2' | 'admin_block_2' | 'evening_review' | 'meetings' | 'buffer' | null;
+  focusSlot: 'morning_routine' | 'deep_work_1' | 'admin_block' | 'lunch' | 'gym' | 'afternoon' | 'evening_review' | 'meetings' | 'buffer' | null;
   estEffort: number | null;
   actualEffort: number | null;
   notes: string | null;
@@ -362,12 +362,13 @@ export default function TaskDetailModal() {
   const formatFocusSlot = (slot: string | null) => {
     if (!slot) return null;
     const slotLabels: Record<string, string> = {
-      morning_routine: 'Morning Routine (6-9am)',
-      deep_work_1: 'Deep Work (9-11am)',
-      admin_block_1: 'Admin Block (11am-12pm)',
-      deep_work_2: 'Deep Work (2-4pm)',
-      admin_block_2: 'Admin Block (4-5pm)',
-      evening_review: 'Evening Review (5-6pm)',
+      morning_routine: 'Morning Routine (7-9am)',
+      deep_work_1: 'Deep Work 1 (9-11am)',
+      admin_block: 'Admin Block (11am-12pm)',
+      lunch: 'Lunch (12-1pm)',
+      gym: 'Gym / Workout (1-3pm)',
+      afternoon: 'Afternoon (3-11pm)',
+      evening_review: 'Evening Review (11pm-12am)',
       meetings: 'Meetings (Flexible)',
       buffer: 'Buffer (Flexible)',
     };
@@ -886,12 +887,13 @@ export default function TaskDetailModal() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="morning_routine">Morning Routine (6-9am)</SelectItem>
-                  <SelectItem value="deep_work_1">Deep Work (9-11am)</SelectItem>
-                  <SelectItem value="admin_block_1">Admin Block (11am-12pm)</SelectItem>
-                  <SelectItem value="deep_work_2">Deep Work (2-4pm)</SelectItem>
-                  <SelectItem value="admin_block_2">Admin Block (4-5pm)</SelectItem>
-                  <SelectItem value="evening_review">Evening Review (5-6pm)</SelectItem>
+                  <SelectItem value="morning_routine">Morning Routine (7-9am)</SelectItem>
+                  <SelectItem value="deep_work_1">Deep Work 1 (9-11am)</SelectItem>
+                  <SelectItem value="admin_block">Admin Block (11am-12pm)</SelectItem>
+                  <SelectItem value="lunch">Lunch (12-1pm)</SelectItem>
+                  <SelectItem value="gym">Gym / Workout (1-3pm)</SelectItem>
+                  <SelectItem value="afternoon">Afternoon (3-11pm)</SelectItem>
+                  <SelectItem value="evening_review">Evening Review (11pm-12am)</SelectItem>
                   <SelectItem value="meetings">Meetings (Flexible)</SelectItem>
                   <SelectItem value="buffer">Buffer (Flexible)</SelectItem>
                 </SelectContent>
