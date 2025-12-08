@@ -23,6 +23,7 @@ import {
   type DailyTradingChecklistData,
 } from "@shared/schema";
 import { getAllIntegrationStatuses, getIntegrationStatus } from "./integrations";
+import * as ticktick from "./ticktick";
 import { z } from "zod";
 import { logger } from "./logger";
 import {
@@ -4030,6 +4031,207 @@ RULES:
     } catch (error) {
       logger.error({ error }, "Error deleting trading checklist");
       res.status(500).json({ error: "Failed to delete trading checklist" });
+    }
+  });
+
+  // ============================================================================
+  // TICKTICK INTEGRATION
+  // ============================================================================
+
+  // Get TickTick connection status
+  app.get("/api/ticktick/status", async (req, res) => {
+    try {
+      const status = await ticktick.checkConnection();
+      res.json(status);
+    } catch (error) {
+      logger.error({ error }, "Error checking TickTick status");
+      res.status(500).json({ error: "Failed to check TickTick connection" });
+    }
+  });
+
+  // Get all TickTick projects (lists)
+  app.get("/api/ticktick/projects", async (req, res) => {
+    try {
+      const projects = await ticktick.getProjects();
+      res.json(projects);
+    } catch (error) {
+      logger.error({ error }, "Error fetching TickTick projects");
+      res.status(500).json({ error: "Failed to fetch TickTick projects" });
+    }
+  });
+
+  // Get tasks from a specific TickTick project
+  app.get("/api/ticktick/projects/:projectId/tasks", async (req, res) => {
+    try {
+      const tasks = await ticktick.getProjectTasks(req.params.projectId);
+      res.json(tasks);
+    } catch (error) {
+      logger.error({ error, projectId: req.params.projectId }, "Error fetching TickTick tasks");
+      res.status(500).json({ error: "Failed to fetch TickTick tasks" });
+    }
+  });
+
+  // Get or create the SB-OS Inbox project in TickTick
+  app.post("/api/ticktick/inbox/setup", async (req, res) => {
+    try {
+      const inboxName = req.body.name || process.env.TICKTICK_INBOX_NAME || "SB-OS Inbox";
+      const project = await ticktick.getOrCreateInboxProject(inboxName);
+      res.json({
+        success: true,
+        project,
+        message: `Inbox project "${project.name}" is ready. Add tasks to this list in TickTick and sync them to SB-OS.`,
+      });
+    } catch (error) {
+      logger.error({ error }, "Error setting up TickTick inbox");
+      res.status(500).json({ error: "Failed to setup TickTick inbox" });
+    }
+  });
+
+  // Sync tasks from TickTick inbox to SB-OS capture items
+  app.post("/api/ticktick/sync", async (req, res) => {
+    try {
+      // Get the inbox project ID
+      const inboxProjectId = req.body.projectId || await ticktick.getInboxProjectId();
+
+      if (!inboxProjectId) {
+        return res.status(400).json({
+          error: "No inbox project configured",
+          message: "Please set up the inbox first using POST /api/ticktick/inbox/setup or provide a projectId",
+        });
+      }
+
+      // Fetch tasks from TickTick
+      const ticktickTasks = await ticktick.getProjectTasks(inboxProjectId);
+
+      // Filter to only incomplete tasks
+      const incompleteTasks = ticktickTasks.filter(
+        t => t.status === ticktick.TICKTICK_STATUS.NORMAL
+      );
+
+      const result: ticktick.TickTickSyncResult = {
+        synced: 0,
+        skipped: 0,
+        errors: [],
+        items: [],
+      };
+
+      // Get existing capture items with TickTick external IDs to avoid duplicates
+      const existingCaptures = await storage.getCaptures({ clarified: false });
+      const existingExternalIds = new Set(
+        existingCaptures
+          .filter(c => c.externalId?.startsWith('ticktick:'))
+          .map(c => c.externalId)
+      );
+
+      // Process each TickTick task
+      for (const task of incompleteTasks) {
+        const externalId = `ticktick:${task.id}`;
+
+        // Skip if already synced
+        if (existingExternalIds.has(externalId)) {
+          result.skipped++;
+          result.items.push({
+            tickTickId: task.id,
+            title: task.title,
+          });
+          continue;
+        }
+
+        try {
+          // Convert TickTick task to capture item format
+          const captureData = ticktick.tickTickTaskToCaptureItem(task);
+
+          // Create capture item in SB-OS
+          const capture = await storage.createCapture({
+            title: captureData.title,
+            type: captureData.type,
+            source: captureData.source,
+            notes: captureData.notes,
+            externalId: captureData.externalId,
+            clarified: false,
+          });
+
+          result.synced++;
+          result.items.push({
+            tickTickId: task.id,
+            title: task.title,
+            captureId: capture.id,
+          });
+
+          logger.info({
+            tickTickId: task.id,
+            captureId: capture.id,
+            title: task.title,
+          }, "Synced TickTick task to capture item");
+
+        } catch (error: any) {
+          result.errors.push(`Failed to sync task "${task.title}": ${error.message}`);
+          logger.error({ error, taskId: task.id }, "Error syncing TickTick task");
+        }
+      }
+
+      // Optionally complete synced tasks in TickTick
+      if (req.body.completeAfterSync) {
+        for (const item of result.items) {
+          if (item.captureId) {
+            try {
+              await ticktick.completeTask(inboxProjectId, item.tickTickId);
+            } catch (error) {
+              logger.warn({ error, tickTickId: item.tickTickId }, "Failed to complete TickTick task after sync");
+            }
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        ...result,
+        message: `Synced ${result.synced} new items, skipped ${result.skipped} existing items`,
+      });
+
+    } catch (error) {
+      logger.error({ error }, "Error syncing from TickTick");
+      res.status(500).json({ error: "Failed to sync from TickTick" });
+    }
+  });
+
+  // Complete a task in TickTick (after processing in SB-OS)
+  app.post("/api/ticktick/tasks/:taskId/complete", async (req, res) => {
+    try {
+      const { projectId } = req.body;
+      if (!projectId) {
+        return res.status(400).json({ error: "projectId is required" });
+      }
+
+      await ticktick.completeTask(projectId, req.params.taskId);
+      res.json({ success: true, message: "Task completed in TickTick" });
+    } catch (error) {
+      logger.error({ error, taskId: req.params.taskId }, "Error completing TickTick task");
+      res.status(500).json({ error: "Failed to complete TickTick task" });
+    }
+  });
+
+  // Create a task in TickTick (push from SB-OS)
+  app.post("/api/ticktick/tasks", async (req, res) => {
+    try {
+      const { title, projectId, content, dueDate, priority } = req.body;
+
+      if (!title || !projectId) {
+        return res.status(400).json({ error: "title and projectId are required" });
+      }
+
+      const task = await ticktick.createTask({
+        title,
+        projectId,
+        content,
+        dueDate,
+        priority,
+      });
+
+      res.status(201).json(task);
+    } catch (error) {
+      logger.error({ error }, "Error creating TickTick task");
+      res.status(500).json({ error: "Failed to create TickTick task" });
     }
   });
 

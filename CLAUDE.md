@@ -1153,6 +1153,35 @@ ORDER BY priority ASC, focus_slot ASC
 - Context-aware responses
 - Macro estimation for nutrition
 
+### 12.7. TickTick Integration ✅
+
+Mobile capture via TickTick app synced to SB-OS inbox.
+
+**Features:**
+- One-way sync: TickTick inbox → SB-OS capture items
+- Designate a "SB-OS Inbox" list in TickTick for mobile captures
+- Sync pulls incomplete tasks and creates capture items
+- Optional: Auto-complete TickTick tasks after sync
+- Deduplication via `externalId` field
+
+**API Endpoints:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/ticktick/status` | Check connection status |
+| GET | `/api/ticktick/projects` | List all TickTick projects |
+| GET | `/api/ticktick/projects/:id/tasks` | Get tasks from a project |
+| POST | `/api/ticktick/inbox/setup` | Create/find SB-OS Inbox project |
+| POST | `/api/ticktick/sync` | Sync inbox tasks to captures |
+| POST | `/api/ticktick/tasks/:id/complete` | Complete a task in TickTick |
+| POST | `/api/ticktick/tasks` | Create a task in TickTick |
+
+**Workflow:**
+1. Set `TICKTICK_ACCESS_TOKEN` in environment
+2. Call `POST /api/ticktick/inbox/setup` to create inbox list
+3. Add tasks to "SB-OS Inbox" list in TickTick mobile app
+4. Call `POST /api/ticktick/sync` to pull tasks into SB-OS captures
+5. Process captures in SB-OS (convert to tasks, clarify, etc.)
+
 ---
 
 ## 13. Environment Configuration
@@ -1173,6 +1202,9 @@ Optional:
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `TICKTICK_ACCESS_TOKEN` | TickTick OAuth access token for mobile capture |
+| `TICKTICK_INBOX_PROJECT_ID` | (Optional) Specific TickTick project ID for inbox |
+| `TICKTICK_INBOX_NAME` | (Optional) Name of inbox project (default: "SB-OS Inbox") |
 
 ---
 

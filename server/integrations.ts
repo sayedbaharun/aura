@@ -238,6 +238,57 @@ async function checkGoogleDrive(): Promise<IntegrationInfo> {
 }
 
 /**
+ * Check TickTick API connection
+ */
+async function checkTickTick(): Promise<IntegrationInfo> {
+  const accessToken = process.env.TICKTICK_ACCESS_TOKEN;
+
+  if (!accessToken) {
+    return {
+      name: "TickTick",
+      status: "not_configured",
+      description: "Mobile task capture and sync",
+      lastChecked: new Date().toISOString(),
+    };
+  }
+
+  try {
+    const response = await fetch("https://api.ticktick.com/open/v1/project", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.ok) {
+      const projects = await response.json();
+      return {
+        name: "TickTick",
+        status: "connected",
+        description: `Mobile task capture (${projects.length} projects)`,
+        lastChecked: new Date().toISOString(),
+      };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        name: "TickTick",
+        status: "error",
+        description: "Mobile task capture and sync",
+        lastChecked: new Date().toISOString(),
+        errorMessage: errorData.error?.message || `HTTP ${response.status}`,
+      };
+    }
+  } catch (error: any) {
+    return {
+      name: "TickTick",
+      status: "error",
+      description: "Mobile task capture and sync",
+      lastChecked: new Date().toISOString(),
+      errorMessage: error.message || "Connection failed",
+    };
+  }
+}
+
+/**
  * Check Telegram Bot connection
  */
 async function checkTelegram(): Promise<IntegrationInfo> {
@@ -296,6 +347,7 @@ export async function getAllIntegrationStatuses(): Promise<IntegrationInfo[]> {
     checkGoogleDrive(),
     checkGmail(),
     checkTelegram(),
+    checkTickTick(),
   ]);
 
   return results;
@@ -311,6 +363,7 @@ export async function getIntegrationStatus(name: string): Promise<IntegrationInf
     "google-drive": checkGoogleDrive,
     gmail: checkGmail,
     telegram: checkTelegram,
+    ticktick: checkTickTick,
   };
 
   const checkFn = checks[name.toLowerCase()];
