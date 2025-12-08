@@ -35,14 +35,14 @@ const defaultTaskTypes: CategorySeed[] = [
 ];
 
 const defaultFocusSlots: CategorySeed[] = [
-  { type: "focus_slot", value: "morning_routine", label: "Morning Routine", description: "Wake up, planning, breakfast", icon: "Sun", color: "#f59e0b", metadata: { time: "7:00-10:00", isDefault: true }, sortOrder: 1 },
-  { type: "focus_slot", value: "gym", label: "Gym", description: "Workout and exercise", icon: "Dumbbell", color: "#ef4444", metadata: { time: "10:00-12:00", isDefault: true }, sortOrder: 2 },
-  { type: "focus_slot", value: "admin", label: "Admin Block", description: "Email, admin, quick tasks (90 mins)", icon: "Mail", color: "#8b5cf6", metadata: { time: "12:00-13:30", isDefault: true }, sortOrder: 3 },
-  { type: "focus_slot", value: "lunch", label: "Lunch", description: "Lunch break and recharge", icon: "Coffee", color: "#22c55e", metadata: { time: "13:30-15:00", isDefault: true }, sortOrder: 4 },
-  { type: "focus_slot", value: "walk", label: "Walk", description: "Daily walk for health and thinking", icon: "Footprints", color: "#06b6d4", metadata: { time: "15:00-16:00", isDefault: true }, sortOrder: 5 },
-  { type: "focus_slot", value: "deep_work", label: "Deep Work", description: "4-hour focused work session (PRIORITY)", icon: "Brain", color: "#3b82f6", metadata: { time: "16:00-20:00", isDefault: true }, sortOrder: 6 },
-  { type: "focus_slot", value: "evening", label: "Evening", description: "Wind down, personal time", icon: "Moon", color: "#6366f1", metadata: { time: "20:00-01:00", isDefault: true }, sortOrder: 7 },
-  { type: "focus_slot", value: "meetings", label: "Meetings", description: "Meetings, calls - can interrupt other slots", icon: "Users", color: "#10b981", metadata: { time: "Flexible", isDefault: true }, sortOrder: 8 },
+  { type: "focus_slot", value: "morning_routine", label: "Morning Routine", description: "Wake up, planning, breakfast", icon: "Sun", color: "#f59e0b", metadata: { time: "7:00-9:00", isDefault: true }, sortOrder: 1 },
+  { type: "focus_slot", value: "deep_work_1", label: "Deep Work 1", description: "Morning deep work session (PRIORITY)", icon: "Brain", color: "#3b82f6", metadata: { time: "9:00-11:00", isDefault: true }, sortOrder: 2 },
+  { type: "focus_slot", value: "admin_block", label: "Admin Block", description: "Email, admin, quick tasks", icon: "Mail", color: "#8b5cf6", metadata: { time: "11:00-12:00", isDefault: true }, sortOrder: 3 },
+  { type: "focus_slot", value: "lunch", label: "Lunch", description: "Lunch break and recharge", icon: "Coffee", color: "#22c55e", metadata: { time: "12:00-13:00", isDefault: true }, sortOrder: 4 },
+  { type: "focus_slot", value: "gym", label: "Gym / Workout", description: "Gym session and exercise", icon: "Dumbbell", color: "#ef4444", metadata: { time: "13:00-15:00", isDefault: true }, sortOrder: 5 },
+  { type: "focus_slot", value: "afternoon", label: "Afternoon", description: "Flexible time for meetings, calls, other work", icon: "Sun", color: "#06b6d4", metadata: { time: "15:00-23:00", isDefault: true }, sortOrder: 6 },
+  { type: "focus_slot", value: "evening_review", label: "Evening Review", description: "Reflection, planning tomorrow, wind down", icon: "Moon", color: "#6366f1", metadata: { time: "23:00-00:00", isDefault: true }, sortOrder: 7 },
+  { type: "focus_slot", value: "meetings", label: "Meetings", description: "Meetings, calls - can overlap other slots", icon: "Users", color: "#10b981", metadata: { time: "Flexible", isDefault: true }, sortOrder: 8 },
   { type: "focus_slot", value: "buffer", label: "Buffer", description: "Flex time, unexpected tasks", icon: "Clock", color: "#6b7280", metadata: { time: "Flexible", isDefault: true }, sortOrder: 9 },
 ];
 

@@ -128,20 +128,24 @@ export const domainEnum = pgEnum('domain', [
 ]);
 
 export const focusSlotEnum = pgEnum('focus_slot', [
-  'deep_work_1',      // Legacy: 9-11am
-  'deep_work_2',      // Legacy: 2-4pm
-  'admin_block_1',    // Legacy: 11am-12pm
-  'admin_block_2',    // Legacy: 4-5pm
-  'meetings',         // Flexible: Meetings, calls
-  'buffer',           // Flexible: Flex time, unexpected
-  'morning_routine',  // 7:00-10:00 AM: Health, planning, breakfast
-  'evening_review',   // Legacy: 5-6pm
-  'gym',              // 10:00 AM-12:00 PM: Exercise
-  'admin',            // 12:00-1:30 PM: Admin block
-  'lunch',            // 1:30-3:00 PM: Lunch break
-  'walk',             // 3:00-4:00 PM: Walking/movement
-  'deep_work',        // 4:00-8:00 PM: Deep work session
-  'evening'           // 8:00 PM-1:00 AM: Evening activities
+  // Current schedule slots
+  'morning_routine',  // 7:00-9:00 AM: Health, planning, breakfast
+  'deep_work_1',      // 9:00-11:00 AM: Deep work session 1
+  'admin_block',      // 11:00 AM-12:00 PM: Admin, email, quick tasks
+  'lunch',            // 12:00-1:00 PM: Lunch break
+  'gym',              // 1:00-3:00 PM: Gym/Workout
+  'afternoon',        // 3:00-11:00 PM: Flexible - meetings, calls, other work
+  'evening_review',   // 11:00 PM-12:00 AM: Evening reflection and planning
+  'meetings',         // Flexible: Meetings, calls (can overlap other slots)
+  'buffer',           // Flexible: Flex time, unexpected tasks
+  // Legacy values (kept for backward compatibility)
+  'deep_work_2',      // Legacy
+  'admin_block_1',    // Legacy
+  'admin_block_2',    // Legacy
+  'admin',            // Legacy
+  'walk',             // Legacy
+  'deep_work',        // Legacy
+  'evening'           // Legacy
 ]);
 
 export const captureTypeEnum = pgEnum('capture_type', [
