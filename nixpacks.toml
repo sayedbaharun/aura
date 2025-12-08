@@ -1,0 +1,14 @@
+# Nixpacks configuration for Railway deployment
+# Explicitly configure Node.js version and build steps
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start"
