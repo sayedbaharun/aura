@@ -4235,6 +4235,122 @@ RULES:
     }
   });
 
+  // Push SB-OS tasks with focusDate/dueDate to TickTick
+  app.post("/api/ticktick/push-tasks", async (req, res) => {
+    try {
+      // Get TickTick projects to map domains
+      const ticktickProjects = await ticktick.getProjects();
+
+      // Map domain names to TickTick project IDs (case-insensitive, emoji-stripped match)
+      const domainToProject: Record<string, string> = {};
+      const projectNameMap: Record<string, string> = {};
+
+      for (const project of ticktickProjects) {
+        // Strip emojis and normalize name
+        const normalizedName = project.name.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim().toLowerCase();
+        projectNameMap[normalizedName] = project.id;
+
+        // Map common domains
+        if (normalizedName.includes('work')) domainToProject['work'] = project.id;
+        if (normalizedName.includes('home')) domainToProject['home'] = project.id;
+        if (normalizedName.includes('health')) domainToProject['health'] = project.id;
+        if (normalizedName.includes('finance')) domainToProject['finance'] = project.id;
+        if (normalizedName.includes('travel')) domainToProject['travel'] = project.id;
+        if (normalizedName.includes('learning')) domainToProject['learning'] = project.id;
+        if (normalizedName.includes('play')) domainToProject['play'] = project.id;
+        if (normalizedName.includes('calls')) domainToProject['calls'] = project.id;
+        if (normalizedName.includes('personal')) domainToProject['personal'] = project.id;
+        if (normalizedName.includes('shopping')) domainToProject['shopping'] = project.id;
+      }
+
+      // Default project for unmapped domains (use first project or inbox)
+      const defaultProjectId = ticktickProjects[0]?.id;
+
+      // Get active tasks with focusDate or dueDate
+      const allTasks = await storage.getTasks({});
+      const tasksToSync = allTasks.filter(task =>
+        // Has a date
+        (task.focusDate || task.dueDate) &&
+        // Not done or cancelled
+        !['done', 'cancelled'].includes(task.status) &&
+        // Not already synced to TickTick
+        !task.externalId?.startsWith('ticktick:')
+      );
+
+      const result = {
+        pushed: 0,
+        skipped: 0,
+        errors: [] as string[],
+        items: [] as Array<{ taskId: string; title: string; tickTickId?: string; tickTickProject?: string }>,
+      };
+
+      // Map SB-OS priority to TickTick priority
+      const priorityMap: Record<string, number> = {
+        'P0': ticktick.TICKTICK_PRIORITY.HIGH,
+        'P1': ticktick.TICKTICK_PRIORITY.MEDIUM,
+        'P2': ticktick.TICKTICK_PRIORITY.LOW,
+        'P3': ticktick.TICKTICK_PRIORITY.NONE,
+      };
+
+      for (const task of tasksToSync) {
+        try {
+          // Find target project based on domain
+          const projectId = (task.domain && domainToProject[task.domain]) || defaultProjectId;
+
+          if (!projectId) {
+            result.errors.push(`No TickTick project found for task "${task.title}"`);
+            continue;
+          }
+
+          // Use focusDate or dueDate
+          const taskDate = task.focusDate || task.dueDate;
+
+          // Create in TickTick
+          const ticktickTask = await ticktick.createTask({
+            title: task.title,
+            projectId,
+            content: task.notes || undefined,
+            dueDate: taskDate ? `${taskDate}T09:00:00.000+0000` : undefined,
+            priority: task.priority ? priorityMap[task.priority] : ticktick.TICKTICK_PRIORITY.NONE,
+          });
+
+          // Update SB-OS task with TickTick ID
+          await storage.updateTask(task.id, {
+            externalId: `ticktick:${ticktickTask.id}`,
+          });
+
+          result.pushed++;
+          result.items.push({
+            taskId: task.id,
+            title: task.title,
+            tickTickId: ticktickTask.id,
+            tickTickProject: ticktickProjects.find(p => p.id === projectId)?.name,
+          });
+
+          logger.info({
+            taskId: task.id,
+            tickTickId: ticktickTask.id,
+            title: task.title,
+          }, "Pushed SB-OS task to TickTick");
+
+        } catch (error: any) {
+          result.errors.push(`Failed to push task "${task.title}": ${error.message}`);
+          logger.error({ error, taskId: task.id }, "Error pushing task to TickTick");
+        }
+      }
+
+      res.json({
+        success: true,
+        ...result,
+        message: `Pushed ${result.pushed} tasks to TickTick`,
+      });
+
+    } catch (error) {
+      logger.error({ error }, "Error pushing tasks to TickTick");
+      res.status(500).json({ error: "Failed to push tasks to TickTick" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
