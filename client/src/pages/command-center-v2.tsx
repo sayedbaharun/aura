@@ -130,7 +130,7 @@ export default function CommandCenterV2() {
             title: "Admin & Logistics",
             description: "Process inbox. Reply to emails. Clear the clutter.",
             action: "Open Inbox",
-            navigateTo: "/captures"
+            navigateTo: "/capture"
         },
         shutdown: {
             title: "System Shutdown",
@@ -354,7 +354,7 @@ export default function CommandCenterV2() {
                     </Card>
 
                     <Card
-                        onClick={() => navigate("/captures")}
+                        onClick={() => navigate("/capture")}
                         className="cursor-pointer hover:bg-muted/30 transition-colors"
                     >
                         <CardHeader className="pb-2">
