@@ -1,7 +1,7 @@
 // SB-OS Service Worker
-const CACHE_NAME = 'sb-os-v2';
-const STATIC_CACHE = 'sbos-static-v2';
-const DYNAMIC_CACHE = 'sbos-dynamic-v2';
+const CACHE_NAME = 'sb-os-v3';
+const STATIC_CACHE = 'sbos-static-v3';
+const DYNAMIC_CACHE = 'sbos-dynamic-v3';
 
 // Assets to cache immediately on install
 const STATIC_ASSETS = [
