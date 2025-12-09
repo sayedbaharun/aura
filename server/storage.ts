@@ -83,7 +83,7 @@ export interface IStorage {
   deleteVenture(id: string): Promise<void>;
 
   // Projects
-  getProjects(filters?: { ventureId?: string }): Promise<Project[]>;
+  getProjects(filters?: { ventureId?: string; limit?: number; offset?: number }): Promise<Project[]>;
   getProject(id: string): Promise<Project | undefined>;
   createProject(data: InsertProject): Promise<Project>;
   updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
@@ -121,7 +121,7 @@ export interface IStorage {
   getActiveTasksCount(projectId?: string): Promise<number>;
 
   // Capture Items
-  getCaptures(filters?: { clarified?: boolean; ventureId?: string }): Promise<CaptureItem[]>;
+  getCaptures(filters?: { clarified?: boolean; ventureId?: string; limit?: number; offset?: number }): Promise<CaptureItem[]>;
   getCapture(id: string): Promise<CaptureItem | undefined>;
   createCapture(data: InsertCaptureItem): Promise<CaptureItem>;
   updateCapture(id: string, data: Partial<InsertCaptureItem>): Promise<CaptureItem | undefined>;
@@ -157,6 +157,8 @@ export interface IStorage {
     domain?: string;
     status?: string;
     parentId?: string | null;
+    limit?: number;
+    offset?: number;
   }): Promise<Doc[]>;
   getDoc(id: string): Promise<Doc | undefined>;
   getDocChildren(parentId: string | null, ventureId?: string): Promise<Doc[]>;
@@ -372,19 +374,26 @@ export class DBStorage implements IStorage {
   // PROJECTS
   // ============================================================================
 
-  async getProjects(filters?: { ventureId?: string }): Promise<Project[]> {
+  async getProjects(filters?: { ventureId?: string; limit?: number; offset?: number }): Promise<Project[]> {
+    const queryLimit = filters?.limit ?? 100;
+    const queryOffset = filters?.offset ?? 0;
+
     if (filters?.ventureId) {
       return await this.db
         .select()
         .from(projects)
         .where(eq(projects.ventureId, filters.ventureId))
-        .orderBy(desc(projects.createdAt));
+        .orderBy(desc(projects.createdAt))
+        .limit(queryLimit)
+        .offset(queryOffset);
     }
 
     return await this.db
       .select()
       .from(projects)
-      .orderBy(desc(projects.createdAt));
+      .orderBy(desc(projects.createdAt))
+      .limit(queryLimit)
+      .offset(queryOffset);
   }
 
   async getProject(id: string): Promise<Project | undefined> {
@@ -691,8 +700,10 @@ export class DBStorage implements IStorage {
   // CAPTURE ITEMS
   // ============================================================================
 
-  async getCaptures(filters?: { clarified?: boolean; ventureId?: string }): Promise<CaptureItem[]> {
+  async getCaptures(filters?: { clarified?: boolean; ventureId?: string; limit?: number; offset?: number }): Promise<CaptureItem[]> {
     const conditions = [];
+    const queryLimit = filters?.limit ?? 100;
+    const queryOffset = filters?.offset ?? 0;
 
     if (filters?.clarified !== undefined) {
       conditions.push(eq(captureItems.clarified, filters.clarified));
@@ -708,14 +719,16 @@ export class DBStorage implements IStorage {
         .from(captureItems)
         .where(and(...conditions))
         .orderBy(desc(captureItems.createdAt))
-        .limit(100); // Reasonable limit for capture items
+        .limit(queryLimit)
+        .offset(queryOffset);
     }
 
     return await this.db
       .select()
       .from(captureItems)
       .orderBy(desc(captureItems.createdAt))
-      .limit(100); // Reasonable limit for capture items
+      .limit(queryLimit)
+      .offset(queryOffset);
   }
 
   async getCapture(id: string): Promise<CaptureItem | undefined> {
@@ -959,8 +972,12 @@ export class DBStorage implements IStorage {
     domain?: string;
     status?: string;
     parentId?: string | null;
+    limit?: number;
+    offset?: number;
   }): Promise<Doc[]> {
     const conditions = [];
+    const queryLimit = filters?.limit ?? 200;
+    const queryOffset = filters?.offset ?? 0;
 
     if (filters?.ventureId) {
       conditions.push(eq(docs.ventureId, filters.ventureId));
@@ -994,7 +1011,8 @@ export class DBStorage implements IStorage {
       .from(docs)
       .where(whereClause)
       .orderBy(docs.order, desc(docs.updatedAt))
-      .limit(200); // Reasonable limit for doc listings
+      .limit(queryLimit)
+      .offset(queryOffset);
   }
 
   async getDoc(id: string): Promise<Doc | undefined> {

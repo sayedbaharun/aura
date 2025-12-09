@@ -34,10 +34,16 @@ function isCalendarConfigured(): boolean {
   );
 }
 
-// Get all tasks (with filters)
+// Get all tasks (with filters and pagination)
+// Pagination: add ?limit=N&offset=M to paginate. Without these, returns array (backwards compatible)
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const filters = {
+    // Check if pagination is requested
+    const wantsPagination = req.query.limit !== undefined || req.query.offset !== undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const filters: Record<string, any> = {
       ventureId: req.query.venture_id as string,
       projectId: req.query.project_id as string,
       phaseId: req.query.phase_id as string,
@@ -46,6 +52,8 @@ router.get("/", async (req: Request, res: Response) => {
       focusDateGte: req.query.focus_date_gte as string,
       focusDateLte: req.query.focus_date_lte as string,
       dueDate: req.query.due_date as string,
+      limit,
+      offset,
     };
 
     // Remove undefined filters
@@ -59,14 +67,30 @@ router.get("/", async (req: Request, res: Response) => {
       const validStatusValues = statuses.filter(s => VALID_TASK_STATUSES.includes(s));
 
       if (validStatusValues.length === 0 && statuses.length > 0) {
-        return res.json([]);
+        return wantsPagination
+          ? res.json({ data: [], pagination: { limit, offset, hasMore: false } })
+          : res.json([]);
       }
 
       cleanFilters.status = validStatusValues.join(',');
     }
 
     const tasks = await storage.getTasks(cleanFilters);
-    res.json(tasks);
+
+    // Return with pagination metadata if pagination was requested, otherwise return array
+    if (wantsPagination) {
+      res.json({
+        data: tasks,
+        pagination: {
+          limit,
+          offset,
+          count: tasks.length,
+          hasMore: tasks.length === limit,
+        }
+      });
+    } else {
+      res.json(tasks);
+    }
   } catch (error) {
     logger.error({ error }, "Error fetching tasks");
     res.status(500).json({ error: "Failed to fetch tasks" });

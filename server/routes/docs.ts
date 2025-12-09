@@ -11,14 +11,21 @@ import { z } from "zod";
 const router = Router();
 
 // Get all docs (with filters)
+// Pagination: add ?limit=N&offset=M to paginate. Without these, returns array (backwards compatible)
 router.get("/", async (req: Request, res: Response) => {
   try {
+    const wantsPagination = req.query.limit !== undefined || req.query.offset !== undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 200, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+
     const filters: Record<string, any> = {
       ventureId: req.query.venture_id as string,
       projectId: req.query.project_id as string,
       type: req.query.type as string,
       domain: req.query.domain as string,
       status: req.query.status as string,
+      limit,
+      offset,
     };
 
     // Handle parentId - can be 'null' string for root level docs
@@ -31,7 +38,20 @@ router.get("/", async (req: Request, res: Response) => {
     );
 
     const docs = await storage.getDocs(cleanFilters);
-    res.json(docs);
+
+    if (wantsPagination) {
+      res.json({
+        data: docs,
+        pagination: {
+          limit,
+          offset,
+          count: docs.length,
+          hasMore: docs.length === limit,
+        }
+      });
+    } else {
+      res.json(docs);
+    }
   } catch (error) {
     logger.error({ error }, "Error fetching docs");
     res.status(500).json({ error: "Failed to fetch docs" });
