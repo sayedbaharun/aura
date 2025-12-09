@@ -25,11 +25,32 @@ function sanitizeBody(body: Record<string, any>): Record<string, any> {
 }
 
 // Get all projects (optionally filter by venture)
+// Pagination: add ?limit=N&offset=M to paginate. Without these, returns array (backwards compatible)
 router.get("/", async (req: Request, res: Response) => {
   try {
+    const wantsPagination = req.query.limit !== undefined || req.query.offset !== undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+
     const ventureId = req.query.venture_id as string;
-    const projects = await storage.getProjects(ventureId ? { ventureId } : undefined);
-    res.json(projects);
+    const filters: Record<string, any> = { limit, offset };
+    if (ventureId) filters.ventureId = ventureId;
+
+    const projects = await storage.getProjects(filters);
+
+    if (wantsPagination) {
+      res.json({
+        data: projects,
+        pagination: {
+          limit,
+          offset,
+          count: projects.length,
+          hasMore: projects.length === limit,
+        }
+      });
+    } else {
+      res.json(projects);
+    }
   } catch (error) {
     logger.error({ error }, "Error fetching projects");
     res.status(500).json({ error: "Failed to fetch projects" });

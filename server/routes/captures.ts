@@ -11,15 +11,34 @@ import { z } from "zod";
 const router = Router();
 
 // Get all captures (optionally filter by clarified status)
+// Pagination: add ?limit=N&offset=M to paginate. Without these, returns array (backwards compatible)
 router.get("/", async (req: Request, res: Response) => {
   try {
+    const wantsPagination = req.query.limit !== undefined || req.query.offset !== undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+
     const clarifiedParam = req.query.clarified as string;
-    const filters = clarifiedParam !== undefined
-      ? { clarified: clarifiedParam === 'true' }
-      : undefined;
+    const filters: Record<string, any> = { limit, offset };
+    if (clarifiedParam !== undefined) {
+      filters.clarified = clarifiedParam === 'true';
+    }
 
     const captures = await storage.getCaptures(filters);
-    res.json(captures);
+
+    if (wantsPagination) {
+      res.json({
+        data: captures,
+        pagination: {
+          limit,
+          offset,
+          count: captures.length,
+          hasMore: captures.length === limit,
+        }
+      });
+    } else {
+      res.json(captures);
+    }
   } catch (error) {
     logger.error({ error }, "Error fetching captures");
     res.status(500).json({ error: "Failed to fetch captures" });
