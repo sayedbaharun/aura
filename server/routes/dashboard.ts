@@ -196,28 +196,37 @@ router.get("/urgent", async (req: Request, res: Response) => {
   }
 });
 
-// Get top 3 outcomes for today
+// Get top 3 priority tasks for today
 router.get("/top3", async (req: Request, res: Response) => {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const day = await storage.getDay(today);
 
-    if (!day || !day.top3Outcomes) {
-      return res.json({ outcomes: [], day: null });
-    }
+    // Get top priority tasks (P0, P1) that are active
+    const topTasks = await storage.getTopPriorityTasks(today, 3);
 
-    res.json({
-      outcomes: day.top3Outcomes,
-      oneThingToShip: day.oneThingToShip,
-      day: {
-        id: day.id,
-        title: day.title,
-        mood: day.mood
-      }
+    // Enhance tasks with additional context
+    const enhancedTasks = topTasks.map(task => {
+      const isOverdue = task.dueDate && task.dueDate < today;
+      const isDueToday = task.dueDate === today;
+
+      return {
+        id: task.id,
+        title: task.title,
+        priority: task.priority,
+        status: task.status,
+        dueDate: task.dueDate,
+        focusDate: task.focusDate,
+        ventureId: task.ventureId,
+        projectId: task.projectId,
+        isOverdue,
+        isDueToday
+      };
     });
+
+    res.json({ tasks: enhancedTasks });
   } catch (error) {
     console.error("[Dashboard Top3] Error:", error);
-    res.status(500).json({ message: "Failed to fetch top 3 outcomes" });
+    res.status(500).json({ message: "Failed to fetch top 3 tasks" });
   }
 });
 
