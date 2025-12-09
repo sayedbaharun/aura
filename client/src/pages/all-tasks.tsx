@@ -23,6 +23,7 @@ import {
   Search,
   FolderKanban,
   Layers,
+  Upload,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -227,6 +228,35 @@ export default function AllTasks() {
     },
     onError: () => {
       toast({ title: "Failed to delete task", variant: "destructive" });
+    },
+  });
+
+  // Push tasks to TickTick mutation
+  const pushToTickTickMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/ticktick/push-tasks");
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      if (data.pushed > 0) {
+        toast({
+          title: "Pushed to TickTick!",
+          description: `${data.pushed} task${data.pushed > 1 ? "s" : ""} synced to TickTick.`,
+        });
+      } else {
+        toast({
+          title: "No tasks to push",
+          description: "All dated tasks are already synced or completed.",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Push failed",
+        description: error.message || "Could not push tasks to TickTick",
+        variant: "destructive",
+      });
     },
   });
 
@@ -446,6 +476,14 @@ export default function AllTasks() {
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => pushToTickTickMutation.mutate()}
+                disabled={pushToTickTickMutation.isPending}
+              >
+                <Upload className={`h-4 w-4 mr-2 ${pushToTickTickMutation.isPending ? "animate-pulse" : ""}`} />
+                {pushToTickTickMutation.isPending ? "Pushing..." : "Push to TickTick"}
+              </Button>
               <Button onClick={() => setCreateModalOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Task
