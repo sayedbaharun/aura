@@ -47,8 +47,9 @@ router.get("/:id", async (req: Request, res: Response) => {
     }
     res.json(entry);
   } catch (error) {
-    logger.error({ error }, "Error fetching health entry");
-    res.status(500).json({ error: "Failed to fetch health entry" });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ error, errorMessage, healthEntryId: req.params.id }, "Error fetching health entry");
+    res.status(500).json({ error: "Failed to fetch health entry", details: errorMessage });
   }
 });
 
@@ -98,8 +99,10 @@ router.patch("/:id", async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Invalid health entry data", details: error.errors });
     } else {
-      logger.error({ error }, "Error updating health entry");
-      res.status(500).json({ error: "Failed to update health entry" });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error({ error, errorMessage, errorStack, healthEntryId: req.params.id, body: req.body }, "Error updating health entry");
+      res.status(500).json({ error: "Failed to update health entry", details: errorMessage });
     }
   }
 });
