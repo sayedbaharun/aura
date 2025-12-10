@@ -27,6 +27,7 @@ import MorningRitual from "@/pages/morning-ritual";
 import EveningReview from "@/pages/evening-review";
 import Shopping from "@/pages/shopping";
 import Books from "@/pages/books";
+import Finance from "@/pages/finance";
 import CapturePage from "@/pages/capture";
 import TradingPage from "@/pages/trading";
 import AiChat from "@/pages/ai-chat";
@@ -71,6 +72,7 @@ function Router() {
             <Route path="/evening/:date" component={EveningReview} />
             <Route path="/shopping" component={Shopping} />
             <Route path="/books" component={Books} />
+            <Route path="/finance" component={Finance} />
             <Route path="/capture" component={CapturePage} />
             <Route path="/trading" component={TradingPage} />
             <Route path="/command-center" component={CommandCenter} />

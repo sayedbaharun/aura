@@ -1028,6 +1028,132 @@ export type InsertBook = z.infer<typeof insertBookSchema>;
 export type Book = typeof books.$inferSelect;
 
 // ----------------------------------------------------------------------------
+// FINANCIAL ACCOUNTS (Net Worth Tracking)
+// ----------------------------------------------------------------------------
+
+export const financialAccountTypeEnum = pgEnum('financial_account_type', [
+  // Cash & Bank
+  'checking',      // Bank checking accounts
+  'savings',       // Savings accounts
+  // Investments
+  'investment',    // Brokerage, ISA, 401k, etc.
+  'retirement',    // Pension, 401k, IRA
+  'crypto',        // Cryptocurrency wallets
+  // Physical Assets
+  'property',      // Real estate
+  'vehicle',       // Cars, motorcycles
+  'jewelry',       // Watches, gold, silver
+  'collectible',   // Art, wine, other collectibles
+  'other_asset',   // Anything else valuable
+  // Liabilities
+  'credit_card',   // Credit card debt
+  'loan',          // Personal loans, car loans
+  'mortgage',      // Property mortgages
+  'other_debt'     // Other debts
+]);
+
+export const financialAccounts = pgTable(
+  "financial_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),                                    // "Chase Checking", "Vanguard ISA", "Gold Coins"
+    type: financialAccountTypeEnum("type").notNull(),
+    institution: text("institution"),                                 // Bank/broker name or null for physical assets
+    currentBalance: real("current_balance").default(0).notNull(),    // Latest balance in USD
+    currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+    isAsset: boolean("is_asset").default(true).notNull(),            // true = asset, false = liability
+    isActive: boolean("is_active").default(true).notNull(),          // For hiding closed accounts
+    icon: varchar("icon", { length: 10 }),                           // Emoji icon
+    color: varchar("color", { length: 7 }),                          // Hex color
+    notes: text("notes"),
+    // Metadata for physical assets (purchase price, location, etc.)
+    metadata: jsonb("metadata").$type<{
+      purchasePrice?: number;
+      purchaseDate?: string;
+      location?: string;
+      serialNumber?: string;
+      estimatedValue?: number;
+      lastAppraisalDate?: string;
+      [key: string]: any;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_financial_accounts_type").on(table.type),
+    index("idx_financial_accounts_is_asset").on(table.isAsset),
+    index("idx_financial_accounts_is_active").on(table.isActive),
+    index("idx_financial_accounts_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertFinancialAccountSchema = createInsertSchema(financialAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFinancialAccount = z.infer<typeof insertFinancialAccountSchema>;
+export type FinancialAccount = typeof financialAccounts.$inferSelect;
+
+// Account Snapshots: Balance history for tracking changes over time
+export const accountSnapshots = pgTable(
+  "account_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id").references(() => financialAccounts.id, { onDelete: "cascade" }).notNull(),
+    balance: real("balance").notNull(),
+    note: text("note"),                                              // Optional note for this update
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_account_snapshots_account_id").on(table.accountId),
+    index("idx_account_snapshots_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertAccountSnapshotSchema = createInsertSchema(accountSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAccountSnapshot = z.infer<typeof insertAccountSnapshotSchema>;
+export type AccountSnapshot = typeof accountSnapshots.$inferSelect;
+
+// Net Worth Snapshots: Monthly rollup for historical tracking
+export const netWorthSnapshots = pgTable(
+  "net_worth_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    date: date("date").notNull().unique(),                           // Snapshot date (typically first of month)
+    totalAssets: real("total_assets").notNull(),
+    totalLiabilities: real("total_liabilities").notNull(),
+    netWorth: real("net_worth").notNull(),
+    breakdown: jsonb("breakdown").$type<{
+      byType: Record<string, number>;                                // { checking: 5000, savings: 10000, ... }
+      byAccount: { id: string; name: string; balance: number }[];   // Individual account balances
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_net_worth_snapshots_date").on(table.date),
+    index("idx_net_worth_snapshots_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertNetWorthSnapshotSchema = createInsertSchema(netWorthSnapshots)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    date: dateStringRequiredSchema,
+  });
+
+export type InsertNetWorthSnapshot = z.infer<typeof insertNetWorthSnapshotSchema>;
+export type NetWorthSnapshot = typeof netWorthSnapshots.$inferSelect;
+
+// ----------------------------------------------------------------------------
 // AI AGENT PROMPTS
 // ----------------------------------------------------------------------------
 
