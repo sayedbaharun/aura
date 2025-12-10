@@ -55,13 +55,15 @@ export default function EveningHealthLog() {
   useEffect(() => {
     if (todayEntry) {
       // Parse combined workout type (e.g., "strength_push" -> type: "strength", subType: "push")
+      // Note: "at_home" is a valid standalone type that should NOT be split
       let parsedWorkoutType = todayEntry.workoutType || "none";
       let parsedWorkoutSubType = "";
 
-      if (parsedWorkoutType.includes("_")) {
-        const [type, subType] = parsedWorkoutType.split("_");
+      // Only split if it's a known type with subtype (strength or cardio)
+      if (parsedWorkoutType.startsWith("strength_") || parsedWorkoutType.startsWith("cardio_")) {
+        const [type, ...rest] = parsedWorkoutType.split("_");
         parsedWorkoutType = type;
-        parsedWorkoutSubType = subType;
+        parsedWorkoutSubType = rest.join("_");
       }
 
       setFormData({
@@ -150,13 +152,15 @@ export default function EveningHealthLog() {
 
   const handleCancel = () => {
     if (todayEntry) {
+      // Note: "at_home" is a valid standalone type that should NOT be split
       let parsedWorkoutType = todayEntry.workoutType || "none";
       let parsedWorkoutSubType = "";
 
-      if (parsedWorkoutType.includes("_")) {
-        const [type, subType] = parsedWorkoutType.split("_");
+      // Only split if it's a known type with subtype (strength or cardio)
+      if (parsedWorkoutType.startsWith("strength_") || parsedWorkoutType.startsWith("cardio_")) {
+        const [type, ...rest] = parsedWorkoutType.split("_");
         parsedWorkoutType = type;
-        parsedWorkoutSubType = subType;
+        parsedWorkoutSubType = rest.join("_");
       }
 
       setFormData({
