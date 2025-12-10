@@ -7,6 +7,7 @@ import { storage } from "../storage";
 import { logger } from "../logger";
 import { insertHealthEntrySchema } from "@shared/schema";
 import { z } from "zod";
+import { isValidUUID } from "./constants";
 
 const router = Router();
 
@@ -33,7 +34,14 @@ router.get("/", async (req: Request, res: Response) => {
 // Get single health entry
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const entry = await storage.getHealthEntry(req.params.id);
+    const { id } = req.params;
+
+    // Validate UUID format to prevent PostgreSQL errors
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: "Invalid health entry ID format" });
+    }
+
+    const entry = await storage.getHealthEntry(id);
     if (!entry) {
       return res.status(404).json({ error: "Health entry not found" });
     }
@@ -73,8 +81,15 @@ router.post("/", async (req: Request, res: Response) => {
 // Update health entry
 router.patch("/:id", async (req: Request, res: Response) => {
   try {
+    const { id } = req.params;
+
+    // Validate UUID format to prevent PostgreSQL errors
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: "Invalid health entry ID format" });
+    }
+
     const updates = insertHealthEntrySchema.partial().parse(req.body);
-    const entry = await storage.updateHealthEntry(req.params.id, updates);
+    const entry = await storage.updateHealthEntry(id, updates);
     if (!entry) {
       return res.status(404).json({ error: "Health entry not found" });
     }
