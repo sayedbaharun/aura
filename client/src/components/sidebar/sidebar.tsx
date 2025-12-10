@@ -24,6 +24,7 @@ import {
   Calendar,
   Plug,
   Layers,
+  DollarSign,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
 import NavItem from "./nav-item";
@@ -159,6 +160,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[]; default
         href: "/books",
         icon: Library,
         label: "Books",
+      },
+      {
+        href: "/finance",
+        icon: DollarSign,
+        label: "Finance",
       },
     ],
   },

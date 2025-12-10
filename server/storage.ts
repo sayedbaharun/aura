@@ -43,6 +43,12 @@ import {
   type InsertTradingStrategy,
   type DailyTradingChecklist,
   type InsertDailyTradingChecklist,
+  type FinancialAccount,
+  type InsertFinancialAccount,
+  type AccountSnapshot,
+  type InsertAccountSnapshot,
+  type NetWorthSnapshot,
+  type InsertNetWorthSnapshot,
   ventures,
   projects,
   phases,
@@ -65,6 +71,9 @@ import {
   ventureAgentActions,
   tradingStrategies,
   dailyTradingChecklists,
+  financialAccounts,
+  accountSnapshots,
+  netWorthSnapshots,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
@@ -201,6 +210,23 @@ export interface IStorage {
   updateBook(id: string, data: Partial<InsertBook>): Promise<Book | undefined>;
   deleteBook(id: string): Promise<void>;
 
+  // Financial Accounts
+  getFinancialAccounts(filters?: { type?: string; isActive?: boolean; isAsset?: boolean }): Promise<FinancialAccount[]>;
+  getFinancialAccount(id: string): Promise<FinancialAccount | undefined>;
+  createFinancialAccount(data: InsertFinancialAccount): Promise<FinancialAccount>;
+  updateFinancialAccount(id: string, data: Partial<InsertFinancialAccount>): Promise<FinancialAccount | undefined>;
+  deleteFinancialAccount(id: string): Promise<void>;
+  updateAccountBalance(accountId: string, balance: number, note?: string): Promise<FinancialAccount>;
+
+  // Account Snapshots
+  getAccountSnapshots(accountId: string, limit?: number): Promise<AccountSnapshot[]>;
+  createAccountSnapshot(data: InsertAccountSnapshot): Promise<AccountSnapshot>;
+
+  // Net Worth
+  getNetWorth(): Promise<{ totalAssets: number; totalLiabilities: number; netWorth: number; byType: Record<string, number> }>;
+  getNetWorthSnapshots(limit?: number): Promise<NetWorthSnapshot[]>;
+  createNetWorthSnapshot(): Promise<NetWorthSnapshot>;
+
   // Schema Management
   ensureSchema(): Promise<void>;
 
@@ -285,6 +311,102 @@ export class DBStorage implements IStorage {
         await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_daily_trading_checklists_date" ON "daily_trading_checklists" ("date")`);
         await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_daily_trading_checklists_strategy_id" ON "daily_trading_checklists" ("strategy_id")`);
         console.log("✅ Auto-Migration: Created daily_trading_checklists table");
+      }
+
+      // Check and create financial_account_type enum
+      const finAccountTypeEnumExists = await this.db.execute(sql`
+        SELECT 1 FROM pg_type WHERE typname = 'financial_account_type'
+      `);
+
+      if (finAccountTypeEnumExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating financial_account_type enum...");
+        await this.db.execute(sql`
+          CREATE TYPE "financial_account_type" AS ENUM (
+            'checking', 'savings', 'investment', 'retirement', 'crypto',
+            'property', 'vehicle', 'jewelry', 'collectible', 'other_asset',
+            'credit_card', 'loan', 'mortgage', 'other_debt'
+          )
+        `);
+        console.log("✅ Auto-Migration: Created financial_account_type enum");
+      }
+
+      // Check and create financial_accounts table
+      const financialAccountsExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'financial_accounts'
+      `);
+
+      if (financialAccountsExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating financial_accounts table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "financial_accounts" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "name" text NOT NULL,
+            "type" "financial_account_type" NOT NULL,
+            "institution" text,
+            "current_balance" real DEFAULT 0 NOT NULL,
+            "currency" varchar(3) DEFAULT 'USD' NOT NULL,
+            "is_asset" boolean DEFAULT true NOT NULL,
+            "is_active" boolean DEFAULT true NOT NULL,
+            "icon" varchar(10),
+            "color" varchar(7),
+            "notes" text,
+            "metadata" jsonb,
+            "created_at" timestamp DEFAULT now() NOT NULL,
+            "updated_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_financial_accounts_type" ON "financial_accounts" ("type")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_financial_accounts_is_asset" ON "financial_accounts" ("is_asset")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_financial_accounts_is_active" ON "financial_accounts" ("is_active")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_financial_accounts_created_at" ON "financial_accounts" ("created_at")`);
+        console.log("✅ Auto-Migration: Created financial_accounts table");
+      }
+
+      // Check and create account_snapshots table
+      const accountSnapshotsExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'account_snapshots'
+      `);
+
+      if (accountSnapshotsExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating account_snapshots table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "account_snapshots" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "account_id" uuid NOT NULL REFERENCES "financial_accounts"("id") ON DELETE CASCADE,
+            "balance" real NOT NULL,
+            "note" text,
+            "created_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_account_snapshots_account_id" ON "account_snapshots" ("account_id")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_account_snapshots_created_at" ON "account_snapshots" ("created_at")`);
+        console.log("✅ Auto-Migration: Created account_snapshots table");
+      }
+
+      // Check and create net_worth_snapshots table
+      const netWorthSnapshotsExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'net_worth_snapshots'
+      `);
+
+      if (netWorthSnapshotsExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating net_worth_snapshots table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "net_worth_snapshots" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "date" date NOT NULL UNIQUE,
+            "total_assets" real NOT NULL,
+            "total_liabilities" real NOT NULL,
+            "net_worth" real NOT NULL,
+            "breakdown" jsonb,
+            "created_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_net_worth_snapshots_date" ON "net_worth_snapshots" ("date")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_net_worth_snapshots_created_at" ON "net_worth_snapshots" ("created_at")`);
+        console.log("✅ Auto-Migration: Created net_worth_snapshots table");
       }
     } catch (error) {
       console.error("❌ Auto-Migration Error:", error);
@@ -1812,6 +1934,244 @@ export class DBStorage implements IStorage {
     } catch (error) {
       console.error("Error deleting daily trading checklist:", error);
     }
+  }
+
+  // ============================================================================
+  // FINANCIAL ACCOUNTS
+  // ============================================================================
+
+  async getFinancialAccounts(filters?: { type?: string; isActive?: boolean; isAsset?: boolean }): Promise<FinancialAccount[]> {
+    try {
+      const conditions = [];
+
+      if (filters?.type) {
+        conditions.push(eq(financialAccounts.type, filters.type as any));
+      }
+      if (filters?.isActive !== undefined) {
+        conditions.push(eq(financialAccounts.isActive, filters.isActive));
+      }
+      if (filters?.isAsset !== undefined) {
+        conditions.push(eq(financialAccounts.isAsset, filters.isAsset));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return await this.db
+        .select()
+        .from(financialAccounts)
+        .where(whereClause)
+        .orderBy(financialAccounts.isAsset, financialAccounts.type, financialAccounts.name);
+    } catch (error) {
+      console.error("Error fetching financial accounts:", error);
+      return [];
+    }
+  }
+
+  async getFinancialAccount(id: string): Promise<FinancialAccount | undefined> {
+    try {
+      const [account] = await this.db
+        .select()
+        .from(financialAccounts)
+        .where(eq(financialAccounts.id, id))
+        .limit(1);
+      return account;
+    } catch (error) {
+      console.error("Error fetching financial account:", error);
+      return undefined;
+    }
+  }
+
+  async createFinancialAccount(data: InsertFinancialAccount): Promise<FinancialAccount> {
+    const [account] = await this.db
+      .insert(financialAccounts)
+      .values(data as any)
+      .returning();
+
+    // Create initial snapshot
+    await this.createAccountSnapshot({
+      accountId: account.id,
+      balance: account.currentBalance,
+      note: "Initial balance",
+    });
+
+    return account;
+  }
+
+  async updateFinancialAccount(id: string, updates: Partial<InsertFinancialAccount>): Promise<FinancialAccount | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(financialAccounts)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(financialAccounts.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating financial account:", error);
+      return undefined;
+    }
+  }
+
+  async deleteFinancialAccount(id: string): Promise<void> {
+    try {
+      await this.db.delete(financialAccounts).where(eq(financialAccounts.id, id));
+    } catch (error) {
+      console.error("Error deleting financial account:", error);
+    }
+  }
+
+  async updateAccountBalance(accountId: string, balance: number, note?: string): Promise<FinancialAccount> {
+    // Update the account's current balance
+    const [updated] = await this.db
+      .update(financialAccounts)
+      .set({ currentBalance: balance, updatedAt: new Date() })
+      .where(eq(financialAccounts.id, accountId))
+      .returning();
+
+    if (!updated) {
+      throw new Error("Account not found");
+    }
+
+    // Create a snapshot for the balance change
+    await this.createAccountSnapshot({
+      accountId,
+      balance,
+      note: note || undefined,
+    });
+
+    return updated;
+  }
+
+  // ============================================================================
+  // ACCOUNT SNAPSHOTS
+  // ============================================================================
+
+  async getAccountSnapshots(accountId: string, limit: number = 100): Promise<AccountSnapshot[]> {
+    try {
+      return await this.db
+        .select()
+        .from(accountSnapshots)
+        .where(eq(accountSnapshots.accountId, accountId))
+        .orderBy(desc(accountSnapshots.createdAt))
+        .limit(limit);
+    } catch (error) {
+      console.error("Error fetching account snapshots:", error);
+      return [];
+    }
+  }
+
+  async createAccountSnapshot(data: InsertAccountSnapshot): Promise<AccountSnapshot> {
+    const [snapshot] = await this.db
+      .insert(accountSnapshots)
+      .values(data as any)
+      .returning();
+    return snapshot;
+  }
+
+  // ============================================================================
+  // NET WORTH
+  // ============================================================================
+
+  async getNetWorth(): Promise<{ totalAssets: number; totalLiabilities: number; netWorth: number; byType: Record<string, number> }> {
+    try {
+      const accounts = await this.getFinancialAccounts({ isActive: true });
+
+      let totalAssets = 0;
+      let totalLiabilities = 0;
+      const byType: Record<string, number> = {};
+
+      for (const account of accounts) {
+        const balance = account.currentBalance;
+
+        if (account.isAsset) {
+          totalAssets += balance;
+        } else {
+          totalLiabilities += balance;
+        }
+
+        // Group by type
+        byType[account.type] = (byType[account.type] || 0) + balance;
+      }
+
+      return {
+        totalAssets,
+        totalLiabilities,
+        netWorth: totalAssets - totalLiabilities,
+        byType,
+      };
+    } catch (error) {
+      console.error("Error calculating net worth:", error);
+      return { totalAssets: 0, totalLiabilities: 0, netWorth: 0, byType: {} };
+    }
+  }
+
+  async getNetWorthSnapshots(limit: number = 12): Promise<NetWorthSnapshot[]> {
+    try {
+      return await this.db
+        .select()
+        .from(netWorthSnapshots)
+        .orderBy(desc(netWorthSnapshots.date))
+        .limit(limit);
+    } catch (error) {
+      console.error("Error fetching net worth snapshots:", error);
+      return [];
+    }
+  }
+
+  async createNetWorthSnapshot(): Promise<NetWorthSnapshot> {
+    const netWorth = await this.getNetWorth();
+    const accounts = await this.getFinancialAccounts({ isActive: true });
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Check if snapshot for today already exists
+    const existing = await this.db
+      .select()
+      .from(netWorthSnapshots)
+      .where(eq(netWorthSnapshots.date, today))
+      .limit(1);
+
+    if (existing.length > 0) {
+      // Update existing snapshot
+      const [updated] = await this.db
+        .update(netWorthSnapshots)
+        .set({
+          totalAssets: netWorth.totalAssets,
+          totalLiabilities: netWorth.totalLiabilities,
+          netWorth: netWorth.netWorth,
+          breakdown: {
+            byType: netWorth.byType,
+            byAccount: accounts.map(a => ({
+              id: a.id,
+              name: a.name,
+              balance: a.currentBalance,
+            })),
+          },
+        })
+        .where(eq(netWorthSnapshots.id, existing[0].id))
+        .returning();
+      return updated;
+    }
+
+    // Create new snapshot
+    const [snapshot] = await this.db
+      .insert(netWorthSnapshots)
+      .values({
+        date: today,
+        totalAssets: netWorth.totalAssets,
+        totalLiabilities: netWorth.totalLiabilities,
+        netWorth: netWorth.netWorth,
+        breakdown: {
+          byType: netWorth.byType,
+          byAccount: accounts.map(a => ({
+            id: a.id,
+            name: a.name,
+            balance: a.currentBalance,
+          })),
+        },
+      } as any)
+      .returning();
+
+    return snapshot;
   }
 
 }
