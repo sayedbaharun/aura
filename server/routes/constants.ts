@@ -29,3 +29,14 @@ export const VALID_TASK_STATUSES = ['idea', 'next', 'in_progress', 'waiting', 'd
 
 // Priority order for sorting
 export const PRIORITY_ORDER: Record<string, number> = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
+
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Validate if a string is a valid UUID format
+ * This helps prevent 500 errors from PostgreSQL when invalid UUIDs are passed
+ */
+export function isValidUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
