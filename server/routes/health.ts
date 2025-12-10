@@ -89,6 +89,9 @@ router.patch("/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid health entry ID format" });
     }
 
+    // Log incoming request for debugging
+    logger.info({ healthEntryId: id, body: req.body }, "Health entry update request");
+
     const updates = insertHealthEntrySchema.partial().parse(req.body);
     const entry = await storage.updateHealthEntry(id, updates);
     if (!entry) {
@@ -97,12 +100,12 @@ router.patch("/:id", async (req: Request, res: Response) => {
     res.json(entry);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: "Invalid health entry data", details: error.errors });
+      res.status(400).json({ error: "Invalid health entry data", details: error.errors, receivedData: req.body });
     } else {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error({ error, errorMessage, errorStack, healthEntryId: req.params.id, body: req.body }, "Error updating health entry");
-      res.status(500).json({ error: "Failed to update health entry", details: errorMessage });
+      res.status(500).json({ error: "Failed to update health entry", details: errorMessage, receivedData: req.body });
     }
   }
 });
