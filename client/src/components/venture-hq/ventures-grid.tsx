@@ -87,7 +87,7 @@ export default function VenturesGrid({ viewMode, statusFilter }: VenturesGridPro
     ).length;
 
     const ventureTasks = Array.isArray(tasks) ? tasks.filter((t) => t.ventureId === ventureId) : [];
-    const openTasks = ventureTasks.filter((t) => t.status !== "done" && t.status !== "cancelled").length;
+    const openTasks = ventureTasks.filter((t) => t.status !== "completed" && t.status !== "on_hold").length;
 
     return {
       activeProjects,

@@ -51,11 +51,11 @@ export default function ThisWeekPreview() {
 
     const dayTasks = tasks.filter(
       t => (t.focusDate === dateStr || t.dueDate === dateStr) &&
-           t.status !== "done" && t.status !== "cancelled"
+           t.status !== "completed" && t.status !== "on_hold"
     );
     const doneTasks = tasks.filter(
       t => (t.focusDate === dateStr || t.dueDate === dateStr) &&
-           t.status === "done"
+           t.status === "completed"
     );
 
     const isToday = isSameDay(date, today);
@@ -83,7 +83,7 @@ export default function ThisWeekPreview() {
 
   // Find upcoming deadlines/important items
   const upcomingDeadlines = tasks
-    .filter(t => t.dueDate && t.dueDate > todayStr && t.status !== "done")
+    .filter(t => t.dueDate && t.dueDate > todayStr && t.status !== "completed")
     .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""))
     .slice(0, 3);
 

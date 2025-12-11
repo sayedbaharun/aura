@@ -67,8 +67,8 @@ export default function TodaysFocus() {
   // Filter tasks: focusDate = today OR dueDate = today OR overdue
   // Use startsWith for date comparison to handle any timezone suffix issues
   const todaysTasks = allTasks.filter(task => {
-    // Skip cancelled tasks
-    if (task.status === "cancelled") return false;
+    // Skip on_hold tasks
+    if (task.status === "on_hold") return false;
 
     // Check focusDate - compare as strings (both should be YYYY-MM-DD format)
     const hasFocusToday = task.focusDate?.startsWith(todayStr);
@@ -76,11 +76,11 @@ export default function TodaysFocus() {
     // Check dueDate
     const hasDueToday = task.dueDate?.startsWith(todayStr);
 
-    // Check if overdue (past due date, not done)
+    // Check if overdue (past due date, not completed)
     const isOverdue = task.dueDate &&
       !task.dueDate.startsWith(todayStr) &&
       isPast(parseISO(task.dueDate)) &&
-      task.status !== "done";
+      task.status !== "completed";
 
     return hasFocusToday || hasDueToday || isOverdue;
   });
@@ -93,8 +93,8 @@ export default function TodaysFocus() {
   const isLoading = dayLoading || tasksLoading;
 
   // Calculate metrics
-  const activeTasks = todaysTasks.filter(t => t.status !== "done");
-  const completedTasks = todaysTasks.filter(t => t.status === "done");
+  const activeTasks = todaysTasks.filter(t => t.status !== "completed");
+  const completedTasks = todaysTasks.filter(t => t.status === "completed");
   const totalScheduledHours = todaysTasks.reduce((sum, t) => sum + (t.estEffort || 0), 0);
 
   // Sort by priority for display
@@ -103,16 +103,16 @@ export default function TodaysFocus() {
     return priorityOrder[a.priority] - priorityOrder[b.priority];
   });
 
-  // Find overdue tasks (past due date, not done, not cancelled)
+  // Find overdue tasks (past due date, not completed, not on_hold)
   const overdueTasks = allTasks.filter(task => {
-    if (!task.dueDate || task.status === "done" || task.status === "cancelled") return false;
+    if (!task.dueDate || task.status === "completed" || task.status === "on_hold") return false;
     const isDueToday = task.dueDate.startsWith(todayStr);
     return !isDueToday && isPast(parseISO(task.dueDate));
   });
 
-  // Find tasks due today (not done, not cancelled)
+  // Find tasks due today (not completed, not on_hold)
   const dueTodayTasks = todaysTasks.filter(task => {
-    if (!task.dueDate || task.status === "done" || task.status === "cancelled") return false;
+    if (!task.dueDate || task.status === "completed" || task.status === "on_hold") return false;
     return task.dueDate.startsWith(todayStr);
   });
 

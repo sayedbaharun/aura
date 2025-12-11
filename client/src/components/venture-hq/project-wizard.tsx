@@ -912,7 +912,7 @@ export default function ProjectWizard({
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     You can set or adjust dates later. Tasks will be created with
-                    status "idea" so you can promote them to "next" when ready.
+                    status "todo" so you can start working on them when ready.
                   </p>
                 </CardContent>
               </Card>

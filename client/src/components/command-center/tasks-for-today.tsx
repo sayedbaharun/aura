@@ -55,7 +55,7 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
 
   // Filter tasks based on showOnlyIncomplete prop
   const tasks = showOnlyIncomplete
-    ? (Array.isArray(rawTasks) ? rawTasks : []).filter((t) => t.status !== "done" && t.status !== "cancelled")
+    ? (Array.isArray(rawTasks) ? rawTasks : []).filter((t) => t.status !== "completed" && t.status !== "on_hold")
     : (Array.isArray(rawTasks) ? rawTasks : []);
 
   const { data: ventures = [] } = useQuery<Venture[]>({
@@ -106,7 +106,7 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
   });
 
   const handleToggleTask = (task: Task) => {
-    const newStatus = task.status === "done" ? "in_progress" : "done";
+    const newStatus = task.status === "completed" ? "in_progress" : "completed";
     updateTaskMutation.mutate({
       id: task.id,
       data: { status: newStatus },
@@ -263,11 +263,11 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
                         key={task.id}
                         className={cn(
                           "flex items-start gap-3 p-3 rounded-lg border",
-                          task.status === "done" && "opacity-60"
+                          task.status === "completed" && "opacity-60"
                         )}
                       >
                         <Checkbox
-                          checked={task.status === "done"}
+                          checked={task.status === "completed"}
                           onCheckedChange={() => handleToggleTask(task)}
                           className="mt-1"
                         />
@@ -283,7 +283,7 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
                           <p
                             className={cn(
                               "text-sm font-medium cursor-pointer hover:underline",
-                              task.status === "done" && "line-through"
+                              task.status === "completed" && "line-through"
                             )}
                             onClick={() => openTaskDetail(task.id)}
                           >

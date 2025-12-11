@@ -163,7 +163,7 @@ IMPORTANT INSTRUCTIONS:
             properties: {
               status: {
                 type: "string",
-                enum: ["idea", "next", "in_progress", "waiting", "done", "cancelled"],
+                enum: ["todo", "in_progress", "completed", "on_hold"],
                 description: "Filter by task status",
               },
               priority: {
@@ -238,7 +238,7 @@ IMPORTANT INSTRUCTIONS:
               title: { type: "string", description: "Task title" },
               notes: { type: "string", description: "Task description/notes" },
               priority: { type: "string", enum: ["P0", "P1", "P2", "P3"], description: "Priority level" },
-              status: { type: "string", enum: ["idea", "next", "in_progress"], description: "Initial status (default: next)" },
+              status: { type: "string", enum: ["todo", "in_progress"], description: "Initial status (default: todo)" },
               projectId: { type: "string", description: "Assign to project (optional)" },
               dueDate: { type: "string", description: "Due date in YYYY-MM-DD format (optional)" },
             },
@@ -258,7 +258,7 @@ IMPORTANT INSTRUCTIONS:
             type: "object",
             properties: {
               taskId: { type: "string", description: "Task ID" },
-              status: { type: "string", enum: ["idea", "next", "in_progress", "waiting", "done", "cancelled"] },
+              status: { type: "string", enum: ["todo", "in_progress", "completed", "on_hold"] },
             },
             required: ["taskId", "status"],
           },

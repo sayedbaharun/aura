@@ -59,9 +59,9 @@ export default function DeepWorkQueue({ onScheduleTask }: NeedsSchedulingQueuePr
   });
 
   // Filter: has dueDate but NO focusDate (committed but not scheduled)
-  // Also filter out done/cancelled tasks
+  // Also filter out completed/on_hold tasks
   const needsSchedulingTasks = allTasks.filter(
-    (task) => task.dueDate && !task.focusDate && task.status !== "done" && task.status !== "cancelled"
+    (task) => task.dueDate && !task.focusDate && task.status !== "completed" && task.status !== "on_hold"
   );
 
   const { data: ventures = [] } = useQuery<Venture[]>({

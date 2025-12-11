@@ -84,7 +84,7 @@ export default function DayDetailModal({
     enabled: !!date,
   });
 
-  const completedTasks = tasks.filter((t) => t.status === "done");
+  const completedTasks = tasks.filter((t) => t.status === "completed");
 
   if (!date) return null;
 
@@ -311,7 +311,7 @@ export default function DayDetailModal({
                   <div key={task.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                     <div className="text-emerald-600 font-bold">✓</div>
                     <div className="flex-1 text-sm">{task.title}</div>
-                    <Badge variant="secondary">Done</Badge>
+                    <Badge variant="secondary">Completed</Badge>
                   </div>
                 ))}
               </div>

@@ -67,12 +67,10 @@ import type { Task, Venture, Project, Phase } from "@shared/schema";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
-  { value: "idea", label: "Idea", icon: Lightbulb },
-  { value: "next", label: "Next", icon: Circle },
+  { value: "todo", label: "To Do", icon: Circle },
   { value: "in_progress", label: "In Progress", icon: Hourglass },
-  { value: "waiting", label: "Waiting", icon: Pause },
-  { value: "done", label: "Done", icon: CheckCircle2 },
-  { value: "cancelled", label: "Cancelled", icon: XCircle },
+  { value: "completed", label: "Completed", icon: CheckCircle2 },
+  { value: "on_hold", label: "On Hold", icon: Pause },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -112,18 +110,14 @@ const getPriorityColor = (priority: string | null) => {
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "done":
+    case "completed":
       return "text-green-600";
     case "in_progress":
       return "text-blue-600";
-    case "next":
-      return "text-purple-600";
-    case "waiting":
+    case "todo":
+      return "text-gray-600";
+    case "on_hold":
       return "text-yellow-600";
-    case "cancelled":
-      return "text-gray-400";
-    case "idea":
-      return "text-cyan-600";
     default:
       return "text-gray-500";
   }
@@ -131,18 +125,14 @@ const getStatusColor = (status: string) => {
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case "done":
-      return { label: "Done", className: "bg-green-500/20 text-green-400 border-green-500/30" };
+    case "completed":
+      return { label: "Completed", className: "bg-green-500/20 text-green-400 border-green-500/30" };
     case "in_progress":
       return { label: "In Progress", className: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
-    case "next":
-      return { label: "Next", className: "bg-purple-500/20 text-purple-400 border-purple-500/30" };
-    case "waiting":
-      return { label: "Waiting", className: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" };
-    case "cancelled":
-      return { label: "Cancelled", className: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
-    case "idea":
-      return { label: "Idea", className: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" };
+    case "todo":
+      return { label: "To Do", className: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
+    case "on_hold":
+      return { label: "On Hold", className: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" };
     default:
       return { label: status, className: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
   }
@@ -151,11 +141,9 @@ const getStatusBadge = (status: string) => {
 const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 const statusOrder: Record<string, number> = {
   in_progress: 0,
-  next: 1,
-  waiting: 2,
-  idea: 3,
-  done: 4,
-  cancelled: 5,
+  todo: 1,
+  on_hold: 2,
+  completed: 3,
 };
 
 export default function AllTasks() {
@@ -405,10 +393,10 @@ export default function AllTasks() {
 
   // Calculate stats
   const stats = useMemo(() => {
-    const outstanding = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
+    const outstanding = tasks.filter((t) => t.status !== "completed");
     const inProgress = tasks.filter((t) => t.status === "in_progress");
-    const done = tasks.filter((t) => t.status === "done");
-    return { total: tasks.length, outstanding: outstanding.length, inProgress: inProgress.length, done: done.length };
+    const completed = tasks.filter((t) => t.status === "completed");
+    return { total: tasks.length, outstanding: outstanding.length, inProgress: inProgress.length, completed: completed.length };
   }, [tasks]);
 
   // Clear all filters
@@ -432,12 +420,12 @@ export default function AllTasks() {
     focusDateFilter;
 
   const handleToggleStatus = (task: Task) => {
-    const newStatus = task.status === "done" ? "next" : "done";
+    const newStatus = task.status === "completed" ? "todo" : "completed";
     updateTaskMutation.mutate({
       taskId: task.id,
       updates: {
         status: newStatus,
-        completedAt: newStatus === "done" ? new Date() : null,
+        completedAt: newStatus === "completed" ? new Date() : null,
       },
     });
   };
@@ -753,7 +741,7 @@ export default function AllTasks() {
                         key={task.id}
                         className={cn(
                           "cursor-pointer group",
-                          task.status === "done" && "opacity-60"
+                          task.status === "completed" && "opacity-60"
                         )}
                         onClick={() => openTaskDetail(task.id)}
                       >
@@ -765,7 +753,7 @@ export default function AllTasks() {
                         {/* Checkbox */}
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
-                            checked={task.status === "done"}
+                            checked={task.status === "completed"}
                             onCheckedChange={() => handleToggleStatus(task)}
                             className="h-5 w-5"
                           />
@@ -782,7 +770,7 @@ export default function AllTasks() {
                         <TableCell>
                           <span className={cn(
                             "font-medium",
-                            task.status === "done" && "line-through text-muted-foreground"
+                            task.status === "completed" && "line-through text-muted-foreground"
                           )}>
                             {task.title}
                           </span>
@@ -893,7 +881,7 @@ export default function AllTasks() {
                                 className={cn(
                                   "h-8 px-2 text-sm font-normal justify-start",
                                   !task.dueDate && "text-muted-foreground",
-                                  task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" && "text-red-500"
+                                  task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "completed" && "text-red-500"
                                 )}
                               >
                                 <CalendarDays className="h-3 w-3 mr-1.5 text-muted-foreground" />
@@ -982,11 +970,11 @@ export default function AllTasks() {
                                 onClick={() =>
                                   updateTaskMutation.mutate({
                                     taskId: task.id,
-                                    updates: { status: "next" },
+                                    updates: { status: "todo" },
                                   })
                                 }
                               >
-                                Mark as Next
+                                Mark To Do
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() =>
@@ -1003,13 +991,23 @@ export default function AllTasks() {
                                   updateTaskMutation.mutate({
                                     taskId: task.id,
                                     updates: {
-                                      status: "done",
+                                      status: "completed",
                                       completedAt: new Date(),
                                     },
                                   })
                                 }
                               >
-                                Mark Done
+                                Mark Completed
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  updateTaskMutation.mutate({
+                                    taskId: task.id,
+                                    updates: { status: "on_hold" },
+                                  })
+                                }
+                              >
+                                Mark On Hold
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem

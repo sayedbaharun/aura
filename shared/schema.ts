@@ -97,13 +97,10 @@ export const projectCategoryEnum = pgEnum('project_category', [
 export const priorityEnum = pgEnum('priority', ['P0', 'P1', 'P2', 'P3']);
 
 export const taskStatusEnum = pgEnum('task_status', [
-  'idea',
-  'next',
+  'todo',
   'in_progress',
-  'waiting',
-  'done',
-  'cancelled',
-  'backlog'
+  'completed',
+  'on_hold'
 ]);
 
 export const taskTypeEnum = pgEnum('task_type', [
@@ -515,7 +512,7 @@ export const tasks = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     title: text("title").notNull(),
-    status: taskStatusEnum("status").default("idea").notNull(),
+    status: taskStatusEnum("status").default("todo").notNull(),
     priority: priorityEnum("priority"),
     type: taskTypeEnum("type"),
     domain: domainEnum("domain"),

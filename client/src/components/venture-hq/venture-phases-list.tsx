@@ -143,7 +143,7 @@ export default function VenturePhasesList({ ventureId }: VenturePhasesListProps)
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "done":
+      case "completed":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case "in_progress":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
@@ -161,7 +161,7 @@ export default function VenturePhasesList({ ventureId }: VenturePhasesListProps)
 
   const getTaskCountForPhase = (phaseId: string) => {
     const phaseTasks = tasks.filter((t) => t.phaseId === phaseId);
-    const completed = phaseTasks.filter((t) => t.status === "done").length;
+    const completed = phaseTasks.filter((t) => t.status === "completed").length;
     return { total: phaseTasks.length, completed };
   };
 
@@ -232,7 +232,7 @@ export default function VenturePhasesList({ ventureId }: VenturePhasesListProps)
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="not_started">Not Started</SelectItem>
               <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="done">Done</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -326,7 +326,7 @@ export default function VenturePhasesList({ ventureId }: VenturePhasesListProps)
                             <SelectContent>
                               <SelectItem value="not_started">Not Started</SelectItem>
                               <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="done">Done</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
                             </SelectContent>
                           </Select>
                           <AlertDialog>

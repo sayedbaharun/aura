@@ -19,7 +19,7 @@ export default function DayReviewSummary({ day }: DayReviewSummaryProps) {
   });
 
   const taskList = Array.isArray(tasks) ? tasks : [];
-  const completedTasks = taskList.filter((t) => t.status === "done");
+  const completedTasks = taskList.filter((t) => t.status === "completed");
   const totalTasks = taskList.length;
   const completionRate = totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0;
 
@@ -30,7 +30,7 @@ export default function DayReviewSummary({ day }: DayReviewSummaryProps) {
   const oneThingShipped = day?.oneThingToShip
     ? taskList.some(
         (t) =>
-          t.status === "done" &&
+          t.status === "completed" &&
           t.title.toLowerCase().includes(day.oneThingToShip?.toLowerCase().slice(0, 20) || "")
       )
     : false;
@@ -138,7 +138,7 @@ export default function DayReviewSummary({ day }: DayReviewSummaryProps) {
           <div className="flex items-center justify-between text-muted-foreground mb-2">
             <span>High Priority (P0/P1)</span>
             <span>
-              {taskList.filter((t) => (t.priority === "P0" || t.priority === "P1") && t.status === "done").length}/
+              {taskList.filter((t) => (t.priority === "P0" || t.priority === "P1") && t.status === "completed").length}/
               {taskList.filter((t) => t.priority === "P0" || t.priority === "P1").length}
             </span>
           </div>
