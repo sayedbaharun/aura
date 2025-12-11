@@ -68,13 +68,13 @@ interface TaskPickerModalProps {
 }
 
 const SLOT_INFO = {
-  morning_routine: { label: "Morning Routine", time: "7:00-10:00 AM", capacity: 3, startHour: 7, endHour: 10 },
-  gym: { label: "Gym", time: "10:00 AM-12:00 PM", capacity: 2, startHour: 10, endHour: 12 },
-  admin: { label: "Admin Block", time: "12:00-1:30 PM", capacity: 1.5, startHour: 12, endHour: 13.5 },
-  lunch: { label: "Lunch", time: "1:30-3:00 PM", capacity: 1.5, startHour: 13.5, endHour: 15 },
-  walk: { label: "Walk", time: "3:00-4:00 PM", capacity: 1, startHour: 15, endHour: 16 },
-  deep_work: { label: "Deep Work", time: "4:00-8:00 PM", capacity: 4, startHour: 16, endHour: 20 },
-  evening: { label: "Evening", time: "8:00 PM-1:00 AM", capacity: 5, startHour: 20, endHour: 25 },
+  morning_routine: { label: "Morning Routine", time: "7:00-9:00 AM", capacity: 2, startHour: 7, endHour: 9 },
+  deep_work_1: { label: "Deep Work 1", time: "9:00-11:00 AM", capacity: 2, startHour: 9, endHour: 11 },
+  admin_block: { label: "Admin Block", time: "11:00 AM-12:00 PM", capacity: 1, startHour: 11, endHour: 12 },
+  lunch: { label: "Lunch", time: "12:00-1:00 PM", capacity: 1, startHour: 12, endHour: 13 },
+  gym: { label: "Gym / Workout", time: "1:00-3:00 PM", capacity: 2, startHour: 13, endHour: 15 },
+  afternoon: { label: "Afternoon", time: "3:00-11:00 PM", capacity: 8, startHour: 15, endHour: 23 },
+  evening_review: { label: "Evening Review", time: "11:00 PM-12:00 AM", capacity: 1, startHour: 23, endHour: 24 },
   meetings: { label: "Meetings", time: "Flexible", capacity: 4, startHour: 0, endHour: 24 },
   buffer: { label: "Buffer", time: "Flexible", capacity: 2, startHour: 0, endHour: 24 },
 } as const;
