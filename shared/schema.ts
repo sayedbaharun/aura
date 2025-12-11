@@ -1464,3 +1464,102 @@ export const insertDailyTradingChecklistSchema = createInsertSchema(dailyTrading
 
 export type InsertDailyTradingChecklist = z.infer<typeof insertDailyTradingChecklistSchema>;
 export type DailyTradingChecklist = typeof dailyTradingChecklists.$inferSelect;
+
+// ----------------------------------------------------------------------------
+// PEOPLE / RELATIONSHIPS CRM
+// ----------------------------------------------------------------------------
+
+// Enums for People
+export const relationshipTypeEnum = pgEnum("relationship_type", [
+  "personal_friend",
+  "professional_contact",
+  "mentor",
+  "mentee",
+  "investor",
+  "founder",
+  "employee",
+  "contractor",
+  "client",
+  "prospect",
+  "family",
+  "acquaintance",
+  "other"
+]);
+
+export const contactFrequencyEnum = pgEnum("contact_frequency", [
+  "weekly",
+  "biweekly",
+  "monthly",
+  "quarterly",
+  "yearly",
+  "as_needed"
+]);
+
+export const importanceEnum = pgEnum("importance", [
+  "critical",
+  "high",
+  "standard",
+  "low"
+]);
+
+// People table: Contact/relationship management
+export const people = pgTable(
+  "people",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Basic contact info
+    name: text("name").notNull(),
+    email: text("email"),
+    phone: text("phone"),
+    company: text("company"),
+    jobTitle: text("job_title"),
+    birthday: date("birthday"),
+    location: text("location"),
+    photoUrl: text("photo_url"),
+    linkedIn: text("linked_in"),
+
+    // Relationship context
+    relationship: relationshipTypeEnum("relationship"),
+    importance: importanceEnum("importance").default("standard"),
+    howWeMet: text("how_we_met"),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+
+    // Engagement tracking
+    lastContactDate: date("last_contact_date"),
+    nextFollowUp: date("next_follow_up"),
+    contactFrequency: contactFrequencyEnum("contact_frequency").default("as_needed"),
+
+    // Notes and context
+    notes: text("notes"),
+    tags: text("tags"),
+
+    // Sync metadata (for Google Contacts integration)
+    googleContactId: text("google_contact_id").unique(),
+    googleEtag: text("google_etag"),
+    needsEnrichment: boolean("needs_enrichment").default(true),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_people_name").on(table.name),
+    index("idx_people_email").on(table.email),
+    index("idx_people_relationship").on(table.relationship),
+    index("idx_people_importance").on(table.importance),
+    index("idx_people_venture_id").on(table.ventureId),
+    index("idx_people_google_contact_id").on(table.googleContactId),
+    index("idx_people_next_follow_up").on(table.nextFollowUp),
+    index("idx_people_last_contact_date").on(table.lastContactDate),
+  ]
+);
+
+export const insertPersonSchema = createInsertSchema(people).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPerson = z.infer<typeof insertPersonSchema>;
+export type Person = typeof people.$inferSelect;

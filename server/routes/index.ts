@@ -28,6 +28,7 @@ import driveRoutes from "./drive";
 import shoppingRoutes from "./shopping";
 import booksRoutes from "./books";
 import financeRoutes from "./finance";
+import peopleRoutes from "./people";
 import { strategiesRouter, checklistsRouter } from "./trading";
 import ticktickRoutes from "./ticktick";
 import aiChatRoutes from "./ai-chat";
@@ -128,6 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/shopping', shoppingRoutes);
   app.use('/api/books', booksRoutes);
   app.use('/api/finance', financeRoutes);
+  app.use('/api/people', peopleRoutes);
 
   // ============================================================================
   // TRADING

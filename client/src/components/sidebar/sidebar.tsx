@@ -152,6 +152,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[]; default
     label: "Life",
     items: [
       {
+        href: "/people",
+        icon: User,
+        label: "People",
+      },
+      {
         href: "/shopping",
         icon: ShoppingCart,
         label: "Shopping",
