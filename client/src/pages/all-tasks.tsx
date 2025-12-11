@@ -631,7 +631,7 @@ export default function AllTasks() {
 
         {/* Tasks Table */}
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             {tasksLoading ? (
               <div className="text-center py-12 text-muted-foreground">
                 Loading tasks...
@@ -643,7 +643,7 @@ export default function AllTasks() {
                   : "No tasks yet. Click 'New Task' to create one."}
               </div>
             ) : (
-              <Table>
+              <Table className="min-w-[1200px]">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[50px] text-muted-foreground font-medium">NO</TableHead>
