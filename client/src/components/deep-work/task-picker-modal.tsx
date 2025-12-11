@@ -326,7 +326,15 @@ export default function TaskPickerModal({
               <Input
                 type="date"
                 value={selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""}
-                onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    // Parse as local date (not UTC) by appending time to avoid timezone offset issues
+                    const [year, month, day] = e.target.value.split('-').map(Number);
+                    setSelectedDate(new Date(year, month - 1, day));
+                  } else {
+                    setSelectedDate(null);
+                  }
+                }}
                 className="mt-1"
               />
             </div>
