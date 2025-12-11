@@ -484,7 +484,7 @@ RULES:
               storage.getTasks({}),
               storage.getCaptures()
             ]);
-            const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
+            const activeTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'on_hold');
             const todayTasks = tasks.filter(t => t.focusDate === today);
             return JSON.stringify({
               ventures: ventures.length,

@@ -229,10 +229,10 @@ router.patch("/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Task not found" });
     }
 
-    // If task was marked done and has a project, check project completion
-    if (updates.status === 'done' && task.projectId) {
+    // If task was marked completed and has a project, check project completion
+    if (updates.status === 'completed' && task.projectId) {
       const allTasks = await storage.getTasks({ projectId: task.projectId });
-      const allDone = allTasks.every(t => t.status === 'done');
+      const allDone = allTasks.every(t => t.status === 'completed');
 
       if (allDone) {
         return res.json({

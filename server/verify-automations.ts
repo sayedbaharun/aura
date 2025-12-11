@@ -112,15 +112,15 @@ if (existsSync(storagePath)) {
   const storageContent = readFileSync(storagePath, 'utf-8');
 
   verify(
-    'Task Completion Timestamp (done)',
-    storageContent.includes("updates.status === 'done'") &&
+    'Task Completion Timestamp (completed)',
+    storageContent.includes("updates.status === 'completed'") &&
     storageContent.includes('completedAt'),
-    'updateTask() sets completedAt when status is done'
+    'updateTask() sets completedAt when status is completed'
   );
 
   verify(
     'Task Completion Timestamp (clear)',
-    storageContent.includes("updates.status !== 'done'") &&
+    storageContent.includes("updates.status !== 'completed'") &&
     storageContent.includes('completedAt = null'),
     'updateTask() clears completedAt when task is reopened'
   );

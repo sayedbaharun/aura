@@ -160,7 +160,7 @@ router.get("/tasks", async (req: Request, res: Response) => {
     const today = new Date().toISOString().split('T')[0];
     const tasks = await storage.getTasksForToday(today);
 
-    const activeTasks = tasks.filter(t => !['done', 'cancelled'].includes(t.status));
+    const activeTasks = tasks.filter(t => !['completed', 'on_hold'].includes(t.status));
 
     activeTasks.sort((a, b) => {
       const pA = PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] ?? 99;

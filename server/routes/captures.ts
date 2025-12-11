@@ -108,7 +108,7 @@ router.post("/:id/convert", async (req: Request, res: Response) => {
       notes: capture.notes,
       ventureId: capture.ventureId,
       projectId: capture.projectId,
-      status: 'next',
+      status: 'todo',
     });
 
     // Mark capture as clarified and link to task

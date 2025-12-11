@@ -59,14 +59,14 @@ export async function buildVentureContext(ventureId: string): Promise<VentureCon
           ...project,
           phases,
           taskCount: projectTasks.length,
-          completedTaskCount: projectTasks.filter((t: Task) => t.status === 'done').length,
+          completedTaskCount: projectTasks.filter((t: Task) => t.status === 'completed').length,
         };
       })
     );
 
     // Separate tasks by status
     const pendingTasks = allTasks.filter((t: Task) =>
-      t.status === 'next' || t.status === 'in_progress' || t.status === 'waiting'
+      t.status === 'todo' || t.status === 'in_progress'
     );
     const recentTasks = allTasks
       .sort((a: Task, b: Task) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -129,7 +129,7 @@ function generateContextSummary(
       lines.push(`- **${project.name}** [${project.status}] - ${progress}% complete`);
       if (project.outcome) lines.push(`  Outcome: ${project.outcome}`);
       if (project.phases && project.phases.length > 0) {
-        const activePhases = project.phases.filter(m => m.status !== 'done');
+        const activePhases = project.phases.filter(m => m.status !== 'completed');
         if (activePhases.length > 0) {
           lines.push(`  Active Phases: ${activePhases.map(m => m.name).join(', ')}`);
         }
