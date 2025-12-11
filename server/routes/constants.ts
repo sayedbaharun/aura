@@ -25,7 +25,7 @@ export const SLOT_TIMES: Record<string, { startHour: number; endHour: number }> 
 };
 
 // Valid task statuses
-export const VALID_TASK_STATUSES = ['idea', 'next', 'in_progress', 'waiting', 'done', 'cancelled', 'backlog'];
+export const VALID_TASK_STATUSES = ['todo', 'in_progress', 'completed', 'on_hold'];
 
 // Priority order for sorting
 export const PRIORITY_ORDER: Record<string, number> = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };

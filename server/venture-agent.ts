@@ -371,7 +371,7 @@ IMPORTANT INSTRUCTIONS:
           const tasks = await storage.getTasks({ ventureId: this.ventureId });
           const docs = await storage.getDocs({ ventureId: this.ventureId });
 
-          const pendingTasks = tasks.filter(t => ['next', 'in_progress', 'waiting'].includes(t.status));
+          const pendingTasks = tasks.filter(t => ['todo', 'in_progress'].includes(t.status));
           const activeProjects = projects.filter(p => p.status === 'in_progress');
 
           return {
@@ -386,7 +386,7 @@ IMPORTANT INSTRUCTIONS:
                 activeProjects: activeProjects.length,
                 totalTasks: tasks.length,
                 pendingTasks: pendingTasks.length,
-                completedTasks: tasks.filter(t => t.status === 'done').length,
+                completedTasks: tasks.filter(t => t.status === 'completed').length,
                 documents: docs.length,
               },
               recentActivity: {
@@ -543,7 +543,7 @@ IMPORTANT INSTRUCTIONS:
             title: args.title,
             notes: args.notes,
             priority: args.priority,
-            status: args.status || 'next',
+            status: args.status || 'todo',
             ventureId: this.ventureId,
             projectId: args.projectId,
             dueDate: args.dueDate,

@@ -237,7 +237,7 @@ router.post("/push-tasks", async (req: Request, res: Response) => {
     const allTasks = await storage.getTasks({});
     const tasksToSync = allTasks.filter(task =>
       (task.focusDate || task.dueDate) &&
-      !['done', 'cancelled'].includes(task.status) &&
+      !['completed', 'on_hold'].includes(task.status) &&
       !task.externalId?.startsWith('ticktick:')
     );
 

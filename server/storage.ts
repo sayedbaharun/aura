@@ -699,13 +699,13 @@ export class DBStorage implements IStorage {
   async updateTask(id: string, updates: Partial<InsertTask>): Promise<Task | undefined> {
     const updateData: any = { ...updates, updatedAt: new Date() };
 
-    // If status is being set to 'done', set completedAt
-    if (updates.status === 'done' && !updates.completedAt) {
+    // If status is being set to 'completed', set completedAt
+    if (updates.status === 'completed' && !updates.completedAt) {
       updateData.completedAt = new Date();
     }
 
-    // If status is changed from 'done' to something else, clear completedAt
-    if (updates.status && updates.status !== 'done') {
+    // If status is changed from 'completed' to something else, clear completedAt
+    if (updates.status && updates.status !== 'completed') {
       updateData.completedAt = null;
     }
 
@@ -741,7 +741,7 @@ export class DBStorage implements IStorage {
         dueTodayP0P1: sql<number>`count(*) filter (where (${tasks.priority} = 'P0' or ${tasks.priority} = 'P1') and ${tasks.dueDate} = ${today})::int`,
       })
       .from(tasks)
-      .where(not(inArray(tasks.status, ['done', 'cancelled'])))
+      .where(not(inArray(tasks.status, ['completed', 'on_hold'])))
       .groupBy(tasks.ventureId);
 
     const map = new Map<string, { total: number; overdueP0: number; dueTodayP0P1: number }>();
@@ -766,7 +766,7 @@ export class DBStorage implements IStorage {
       .from(tasks)
       .where(
         and(
-          not(inArray(tasks.status, ['done', 'cancelled'])),
+          not(inArray(tasks.status, ['completed', 'on_hold'])),
           or(
             // Overdue P0
             and(eq(tasks.priority, 'P0'), lte(tasks.dueDate, today)),
@@ -790,7 +790,7 @@ export class DBStorage implements IStorage {
     return await this.db
       .select()
       .from(tasks)
-      .where(not(inArray(tasks.status, ['done', 'cancelled'])))
+      .where(not(inArray(tasks.status, ['completed', 'on_hold'])))
       .orderBy(
         // P0 first, then P1, P2, P3
         sql`case ${tasks.priority} when 'P0' then 0 when 'P1' then 1 when 'P2' then 2 else 3 end`,
@@ -805,7 +805,7 @@ export class DBStorage implements IStorage {
    * Get count of non-done tasks for a project - for completion check
    */
   async getActiveTasksCount(projectId?: string): Promise<number> {
-    const conditions = [not(inArray(tasks.status, ['done', 'cancelled']))];
+    const conditions = [not(inArray(tasks.status, ['completed', 'on_hold']))];
     if (projectId) {
       conditions.push(eq(tasks.projectId, projectId));
     }
@@ -889,7 +889,7 @@ export class DBStorage implements IStorage {
     const mergedData = {
       ...taskData,
       title: taskData.title || capture.title,
-      status: taskData.status || 'next' as any,
+      status: taskData.status || 'todo' as any,
       domain: taskData.domain || capture.domain,
       ventureId: taskData.ventureId || capture.ventureId,
       projectId: taskData.projectId || capture.projectId,
