@@ -80,7 +80,7 @@ export default function FocusSessionTimer() {
     queryFn: async () => {
       const res = await apiRequest(
         "GET",
-        "/api/tasks?status=next,in_progress"
+        "/api/tasks?status=todo,in_progress"
       );
       return await res.json();
     },
