@@ -49,6 +49,8 @@ import {
   type InsertAccountSnapshot,
   type NetWorthSnapshot,
   type InsertNetWorthSnapshot,
+  type Person,
+  type InsertPerson,
   ventures,
   projects,
   phases,
@@ -74,6 +76,7 @@ import {
   financialAccounts,
   accountSnapshots,
   netWorthSnapshots,
+  people,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
@@ -226,6 +229,23 @@ export interface IStorage {
   getNetWorth(): Promise<{ totalAssets: number; totalLiabilities: number; netWorth: number; byType: Record<string, number> }>;
   getNetWorthSnapshots(limit?: number): Promise<NetWorthSnapshot[]>;
   createNetWorthSnapshot(): Promise<NetWorthSnapshot>;
+
+  // People / Relationships CRM
+  getPeople(filters?: {
+    relationship?: string;
+    importance?: string;
+    ventureId?: string;
+    needsEnrichment?: boolean;
+  }): Promise<Person[]>;
+  getPerson(id: string): Promise<Person | undefined>;
+  getPersonByGoogleId(googleContactId: string): Promise<Person | undefined>;
+  getPersonByEmail(email: string): Promise<Person | undefined>;
+  createPerson(data: InsertPerson): Promise<Person>;
+  updatePerson(id: string, data: Partial<InsertPerson>): Promise<Person | undefined>;
+  deletePerson(id: string): Promise<void>;
+  getStalePeople(today: string): Promise<Person[]>;
+  getUpcomingFollowUps(today: string, days?: number): Promise<Person[]>;
+  logContact(id: string, date: string): Promise<Person | undefined>;
 
   // Schema Management
   ensureSchema(): Promise<void>;
@@ -2172,6 +2192,220 @@ export class DBStorage implements IStorage {
       .returning();
 
     return snapshot;
+  }
+
+  // ============================================================================
+  // PEOPLE / RELATIONSHIPS CRM
+  // ============================================================================
+
+  async getPeople(filters?: {
+    relationship?: string;
+    importance?: string;
+    ventureId?: string;
+    needsEnrichment?: boolean;
+  }): Promise<Person[]> {
+    try {
+      const conditions = [];
+
+      if (filters?.relationship) {
+        conditions.push(eq(people.relationship, filters.relationship as any));
+      }
+      if (filters?.importance) {
+        conditions.push(eq(people.importance, filters.importance as any));
+      }
+      if (filters?.ventureId) {
+        conditions.push(eq(people.ventureId, filters.ventureId));
+      }
+      if (filters?.needsEnrichment !== undefined) {
+        conditions.push(eq(people.needsEnrichment, filters.needsEnrichment));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return await this.db
+        .select()
+        .from(people)
+        .where(whereClause)
+        .orderBy(desc(people.updatedAt));
+    } catch (error) {
+      console.error("Error fetching people (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getPerson(id: string): Promise<Person | undefined> {
+    try {
+      const [person] = await this.db
+        .select()
+        .from(people)
+        .where(eq(people.id, id))
+        .limit(1);
+      return person;
+    } catch (error) {
+      console.error("Error fetching person (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async getPersonByGoogleId(googleContactId: string): Promise<Person | undefined> {
+    try {
+      const [person] = await this.db
+        .select()
+        .from(people)
+        .where(eq(people.googleContactId, googleContactId))
+        .limit(1);
+      return person;
+    } catch (error) {
+      console.error("Error fetching person by Google ID (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async getPersonByEmail(email: string): Promise<Person | undefined> {
+    try {
+      const [person] = await this.db
+        .select()
+        .from(people)
+        .where(eq(people.email, email))
+        .limit(1);
+      return person;
+    } catch (error) {
+      console.error("Error fetching person by email (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async createPerson(data: InsertPerson): Promise<Person> {
+    try {
+      const [person] = await this.db
+        .insert(people)
+        .values(data as any)
+        .returning();
+      return person;
+    } catch (error) {
+      console.error("Error creating person:", error);
+      throw error;
+    }
+  }
+
+  async updatePerson(id: string, updates: Partial<InsertPerson>): Promise<Person | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(people)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(people.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating person:", error);
+      return undefined;
+    }
+  }
+
+  async deletePerson(id: string): Promise<void> {
+    try {
+      await this.db.delete(people).where(eq(people.id, id));
+    } catch (error) {
+      console.error("Error deleting person:", error);
+    }
+  }
+
+  /**
+   * Get people who are overdue for contact based on their contact frequency
+   */
+  async getStalePeople(today: string): Promise<Person[]> {
+    try {
+      // Get all people with a contact frequency and last contact date
+      // Filter in application logic based on frequency
+      const allPeople = await this.db
+        .select()
+        .from(people)
+        .where(
+          and(
+            not(eq(people.contactFrequency, 'as_needed')),
+            // Has a last contact date or never contacted (needs attention)
+            or(
+              sql`${people.lastContactDate} IS NOT NULL`,
+              sql`${people.lastContactDate} IS NULL`
+            )
+          )
+        )
+        .orderBy(people.lastContactDate);
+
+      // Calculate staleness based on frequency
+      const frequencyDays: Record<string, number> = {
+        weekly: 7,
+        biweekly: 14,
+        monthly: 30,
+        quarterly: 90,
+        yearly: 365,
+      };
+
+      const todayDate = new Date(today);
+      return allPeople.filter(person => {
+        if (!person.contactFrequency || person.contactFrequency === 'as_needed') {
+          return false;
+        }
+        if (!person.lastContactDate) {
+          // Never contacted - definitely stale
+          return true;
+        }
+
+        const lastContact = new Date(person.lastContactDate);
+        const daysSinceContact = Math.floor((todayDate.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
+        const threshold = frequencyDays[person.contactFrequency] || 30;
+
+        return daysSinceContact > threshold;
+      });
+    } catch (error) {
+      console.error("Error fetching stale people (table may not exist):", error);
+      return [];
+    }
+  }
+
+  /**
+   * Get people with upcoming follow-ups in the next N days
+   */
+  async getUpcomingFollowUps(today: string, days: number = 7): Promise<Person[]> {
+    try {
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + days);
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      return await this.db
+        .select()
+        .from(people)
+        .where(
+          and(
+            gte(people.nextFollowUp, today),
+            lte(people.nextFollowUp, endDateStr)
+          )
+        )
+        .orderBy(people.nextFollowUp);
+    } catch (error) {
+      console.error("Error fetching upcoming follow-ups (table may not exist):", error);
+      return [];
+    }
+  }
+
+  /**
+   * Log a contact with a person (updates lastContactDate)
+   */
+  async logContact(id: string, date: string): Promise<Person | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(people)
+        .set({
+          lastContactDate: date,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(people.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error logging contact:", error);
+      return undefined;
+    }
   }
 
 }
