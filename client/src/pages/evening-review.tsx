@@ -174,7 +174,7 @@ export default function EveningReview() {
       const tasks = await res.json();
       // Filter for P0/P1 tasks only
       return Array.isArray(tasks)
-        ? tasks.filter((t: Task) => (t.priority === "P0" || t.priority === "P1") && t.status !== "done" && t.status !== "cancelled")
+        ? tasks.filter((t: Task) => (t.priority === "P0" || t.priority === "P1") && t.status !== "completed" && t.status !== "on_hold")
         : [];
     },
   });
@@ -229,7 +229,7 @@ export default function EveningReview() {
   }, [dayData]);
 
   // Calculate day stats
-  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === "done").length : 0;
+  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === "completed").length : 0;
   const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
   const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 

@@ -37,7 +37,7 @@ import { Link, useRoute, useLocation } from "wouter";
 interface Task {
   id: string;
   title: string;
-  status: 'idea' | 'next' | 'in_progress' | 'waiting' | 'done' | 'cancelled';
+  status: 'todo' | 'in_progress' | 'completed' | 'on_hold';
   priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
   dueDate: string | null;
   ventureId: string | null;
@@ -185,8 +185,8 @@ export default function MorningRitual() {
   const priorityTasksDueToday = dueTasks.filter(
     (task) =>
       (task.priority === "P0" || task.priority === "P1") &&
-      task.status !== "done" &&
-      task.status !== "cancelled"
+      task.status !== "completed" &&
+      task.status !== "on_hold"
   );
 
   // Fetch the day before selected date for syncing priorities

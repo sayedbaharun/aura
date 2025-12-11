@@ -378,7 +378,7 @@ export default function CalendarPage() {
                             }}
                           >
                             <div className="flex items-start gap-2">
-                              {task.status === "done" ? (
+                              {task.status === "completed" ? (
                                 <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                               ) : (
                                 <Circle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -386,7 +386,7 @@ export default function CalendarPage() {
                               <div className="flex-1 min-w-0">
                                 <div className={cn(
                                   "font-medium text-sm",
-                                  task.status === "done" && "line-through text-muted-foreground"
+                                  task.status === "completed" && "line-through text-muted-foreground"
                                 )}>
                                   {task.title}
                                 </div>

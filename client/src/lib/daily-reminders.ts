@@ -35,7 +35,7 @@ async function checkDueTasks(): Promise<void> {
 
   try {
     const today = new Date().toISOString().split('T')[0];
-    const response = await apiRequest('GET', `/api/tasks?due_date=${today}&status=next,in_progress`);
+    const response = await apiRequest('GET', `/api/tasks?due_date=${today}&status=todo,in_progress`);
     const tasksData = await response.json();
     const tasks = Array.isArray(tasksData) ? tasksData as Task[] : [];
 
@@ -71,7 +71,7 @@ async function checkOverdueTasks(): Promise<void> {
 
   try {
     const today = new Date();
-    const response = await apiRequest('GET', '/api/tasks?status=next,in_progress');
+    const response = await apiRequest('GET', '/api/tasks?status=todo,in_progress');
     const tasksData = await response.json();
     const tasks = Array.isArray(tasksData) ? tasksData as Task[] : [];
 
