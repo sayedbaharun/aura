@@ -130,7 +130,7 @@ export default function TasksList({ ventureId }: TasksListProps) {
   });
 
   const handleToggleTask = (task: Task) => {
-    const newStatus = task.status === "done" ? "in_progress" : "done";
+    const newStatus = task.status === "completed" ? "in_progress" : "completed";
     updateTaskMutation.mutate({
       id: task.id,
       data: { status: newStatus },
@@ -257,10 +257,10 @@ export default function TasksList({ ventureId }: TasksListProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="next">Next</SelectItem>
+                <SelectItem value="todo">To Do</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="blocked">Blocked</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
 
@@ -334,11 +334,11 @@ export default function TasksList({ ventureId }: TasksListProps) {
                   key={task.id}
                   className={cn(
                     "flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors",
-                    task.status === "done" && "opacity-60"
+                    task.status === "completed" && "opacity-60"
                   )}
                 >
                   <Checkbox
-                    checked={task.status === "done"}
+                    checked={task.status === "completed"}
                     onCheckedChange={() => handleToggleTask(task)}
                     className="mt-1"
                   />
@@ -364,7 +364,7 @@ export default function TasksList({ ventureId }: TasksListProps) {
                     <p
                       className={cn(
                         "text-sm font-medium",
-                        task.status === "done" && "line-through"
+                        task.status === "completed" && "line-through"
                       )}
                     >
                       {task.title}

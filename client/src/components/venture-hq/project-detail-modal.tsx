@@ -87,7 +87,7 @@ interface ProjectDetailModalProps {
 const PHASE_STATUS_OPTIONS = [
   { value: "not_started", label: "Not Started" },
   { value: "in_progress", label: "In Progress" },
-  { value: "done", label: "Done" },
+  { value: "completed", label: "Completed" },
 ];
 
 export default function ProjectDetailModal({
@@ -227,7 +227,7 @@ export default function ProjectDetailModal({
   };
 
   const handleTogglePhaseStatus = (phase: Phase) => {
-    const newStatus = phase.status === "done" ? "not_started" : "done";
+    const newStatus = phase.status === "completed" ? "not_started" : "completed";
     updatePhaseMutation.mutate({ id: phase.id, data: { status: newStatus } });
   };
 
@@ -248,7 +248,7 @@ export default function ProjectDetailModal({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "done":
+      case "completed":
         return "text-green-600 dark:text-green-400";
       case "in_progress":
         return "text-blue-600 dark:text-blue-400";
@@ -258,9 +258,9 @@ export default function ProjectDetailModal({
   };
 
   // Calculate progress
-  const doneTasks = tasks.filter((t) => t.status === "done").length;
+  const doneTasks = tasks.filter((t) => t.status === "completed").length;
   const taskProgress = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
-  const donePhases = phases.filter((m) => m.status === "done").length;
+  const donePhases = phases.filter((m) => m.status === "completed").length;
   const phaseProgress = phases.length > 0 ? Math.round((donePhases / phases.length) * 100) : 0;
 
   // Get tasks per phase
@@ -425,14 +425,14 @@ export default function ProjectDetailModal({
                 .sort((a, b) => a.order - b.order)
                 .map((phase) => {
                   const phaseTasks = getTasksForPhase(phase.id);
-                  const doneTasksInPhase = phaseTasks.filter((t) => t.status === "done").length;
+                  const doneTasksInPhase = phaseTasks.filter((t) => t.status === "completed").length;
 
                   return (
                     <div
                       key={phase.id}
                       className={cn(
                         "p-3 border rounded-lg transition-colors",
-                        phase.status === "done" && "bg-green-50/50 dark:bg-green-900/10"
+                        phase.status === "completed" && "bg-green-50/50 dark:bg-green-900/10"
                       )}
                     >
                       <div className="flex items-start gap-3">
@@ -440,7 +440,7 @@ export default function ProjectDetailModal({
                           onClick={() => handleTogglePhaseStatus(phase)}
                           className={cn("mt-0.5", getStatusColor(phase.status))}
                         >
-                          {phase.status === "done" ? (
+                          {phase.status === "completed" ? (
                             <CheckCircle2 className="h-5 w-5" />
                           ) : (
                             <Circle className="h-5 w-5" />
@@ -452,7 +452,7 @@ export default function ProjectDetailModal({
                             <h4
                               className={cn(
                                 "font-medium",
-                                phase.status === "done" && "line-through text-muted-foreground"
+                                phase.status === "completed" && "line-through text-muted-foreground"
                               )}
                             >
                               {phase.name}

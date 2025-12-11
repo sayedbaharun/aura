@@ -42,7 +42,7 @@ const STATUS_COLUMNS = [
   { value: "planning", label: "Planning", color: "bg-yellow-500" },
   { value: "in_progress", label: "In Progress", color: "bg-blue-500" },
   { value: "blocked", label: "Blocked", color: "bg-red-500" },
-  { value: "done", label: "Done", color: "bg-green-500" },
+  { value: "completed", label: "Completed", color: "bg-green-500" },
 ];
 
 export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
@@ -117,7 +117,7 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
   const getProjectProgress = (projectId: string) => {
     const tasks = getProjectTasks(projectId);
     if (tasks.length === 0) return 0;
-    const doneTasks = tasks.filter((t) => t.status === "done").length;
+    const doneTasks = tasks.filter((t) => t.status === "completed").length;
     return Math.round((doneTasks / tasks.length) * 100);
   };
 
@@ -142,7 +142,7 @@ export default function ProjectsBoard({ ventureId }: ProjectsBoardProps) {
   const renderProjectCard = (project: Project) => {
     const tasks = getProjectTasks(project.id);
     const progress = getProjectProgress(project.id);
-    const doneTasks = tasks.filter((t) => t.status === "done").length;
+    const doneTasks = tasks.filter((t) => t.status === "completed").length;
 
     return (
       <Card

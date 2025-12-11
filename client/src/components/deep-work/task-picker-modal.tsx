@@ -183,7 +183,7 @@ export default function TaskPickerModal({
 
   // Filter tasks: show unscheduled + optionally scheduled tasks
   const availableTasks = allTasks.filter((task) => {
-    if (task.status === "done" || task.status === "cancelled") return false;
+    if (task.status === "completed" || task.status === "on_hold") return false;
     // If showScheduled is true, show all actionable tasks
     // Otherwise, only show tasks without focusDate
     if (!showScheduled && task.focusDate) return false;
@@ -192,7 +192,7 @@ export default function TaskPickerModal({
 
   // Count tasks with due dates that are already scheduled (hidden by default)
   const scheduledWithDueDates = allTasks.filter(
-    (task) => task.dueDate && task.focusDate && task.status !== "done" && task.status !== "cancelled"
+    (task) => task.dueDate && task.focusDate && task.status !== "completed" && task.status !== "on_hold"
   ).length;
 
   // Sort: tasks with dueDate first (by urgency), then by priority

@@ -44,7 +44,7 @@ import { CalendarIcon, Edit, Trash2, CheckCircle2, XCircle } from 'lucide-react'
 interface Task {
   id: string;
   title: string;
-  status: 'idea' | 'next' | 'in_progress' | 'waiting' | 'done' | 'cancelled';
+  status: 'todo' | 'in_progress' | 'completed' | 'on_hold';
   priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
   type: 'business' | 'deep_work' | 'admin' | 'health' | 'learning' | 'personal' | null;
   domain: 'home' | 'work' | 'health' | 'finance' | 'travel' | 'learning' | 'play' | 'calls' | 'personal' | null;
@@ -184,10 +184,13 @@ export default function TaskDetailModal() {
     },
   });
 
-  // Toggle done/reopen mutation
+  // Toggle completed/reopen mutation
   const toggleDoneMutation = useMutation({
-    mutationFn: async (newStatus: 'done' | 'next') => {
-      const response = await apiRequest('PATCH', `/api/tasks/${taskId}`, { status: newStatus });
+    mutationFn: async (newStatus: 'completed' | 'todo') => {
+      const response = await apiRequest('PATCH', `/api/tasks/${taskId}`, {
+        status: newStatus,
+        completedAt: newStatus === 'completed' ? new Date() : null
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -251,7 +254,7 @@ export default function TaskDetailModal() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
         e.preventDefault();
         if (task) {
-          toggleDoneMutation.mutate(task.status === 'done' ? 'next' : 'done');
+          toggleDoneMutation.mutate(task.status === 'completed' ? 'todo' : 'completed');
         }
       }
     };
@@ -284,7 +287,7 @@ export default function TaskDetailModal() {
 
   const handleToggleDone = () => {
     if (task) {
-      toggleDoneMutation.mutate(task.status === 'done' ? 'next' : 'done');
+      toggleDoneMutation.mutate(task.status === 'completed' ? 'todo' : 'completed');
     }
   };
 
@@ -324,18 +327,14 @@ export default function TaskDetailModal() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'done':
+      case 'completed':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
       case 'in_progress':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'waiting':
+      case 'on_hold':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'cancelled':
+      case 'todo':
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-      case 'next':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
-      case 'idea':
-        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400';
       default:
         return 'bg-secondary text-secondary-foreground';
     }
@@ -572,11 +571,11 @@ export default function TaskDetailModal() {
                 Edit
               </Button>
               <Button
-                variant={task.status === 'done' ? 'outline' : 'default'}
+                variant={task.status === 'completed' ? 'outline' : 'default'}
                 onClick={handleToggleDone}
                 disabled={toggleDoneMutation.isPending}
               >
-                {task.status === 'done' ? (
+                {task.status === 'completed' ? (
                   <>
                     <XCircle className="h-4 w-4 mr-2" />
                     Reopen
@@ -584,7 +583,7 @@ export default function TaskDetailModal() {
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Mark Done
+                    Mark Completed
                   </>
                 )}
               </Button>
@@ -639,19 +638,17 @@ export default function TaskDetailModal() {
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select
-                  value={formData.status || 'idea'}
+                  value={formData.status || 'todo'}
                   onValueChange={(value: any) => setFormData({ ...formData, status: value })}
                 >
                   <SelectTrigger id="status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="idea">Idea</SelectItem>
-                    <SelectItem value="next">Next</SelectItem>
+                    <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="waiting">Waiting</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

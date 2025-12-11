@@ -138,8 +138,8 @@ export default function WeeklyCalendar({
         `/api/tasks?focus_date_gte=${format(weekStart, "yyyy-MM-dd")}&focus_date_lte=${format(weekEnd, "yyyy-MM-dd")}`
       );
       const allTasks = await res.json();
-      // Filter out done and cancelled tasks on the client side
-      return allTasks.filter((t: Task) => t.status !== "done" && t.status !== "cancelled");
+      // Filter out completed and on_hold tasks on the client side
+      return allTasks.filter((t: Task) => t.status !== "completed" && t.status !== "on_hold");
     },
   });
 

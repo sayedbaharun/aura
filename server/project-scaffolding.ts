@@ -412,7 +412,7 @@ export async function commitProjectPlan(
         ventureId: actualVentureId,
         projectId: project.id,
         phaseId: phase.id,
-        status: "idea", // Start as idea, user can promote to next
+        status: "todo", // Start as todo so user can start working on it
         type: taskData.type as any,
         priority: taskData.priority as any,
         estEffort: taskData.estEffort,

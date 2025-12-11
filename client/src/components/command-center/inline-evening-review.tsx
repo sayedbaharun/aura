@@ -96,7 +96,7 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
 
   // Filter to incomplete tasks and group by priority for dropdowns
   const incompleteTasks = Array.isArray(allTasks)
-    ? allTasks.filter(t => !["done", "cancelled"].includes(t.status))
+    ? allTasks.filter(t => !["completed", "on_hold"].includes(t.status))
     : [];
 
   const tasksByPriority = {
@@ -143,7 +143,7 @@ export default function InlineEveningReview({ day }: InlineEveningReviewProps) {
   }, [day]);
 
   // Calculate day stats
-  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === "done").length : 0;
+  const completedTasks = Array.isArray(tasks) ? tasks.filter(t => t.status === "completed").length : 0;
   const totalTasks = Array.isArray(tasks) ? tasks.length : 0;
   const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
