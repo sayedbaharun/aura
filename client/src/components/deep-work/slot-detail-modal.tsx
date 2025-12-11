@@ -47,13 +47,13 @@ interface SlotDetailModalProps {
 }
 
 const SLOT_INFO = {
-  morning_routine: { label: "Morning Routine", time: "7:00-10:00 AM", capacity: 3 },
-  gym: { label: "Gym", time: "10:00 AM-12:00 PM", capacity: 2 },
-  admin: { label: "Admin Block", time: "12:00-1:30 PM", capacity: 1.5 },
-  lunch: { label: "Lunch", time: "1:30-3:00 PM", capacity: 1.5 },
-  walk: { label: "Walk", time: "3:00-4:00 PM", capacity: 1 },
-  deep_work: { label: "Deep Work", time: "4:00-8:00 PM", capacity: 4 },
-  evening: { label: "Evening", time: "8:00 PM-1:00 AM", capacity: 5 },
+  morning_routine: { label: "Morning Routine", time: "7:00-9:00 AM", capacity: 2 },
+  deep_work_1: { label: "Deep Work 1", time: "9:00-11:00 AM", capacity: 2 },
+  admin_block: { label: "Admin Block", time: "11:00 AM-12:00 PM", capacity: 1 },
+  lunch: { label: "Lunch", time: "12:00-1:00 PM", capacity: 1 },
+  gym: { label: "Gym / Workout", time: "1:00-3:00 PM", capacity: 2 },
+  afternoon: { label: "Afternoon", time: "3:00-11:00 PM", capacity: 8 },
+  evening_review: { label: "Evening Review", time: "11:00 PM-12:00 AM", capacity: 1 },
   meetings: { label: "Meetings", time: "Flexible", capacity: 4 },
   buffer: { label: "Buffer", time: "Flexible", capacity: 2 },
 } as const;

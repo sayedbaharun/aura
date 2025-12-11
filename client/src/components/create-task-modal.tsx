@@ -75,12 +75,13 @@ const TYPE_OPTIONS = [
 ];
 
 const FOCUS_SLOT_OPTIONS = [
-  { value: "morning_routine", label: "Morning Routine (6-9am)" },
-  { value: "deep_work_1", label: "Deep Work (9-11am)" },
-  { value: "admin_block_1", label: "Admin Block (11am-12pm)" },
-  { value: "deep_work_2", label: "Deep Work (2-4pm)" },
-  { value: "admin_block_2", label: "Admin Block (4-5pm)" },
-  { value: "evening_review", label: "Evening Review (5-6pm)" },
+  { value: "morning_routine", label: "Morning Routine (7-9am)" },
+  { value: "deep_work_1", label: "Deep Work 1 (9-11am)" },
+  { value: "admin_block", label: "Admin Block (11am-12pm)" },
+  { value: "lunch", label: "Lunch (12-1pm)" },
+  { value: "gym", label: "Gym / Workout (1-3pm)" },
+  { value: "afternoon", label: "Afternoon (3-11pm)" },
+  { value: "evening_review", label: "Evening Review (11pm-12am)" },
   { value: "meetings", label: "Meetings (Flexible)" },
   { value: "buffer", label: "Buffer (Flexible)" },
 ];
