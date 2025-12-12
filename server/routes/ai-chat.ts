@@ -6,12 +6,39 @@ import { Router, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
 import { storage } from "../storage";
 import { logger } from "../logger";
-import { insertAiAgentPromptSchema } from "@shared/schema";
+import { insertAiAgentPromptSchema, insertTradingKnowledgeDocSchema } from "@shared/schema";
 import { AVAILABLE_MODELS } from "../model-manager";
+import multer from "multer";
 import { z } from "zod";
 import { DEFAULT_USER_ID } from "./constants";
 
 const router = Router();
+
+// Configure multer for knowledge doc file uploads (in-memory storage for base64 encoding)
+const knowledgeDocUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow PDFs, text files, and images
+    const allowedMimeTypes = [
+      'application/pdf',
+      'text/plain',
+      'text/markdown',
+      'text/csv',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type: ${file.mimetype}. Allowed types: PDF, TXT, MD, CSV, JPEG, PNG, GIF, WebP`));
+    }
+  },
+});
 
 // Rate limiter for AI endpoints - 20 requests per minute per user
 const aiRateLimiter = rateLimit({
@@ -911,6 +938,174 @@ router.put("/trading/agent/config", async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, "Error updating trading agent config");
     res.status(500).json({ error: "Failed to update trading agent config" });
+  }
+});
+
+// ============================================================================
+// TRADING KNOWLEDGE DOCUMENTS - Documents for AI agent training/context
+// ============================================================================
+
+// Get all trading knowledge documents for the user
+router.get("/trading/knowledge-docs", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const { category, includeInContext } = req.query;
+    const filters: { category?: string; includeInContext?: boolean } = {};
+
+    if (category) filters.category = category as string;
+    if (includeInContext !== undefined) {
+      filters.includeInContext = includeInContext === "true";
+    }
+
+    const docs = await storage.getTradingKnowledgeDocs(userId, filters);
+
+    // Don't send file data in list response for performance
+    const docsWithoutData = docs.map(doc => ({
+      ...doc,
+      fileData: doc.fileData ? "[BASE64_DATA]" : null,
+    }));
+
+    res.json(docsWithoutData);
+  } catch (error) {
+    logger.error({ error }, "Error fetching trading knowledge docs");
+    res.status(500).json({ error: "Failed to fetch trading knowledge docs" });
+  }
+});
+
+// Get a single trading knowledge document
+router.get("/trading/knowledge-docs/:id", async (req: Request, res: Response) => {
+  try {
+    const doc = await storage.getTradingKnowledgeDoc(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+    res.json(doc);
+  } catch (error) {
+    logger.error({ error }, "Error fetching trading knowledge doc");
+    res.status(500).json({ error: "Failed to fetch trading knowledge doc" });
+  }
+});
+
+// Create a trading knowledge document with file upload
+router.post(
+  "/trading/knowledge-docs",
+  knowledgeDocUpload.single("file"),
+  async (req: Request, res: Response) => {
+    try {
+      await ensureDefaultUserExists();
+      const userId = DEFAULT_USER_ID;
+
+      const { title, description, category, tags, priority, includeInContext, extractedText } = req.body;
+
+      if (!title) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+
+      const file = req.file;
+
+      // Prepare document data
+      const docData: any = {
+        userId,
+        title,
+        description: description || null,
+        category: category || "other",
+        tags: tags || null,
+        priority: priority ? parseInt(priority) : 0,
+        includeInContext: includeInContext !== "false",
+        extractedText: extractedText || null,
+      };
+
+      // Handle file upload if present
+      if (file) {
+        docData.fileName = file.originalname;
+        docData.fileType = file.mimetype;
+        docData.fileSize = file.size;
+        docData.storageType = "base64";
+        docData.fileData = file.buffer.toString("base64");
+
+        // For text files, extract content automatically
+        if (file.mimetype === "text/plain" || file.mimetype === "text/markdown" || file.mimetype === "text/csv") {
+          docData.extractedText = file.buffer.toString("utf-8");
+        }
+      }
+
+      const doc = await storage.createTradingKnowledgeDoc(docData);
+
+      // Don't return file data in response
+      res.status(201).json({
+        ...doc,
+        fileData: doc.fileData ? "[BASE64_DATA]" : null,
+      });
+    } catch (error) {
+      logger.error({ error }, "Error creating trading knowledge doc");
+      res.status(500).json({ error: "Failed to create trading knowledge doc" });
+    }
+  }
+);
+
+// Update a trading knowledge document
+router.patch("/trading/knowledge-docs/:id", async (req: Request, res: Response) => {
+  try {
+    const { title, description, category, tags, priority, includeInContext, extractedText, summary } = req.body;
+
+    const updates: any = {};
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (category !== undefined) updates.category = category;
+    if (tags !== undefined) updates.tags = tags;
+    if (priority !== undefined) updates.priority = parseInt(priority);
+    if (includeInContext !== undefined) updates.includeInContext = includeInContext;
+    if (extractedText !== undefined) updates.extractedText = extractedText;
+    if (summary !== undefined) updates.summary = summary;
+
+    const doc = await storage.updateTradingKnowledgeDoc(req.params.id, updates);
+    if (!doc) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    res.json({
+      ...doc,
+      fileData: doc.fileData ? "[BASE64_DATA]" : null,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error updating trading knowledge doc");
+    res.status(500).json({ error: "Failed to update trading knowledge doc" });
+  }
+});
+
+// Delete a trading knowledge document
+router.delete("/trading/knowledge-docs/:id", async (req: Request, res: Response) => {
+  try {
+    await storage.deleteTradingKnowledgeDoc(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Error deleting trading knowledge doc");
+    res.status(500).json({ error: "Failed to delete trading knowledge doc" });
+  }
+});
+
+// Get documents formatted for AI context (text content only)
+router.get("/trading/knowledge-docs/for-context", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const docs = await storage.getTradingKnowledgeDocsForContext(userId);
+
+    // Return only text content for AI context
+    const contextDocs = docs.map(doc => ({
+      id: doc.id,
+      title: doc.title,
+      category: doc.category,
+      content: doc.extractedText || doc.summary || doc.description || "",
+    })).filter(doc => doc.content); // Only return docs with content
+
+    res.json(contextDocs);
+  } catch (error) {
+    logger.error({ error }, "Error fetching trading knowledge docs for context");
+    res.status(500).json({ error: "Failed to fetch trading knowledge docs for context" });
   }
 });
 

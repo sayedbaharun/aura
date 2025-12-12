@@ -20,11 +20,13 @@ import {
   AlertTriangle,
   Settings,
   MessageSquare,
+  Brain,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import TradingAgentConfig from "./trading-agent-config";
+import TradingKnowledgeManager from "./trading-knowledge-manager";
 
 interface TradingConversation {
   id: string;
@@ -256,14 +258,18 @@ export default function TradingAiChat() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="chat" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
             Chat
           </TabsTrigger>
+          <TabsTrigger value="knowledge" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Knowledge
+          </TabsTrigger>
           <TabsTrigger value="config" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Configure Agent
+            Config
           </TabsTrigger>
         </TabsList>
 
@@ -452,6 +458,11 @@ export default function TradingAiChat() {
               </p>
             </div>
           </div>
+        </TabsContent>
+
+        {/* Knowledge Tab */}
+        <TabsContent value="knowledge" className="mt-4">
+          <TradingKnowledgeManager />
         </TabsContent>
 
         {/* Config Tab */}

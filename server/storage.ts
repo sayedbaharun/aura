@@ -55,6 +55,8 @@ import {
   type InsertTradingConversation,
   type TradingAgentConfig,
   type InsertTradingAgentConfig,
+  type TradingKnowledgeDoc,
+  type InsertTradingKnowledgeDoc,
   type VentureScenario,
   type InsertVentureScenario,
   type ScenarioIndicator,
@@ -95,6 +97,7 @@ import {
   people,
   tradingConversations,
   tradingAgentConfig,
+  tradingKnowledgeDocs,
   ventureScenarios,
   scenarioIndicators,
   trendSignals,
@@ -2001,6 +2004,108 @@ export class DBStorage implements IStorage {
     } catch (error) {
       console.error("Error deleting trading agent config (table may not exist):", error);
     }
+  }
+
+  // ============================================================================
+  // TRADING KNOWLEDGE DOCUMENTS
+  // ============================================================================
+
+  async getTradingKnowledgeDocs(
+    userId: string,
+    filters?: {
+      category?: string;
+      includeInContext?: boolean;
+      limit?: number;
+    }
+  ): Promise<TradingKnowledgeDoc[]> {
+    try {
+      const conditions = [eq(tradingKnowledgeDocs.userId, userId)];
+
+      if (filters?.category) {
+        conditions.push(eq(tradingKnowledgeDocs.category, filters.category as any));
+      }
+      if (filters?.includeInContext !== undefined) {
+        conditions.push(eq(tradingKnowledgeDocs.includeInContext, filters.includeInContext));
+      }
+
+      const query = this.db
+        .select()
+        .from(tradingKnowledgeDocs)
+        .where(and(...conditions))
+        .orderBy(desc(tradingKnowledgeDocs.priority), desc(tradingKnowledgeDocs.createdAt));
+
+      if (filters?.limit) {
+        return await query.limit(filters.limit);
+      }
+
+      return await query;
+    } catch (error) {
+      console.error("Error fetching trading knowledge docs (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getTradingKnowledgeDoc(id: string): Promise<TradingKnowledgeDoc | undefined> {
+    try {
+      const [doc] = await this.db
+        .select()
+        .from(tradingKnowledgeDocs)
+        .where(eq(tradingKnowledgeDocs.id, id))
+        .limit(1);
+      return doc;
+    } catch (error) {
+      console.error("Error fetching trading knowledge doc (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async createTradingKnowledgeDoc(data: InsertTradingKnowledgeDoc): Promise<TradingKnowledgeDoc> {
+    try {
+      const [doc] = await this.db
+        .insert(tradingKnowledgeDocs)
+        .values(data as any)
+        .returning();
+      return doc;
+    } catch (error) {
+      console.error("Error creating trading knowledge doc:", error);
+      throw error;
+    }
+  }
+
+  async updateTradingKnowledgeDoc(
+    id: string,
+    updates: Partial<InsertTradingKnowledgeDoc>
+  ): Promise<TradingKnowledgeDoc | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(tradingKnowledgeDocs)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(tradingKnowledgeDocs.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating trading knowledge doc:", error);
+      throw error;
+    }
+  }
+
+  async deleteTradingKnowledgeDoc(id: string): Promise<void> {
+    try {
+      await this.db
+        .delete(tradingKnowledgeDocs)
+        .where(eq(tradingKnowledgeDocs.id, id));
+    } catch (error) {
+      console.error("Error deleting trading knowledge doc:", error);
+      throw error;
+    }
+  }
+
+  async getTradingKnowledgeDocsForContext(userId: string): Promise<TradingKnowledgeDoc[]> {
+    // Get docs that are included in AI context, sorted by priority
+    return this.getTradingKnowledgeDocs(userId, {
+      includeInContext: true,
+      limit: 20 // Limit to prevent context overflow
+    });
   }
 
   // ============================================================================
