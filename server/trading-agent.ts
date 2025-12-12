@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import { logger } from "./logger";
 import * as modelManager from "./model-manager";
-import type { TradingStrategy, DailyTradingChecklist, Day, TradingAgentConfig } from "@shared/schema";
+import type { TradingStrategy, DailyTradingChecklist, Day, TradingAgentConfig, TradingKnowledgeDoc } from "@shared/schema";
 
 // Initialize OpenRouter with OpenAI-compatible API
 const openai = new OpenAI({
@@ -35,6 +35,7 @@ export class TradingAgent {
   private todayChecklist: DailyTradingChecklist | null = null;
   private todayDay: Day | null = null;
   private config: TradingAgentConfig | null = null;
+  private knowledgeDocs: TradingKnowledgeDoc[] = [];
 
   constructor(userId: string) {
     this.userId = userId;
@@ -47,23 +48,26 @@ export class TradingAgent {
     try {
       const today = new Date().toISOString().split("T")[0];
 
-      const [strategies, todayChecklists, todayDay, config] = await Promise.all([
+      const [strategies, todayChecklists, todayDay, config, knowledgeDocs] = await Promise.all([
         storage.getTradingStrategies({ isActive: true }),
         storage.getDailyTradingChecklists({ date: today }),
         storage.getDayOrCreate(today),
         storage.getTradingAgentConfig(this.userId),
+        storage.getTradingKnowledgeDocsForContext(this.userId),
       ]);
 
       this.strategies = strategies;
       this.todayChecklist = todayChecklists[0] || null;
       this.todayDay = todayDay;
       this.config = config;
+      this.knowledgeDocs = knowledgeDocs;
     } catch (error: any) {
       logger.error({ error }, "Error initializing trading agent");
       this.strategies = [];
       this.todayChecklist = null;
       this.todayDay = null;
       this.config = null;
+      this.knowledgeDocs = [];
     }
   }
 
@@ -135,6 +139,25 @@ ${this.config.focusAreas.map(area => `- ${area}`).join("\n")}`;
       customInstructions = `\n\nCUSTOM INSTRUCTIONS FROM TRADER:\n${this.config.systemPrompt}`;
     }
 
+    // Build knowledge base context from uploaded documents
+    let knowledgeBaseContext = "";
+    if (this.knowledgeDocs.length > 0) {
+      const docsContent = this.knowledgeDocs
+        .filter(doc => doc.extractedText || doc.summary || doc.description)
+        .map(doc => {
+          const content = doc.extractedText || doc.summary || doc.description || "";
+          // Truncate very long content to avoid context overflow
+          const truncatedContent = content.length > 2000 ? content.slice(0, 2000) + "..." : content;
+          return `### ${doc.title} (${doc.category})\n${truncatedContent}`;
+        })
+        .join("\n\n");
+
+      if (docsContent) {
+        knowledgeBaseContext = `\n\nTRADER'S KNOWLEDGE BASE (Reference these when answering questions):
+${docsContent}`;
+      }
+    }
+
     return `You are a professional trading assistant integrated into SB-OS - a personal operating system for a trader.
 
 CURRENT CONTEXT:
@@ -164,6 +187,7 @@ IMPORTANT GUIDELINES:
 - Remind about the importance of "no trade is a valid trade" when appropriate
 ${focusEmphasis}
 ${customInstructions}
+${knowledgeBaseContext}
 
 Current date/time: ${new Date().toISOString()}`;
   }

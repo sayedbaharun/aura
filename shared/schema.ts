@@ -1640,6 +1640,71 @@ export const insertTradingAgentConfigSchema = createInsertSchema(tradingAgentCon
 export type TradingAgentConfig = typeof tradingAgentConfig.$inferSelect;
 export type InsertTradingAgentConfig = z.infer<typeof insertTradingAgentConfigSchema>;
 
+// Trading Knowledge Docs: Documents uploaded for AI agent training/context
+export const tradingKnowledgeDocCategoryEnum = pgEnum('trading_knowledge_doc_category', [
+  'strategy',     // Trading strategies and rules
+  'playbook',     // Step-by-step playbooks
+  'notes',        // Personal trading notes
+  'research',     // Market research and analysis
+  'psychology',   // Trading psychology materials
+  'education',    // Educational materials
+  'other'         // Other documents
+]);
+
+export const tradingKnowledgeDocs = pgTable(
+  "trading_knowledge_docs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+
+    // Document info
+    title: text("title").notNull(),
+    description: text("description"),
+    category: tradingKnowledgeDocCategoryEnum("category").default("other"),
+
+    // File info
+    fileName: text("file_name"),
+    fileType: text("file_type"), // MIME type: application/pdf, text/plain, image/png, etc.
+    fileSize: integer("file_size"), // Size in bytes
+
+    // Storage: either URL or base64 data
+    storageType: text("storage_type").default("base64"), // 'url', 'base64', 'local'
+    fileUrl: text("file_url"), // External URL if stored elsewhere
+    fileData: text("file_data"), // Base64 encoded file data
+
+    // Extracted/processed content for AI
+    extractedText: text("extracted_text"), // Text extracted from PDFs, images (OCR)
+    summary: text("summary"), // AI-generated summary
+
+    // AI training settings
+    includeInContext: boolean("include_in_context").default(true), // Whether to include in AI context
+    priority: integer("priority").default(0), // Higher priority = included first
+
+    // Metadata
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    tags: text("tags"), // Comma-separated tags
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_trading_knowledge_docs_user_id").on(table.userId),
+    index("idx_trading_knowledge_docs_category").on(table.category),
+    index("idx_trading_knowledge_docs_include_in_context").on(table.includeInContext),
+    index("idx_trading_knowledge_docs_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertTradingKnowledgeDocSchema = createInsertSchema(tradingKnowledgeDocs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TradingKnowledgeDoc = typeof tradingKnowledgeDocs.$inferSelect;
+export type InsertTradingKnowledgeDoc = z.infer<typeof insertTradingKnowledgeDocSchema>;
+
 // ----------------------------------------------------------------------------
 // STRATEGIC FORESIGHT MODULE
 // ----------------------------------------------------------------------------
