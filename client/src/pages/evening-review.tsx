@@ -4,6 +4,7 @@ import { format, subDays, addDays, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,8 @@ import {
   Trophy,
   TrendingUp,
   AlertCircle,
-  Calendar
+  Calendar,
+  BookOpen
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -77,6 +79,11 @@ interface Day {
       bedBy2am?: boolean;
       completedAt?: string;
     };
+    readingLog?: {
+      bookId: string;
+      bookTitle: string;
+      pagesRead: number;
+    };
     completedAt?: string;
   } | null;
 }
@@ -88,6 +95,19 @@ interface HealthEntry {
   workoutDone: boolean;
   steps: number | null;
   mood: string | null;
+}
+
+interface Book {
+  id: string;
+  title: string;
+  author: string | null;
+  status: "to_read" | "reading" | "finished";
+}
+
+interface ReadingLog {
+  bookId: string;
+  bookTitle: string;
+  pagesRead: number;
 }
 
 export default function EveningReview() {
@@ -134,6 +154,7 @@ export default function EveningReview() {
   });
 
   const [top3Outcomes, setTop3Outcomes] = useState<Top3Outcome[]>([]);
+  const [readingLog, setReadingLog] = useState<ReadingLog | null>(null);
 
   // Fetch the selected day's data
   const { data: dayData, isLoading: isDayLoading } = useQuery<Day>({
@@ -179,6 +200,15 @@ export default function EveningReview() {
     },
   });
 
+  // Fetch books for reading tracker (filter to "reading" status)
+  const { data: books = [] } = useQuery<Book[]>({
+    queryKey: ["/api/books"],
+  });
+
+  const readingBooks = Array.isArray(books)
+    ? books.filter((b) => b.status === "reading")
+    : [];
+
   // P0/P1 tasks available for all priority slots
   const priorityTasks = Array.isArray(allTasks) ? allTasks : [];
 
@@ -199,6 +229,7 @@ export default function EveningReview() {
       },
     });
     setTop3Outcomes([]);
+    setReadingLog(null);
   }, [selectedDate]);
 
   // Load existing data when day data arrives
@@ -224,6 +255,11 @@ export default function EveningReview() {
       // Load top3Outcomes
       if (Array.isArray(dayData.top3Outcomes)) {
         setTop3Outcomes(dayData.top3Outcomes);
+      }
+
+      // Load reading log
+      if (dayData.eveningRituals?.readingLog) {
+        setReadingLog(dayData.eveningRituals.readingLog);
       }
     }
   }, [dayData]);
@@ -253,6 +289,9 @@ export default function EveningReview() {
             ? new Date().toISOString()
             : undefined,
         },
+        readingLog: readingLog && readingLog.bookId && readingLog.pagesRead > 0
+          ? readingLog
+          : undefined,
         completedAt: new Date().toISOString(),
       };
 
@@ -486,6 +525,99 @@ export default function EveningReview() {
               />
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Evening Reading */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-emerald-500" />
+            Evening Reading
+          </CardTitle>
+          <CardDescription>
+            Track what you read today
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="book-select">Book</Label>
+              {readingBooks.length > 0 ? (
+                <Select
+                  value={readingLog?.bookId || ""}
+                  onValueChange={(bookId) => {
+                    const book = readingBooks.find(b => b.id === bookId);
+                    if (book) {
+                      setReadingLog({
+                        bookId: book.id,
+                        bookTitle: book.title,
+                        pagesRead: readingLog?.pagesRead || 0,
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger id="book-select">
+                    <SelectValue placeholder="Select a book you're reading..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {readingBooks.map((book) => (
+                      <SelectItem key={book.id} value={book.id}>
+                        <span className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-emerald-500" />
+                          {book.title}
+                          {book.author && (
+                            <span className="text-muted-foreground text-xs">
+                              by {book.author}
+                            </span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-muted-foreground py-3 text-center border rounded-md bg-muted/30">
+                  No books marked as "reading". Add books from the{" "}
+                  <Link href="/books" className="text-primary underline">
+                    Books page
+                  </Link>.
+                </div>
+              )}
+            </div>
+
+            {readingLog?.bookId && (
+              <div className="space-y-2">
+                <Label htmlFor="pages-read">Pages Read Today</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="pages-read"
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={readingLog.pagesRead || ""}
+                    onChange={(e) => {
+                      setReadingLog({
+                        ...readingLog,
+                        pagesRead: parseInt(e.target.value) || 0,
+                      });
+                    }}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">pages</span>
+                </div>
+              </div>
+            )}
+
+            {readingLog?.bookId && readingLog.pagesRead > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-sm text-emerald-700 dark:text-emerald-300">
+                  Read {readingLog.pagesRead} pages of "{readingLog.bookTitle}"
+                </span>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
