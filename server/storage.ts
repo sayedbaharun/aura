@@ -51,6 +51,8 @@ import {
   type InsertNetWorthSnapshot,
   type Person,
   type InsertPerson,
+  type TradingConversation,
+  type InsertTradingConversation,
   ventures,
   projects,
   phases,
@@ -77,6 +79,7 @@ import {
   accountSnapshots,
   netWorthSnapshots,
   people,
+  tradingConversations,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
@@ -1759,6 +1762,55 @@ export class DBStorage implements IStorage {
       // Table might not exist yet if migration hasn't been run
       console.error("Error fetching venture agent actions (table may not exist):", error);
       return [];
+    }
+  }
+
+  // ============================================================================
+  // TRADING AI AGENT CONVERSATIONS
+  // ============================================================================
+
+  async createTradingConversation(data: InsertTradingConversation): Promise<TradingConversation> {
+    try {
+      const results = await this.db.insert(tradingConversations).values(data as any).returning();
+      return results[0];
+    } catch (error) {
+      console.error("Error creating trading conversation (table may not exist):", error);
+      // Return a mock object to prevent crashes when table doesn't exist
+      return {
+        id: randomUUID(),
+        userId: data.userId,
+        role: data.role as any,
+        content: data.content,
+        metadata: data.metadata as any || null,
+        createdAt: new Date(),
+      };
+    }
+  }
+
+  async getTradingConversations(
+    userId: string,
+    limit: number = 20
+  ): Promise<TradingConversation[]> {
+    try {
+      return await this.db
+        .select()
+        .from(tradingConversations)
+        .where(eq(tradingConversations.userId, userId))
+        .orderBy(desc(tradingConversations.createdAt))
+        .limit(limit);
+    } catch (error) {
+      console.error("Error fetching trading conversations (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async deleteTradingConversations(userId: string): Promise<void> {
+    try {
+      await this.db
+        .delete(tradingConversations)
+        .where(eq(tradingConversations.userId, userId));
+    } catch (error) {
+      console.error("Error deleting trading conversations (table may not exist):", error);
     }
   }
 
