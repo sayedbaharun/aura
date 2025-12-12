@@ -336,6 +336,29 @@ export class DBStorage implements IStorage {
         console.log("✅ Auto-Migration: Created daily_trading_checklists table");
       }
 
+      // Check and create trading_conversations table
+      const tradingConversationsExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'trading_conversations'
+      `);
+
+      if (tradingConversationsExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating trading_conversations table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "trading_conversations" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+            "role" text NOT NULL,
+            "content" text NOT NULL,
+            "metadata" jsonb,
+            "created_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_trading_conversations_user_id" ON "trading_conversations" ("user_id")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_trading_conversations_created_at" ON "trading_conversations" ("created_at")`);
+        console.log("✅ Auto-Migration: Created trading_conversations table");
+      }
+
       // Check and create financial_account_type enum
       const finAccountTypeEnumExists = await this.db.execute(sql`
         SELECT 1 FROM pg_type WHERE typname = 'financial_account_type'
