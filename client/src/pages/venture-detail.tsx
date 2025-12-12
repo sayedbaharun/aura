@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { Plus, Bot, Settings, Sparkles } from "lucide-react";
+import { Plus, Bot, Settings, Sparkles, Telescope } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import CreateProjectModal from "@/components/venture-hq/create-project-modal";
 import ProjectWizard from "@/components/venture-hq/project-wizard";
 import AiAgentConfig from "@/components/venture-hq/ai-agent-config";
 import VentureAiChat from "@/components/venture-hq/venture-ai-chat";
+import { ForesightTab } from "@/components/foresight";
 
 interface Venture {
   id: string;
@@ -96,6 +97,7 @@ export default function VentureDetail() {
               <TabsTrigger value="phases" className="text-xs sm:text-sm">Phases</TabsTrigger>
               <TabsTrigger value="tasks" className="text-xs sm:text-sm">Tasks</TabsTrigger>
               <TabsTrigger value="docs" className="text-xs sm:text-sm whitespace-nowrap">Knowledge</TabsTrigger>
+              <TabsTrigger value="foresight" className="text-xs sm:text-sm whitespace-nowrap">Foresight</TabsTrigger>
               <TabsTrigger value="ai-agent" className="text-xs sm:text-sm whitespace-nowrap">AI Agent</TabsTrigger>
             </TabsList>
           </div>
@@ -128,6 +130,10 @@ export default function VentureDetail() {
 
         <TabsContent value="docs">
           <VentureDocs ventureId={venture.id} />
+        </TabsContent>
+
+        <TabsContent value="foresight">
+          <ForesightTab ventureId={venture.id} />
         </TabsContent>
 
         <TabsContent value="ai-agent" className="space-y-4">

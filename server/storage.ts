@@ -53,6 +53,18 @@ import {
   type InsertPerson,
   type TradingConversation,
   type InsertTradingConversation,
+  type VentureScenario,
+  type InsertVentureScenario,
+  type ScenarioIndicator,
+  type InsertScenarioIndicator,
+  type TrendSignal,
+  type InsertTrendSignal,
+  type StrategicAnalysis,
+  type InsertStrategicAnalysis,
+  type WhatIfQuestion,
+  type InsertWhatIfQuestion,
+  type ForesightConversation,
+  type InsertForesightConversation,
   ventures,
   projects,
   phases,
@@ -80,6 +92,12 @@ import {
   netWorthSnapshots,
   people,
   tradingConversations,
+  ventureScenarios,
+  scenarioIndicators,
+  trendSignals,
+  strategicAnalyses,
+  whatIfQuestions,
+  foresightConversations,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
@@ -255,6 +273,55 @@ export interface IStorage {
 
   // Health Check
   ping(): Promise<boolean>;
+
+  // Strategic Foresight - Scenarios
+  getVentureScenarios(ventureId: string, filters?: { status?: string; quadrant?: string; timeHorizon?: string }): Promise<VentureScenario[]>;
+  getVentureScenario(id: string): Promise<VentureScenario | undefined>;
+  createVentureScenario(data: InsertVentureScenario): Promise<VentureScenario>;
+  updateVentureScenario(id: string, data: Partial<InsertVentureScenario>): Promise<VentureScenario | undefined>;
+  deleteVentureScenario(id: string): Promise<void>;
+
+  // Strategic Foresight - Indicators
+  getScenarioIndicators(filters: { ventureId?: string; scenarioId?: string; status?: string; category?: string }): Promise<ScenarioIndicator[]>;
+  getScenarioIndicator(id: string): Promise<ScenarioIndicator | undefined>;
+  createScenarioIndicator(data: InsertScenarioIndicator): Promise<ScenarioIndicator>;
+  updateScenarioIndicator(id: string, data: Partial<InsertScenarioIndicator>): Promise<ScenarioIndicator | undefined>;
+  deleteScenarioIndicator(id: string): Promise<void>;
+
+  // Strategic Foresight - Trend Signals
+  getTrendSignals(ventureId: string, filters?: { status?: string; category?: string; strength?: string }): Promise<TrendSignal[]>;
+  getTrendSignal(id: string): Promise<TrendSignal | undefined>;
+  createTrendSignal(data: InsertTrendSignal): Promise<TrendSignal>;
+  updateTrendSignal(id: string, data: Partial<InsertTrendSignal>): Promise<TrendSignal | undefined>;
+  deleteTrendSignal(id: string): Promise<void>;
+
+  // Strategic Foresight - Analyses
+  getStrategicAnalyses(ventureId: string, filters?: { framework?: string; status?: string }): Promise<StrategicAnalysis[]>;
+  getStrategicAnalysis(id: string): Promise<StrategicAnalysis | undefined>;
+  createStrategicAnalysis(data: InsertStrategicAnalysis): Promise<StrategicAnalysis>;
+  updateStrategicAnalysis(id: string, data: Partial<InsertStrategicAnalysis>): Promise<StrategicAnalysis | undefined>;
+  deleteStrategicAnalysis(id: string): Promise<void>;
+
+  // Strategic Foresight - What-If Questions
+  getWhatIfQuestions(ventureId: string, filters?: { category?: string; explored?: boolean }): Promise<WhatIfQuestion[]>;
+  getWhatIfQuestion(id: string): Promise<WhatIfQuestion | undefined>;
+  createWhatIfQuestion(data: InsertWhatIfQuestion): Promise<WhatIfQuestion>;
+  updateWhatIfQuestion(id: string, data: Partial<InsertWhatIfQuestion>): Promise<WhatIfQuestion | undefined>;
+  deleteWhatIfQuestion(id: string): Promise<void>;
+
+  // Strategic Foresight - Conversations
+  getForesightConversations(ventureId: string, limit?: number): Promise<ForesightConversation[]>;
+  createForesightConversation(data: InsertForesightConversation): Promise<ForesightConversation>;
+  clearForesightConversations(ventureId: string): Promise<void>;
+
+  // Strategic Foresight - Dashboard Summary
+  getForesightSummary(ventureId: string): Promise<{
+    scenarioCount: number;
+    scenariosByQuadrant: Record<string, number>;
+    indicatorsByStatus: { green: number; yellow: number; red: number };
+    recentSignals: TrendSignal[];
+    unexploredQuestions: number;
+  }>;
 }
 
 // PostgreSQL Storage Implementation
@@ -2457,6 +2524,473 @@ export class DBStorage implements IStorage {
     } catch (error) {
       console.error("Error logging contact:", error);
       return undefined;
+    }
+  }
+
+  // ============================================================================
+  // STRATEGIC FORESIGHT MODULE
+  // ============================================================================
+
+  // ----------------------------------------------------------------------------
+  // VENTURE SCENARIOS
+  // ----------------------------------------------------------------------------
+
+  async getVentureScenarios(
+    ventureId: string,
+    filters?: { status?: string; quadrant?: string; timeHorizon?: string }
+  ): Promise<VentureScenario[]> {
+    try {
+      const conditions = [eq(ventureScenarios.ventureId, ventureId)];
+
+      if (filters?.status) {
+        conditions.push(eq(ventureScenarios.status, filters.status as any));
+      }
+      if (filters?.quadrant) {
+        conditions.push(eq(ventureScenarios.quadrant, filters.quadrant as any));
+      }
+      if (filters?.timeHorizon) {
+        conditions.push(eq(ventureScenarios.timeHorizon, filters.timeHorizon as any));
+      }
+
+      return await this.db
+        .select()
+        .from(ventureScenarios)
+        .where(and(...conditions))
+        .orderBy(desc(ventureScenarios.updatedAt));
+    } catch (error) {
+      console.error("Error fetching venture scenarios:", error);
+      return [];
+    }
+  }
+
+  async getVentureScenario(id: string): Promise<VentureScenario | undefined> {
+    try {
+      const [scenario] = await this.db
+        .select()
+        .from(ventureScenarios)
+        .where(eq(ventureScenarios.id, id));
+      return scenario;
+    } catch (error) {
+      console.error("Error fetching venture scenario:", error);
+      return undefined;
+    }
+  }
+
+  async createVentureScenario(data: InsertVentureScenario): Promise<VentureScenario> {
+    const [scenario] = await this.db
+      .insert(ventureScenarios)
+      .values(data as any)
+      .returning();
+    return scenario;
+  }
+
+  async updateVentureScenario(
+    id: string,
+    data: Partial<InsertVentureScenario>
+  ): Promise<VentureScenario | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(ventureScenarios)
+        .set({ ...data, updatedAt: new Date() } as any)
+        .where(eq(ventureScenarios.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating venture scenario:", error);
+      return undefined;
+    }
+  }
+
+  async deleteVentureScenario(id: string): Promise<void> {
+    await this.db.delete(ventureScenarios).where(eq(ventureScenarios.id, id));
+  }
+
+  // ----------------------------------------------------------------------------
+  // SCENARIO INDICATORS
+  // ----------------------------------------------------------------------------
+
+  async getScenarioIndicators(
+    filters: { ventureId?: string; scenarioId?: string; status?: string; category?: string }
+  ): Promise<ScenarioIndicator[]> {
+    try {
+      const conditions = [];
+
+      if (filters.ventureId) {
+        conditions.push(eq(scenarioIndicators.ventureId, filters.ventureId));
+      }
+      if (filters.scenarioId) {
+        conditions.push(eq(scenarioIndicators.scenarioId, filters.scenarioId));
+      }
+      if (filters.status) {
+        conditions.push(eq(scenarioIndicators.currentStatus, filters.status as any));
+      }
+      if (filters.category) {
+        conditions.push(eq(scenarioIndicators.category, filters.category as any));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return await this.db
+        .select()
+        .from(scenarioIndicators)
+        .where(whereClause)
+        .orderBy(desc(scenarioIndicators.updatedAt));
+    } catch (error) {
+      console.error("Error fetching scenario indicators:", error);
+      return [];
+    }
+  }
+
+  async getScenarioIndicator(id: string): Promise<ScenarioIndicator | undefined> {
+    try {
+      const [indicator] = await this.db
+        .select()
+        .from(scenarioIndicators)
+        .where(eq(scenarioIndicators.id, id));
+      return indicator;
+    } catch (error) {
+      console.error("Error fetching scenario indicator:", error);
+      return undefined;
+    }
+  }
+
+  async createScenarioIndicator(data: InsertScenarioIndicator): Promise<ScenarioIndicator> {
+    const [indicator] = await this.db
+      .insert(scenarioIndicators)
+      .values(data)
+      .returning();
+    return indicator;
+  }
+
+  async updateScenarioIndicator(
+    id: string,
+    data: Partial<InsertScenarioIndicator>
+  ): Promise<ScenarioIndicator | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(scenarioIndicators)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(scenarioIndicators.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating scenario indicator:", error);
+      return undefined;
+    }
+  }
+
+  async deleteScenarioIndicator(id: string): Promise<void> {
+    await this.db.delete(scenarioIndicators).where(eq(scenarioIndicators.id, id));
+  }
+
+  // ----------------------------------------------------------------------------
+  // TREND SIGNALS
+  // ----------------------------------------------------------------------------
+
+  async getTrendSignals(
+    ventureId: string,
+    filters?: { status?: string; category?: string; strength?: string }
+  ): Promise<TrendSignal[]> {
+    try {
+      const conditions = [eq(trendSignals.ventureId, ventureId)];
+
+      if (filters?.status) {
+        conditions.push(eq(trendSignals.status, filters.status as any));
+      }
+      if (filters?.category) {
+        conditions.push(eq(trendSignals.category, filters.category as any));
+      }
+      if (filters?.strength) {
+        conditions.push(eq(trendSignals.signalStrength, filters.strength as any));
+      }
+
+      return await this.db
+        .select()
+        .from(trendSignals)
+        .where(and(...conditions))
+        .orderBy(desc(trendSignals.createdAt));
+    } catch (error) {
+      console.error("Error fetching trend signals:", error);
+      return [];
+    }
+  }
+
+  async getTrendSignal(id: string): Promise<TrendSignal | undefined> {
+    try {
+      const [signal] = await this.db
+        .select()
+        .from(trendSignals)
+        .where(eq(trendSignals.id, id));
+      return signal;
+    } catch (error) {
+      console.error("Error fetching trend signal:", error);
+      return undefined;
+    }
+  }
+
+  async createTrendSignal(data: InsertTrendSignal): Promise<TrendSignal> {
+    const [signal] = await this.db
+      .insert(trendSignals)
+      .values(data as any)
+      .returning();
+    return signal;
+  }
+
+  async updateTrendSignal(
+    id: string,
+    data: Partial<InsertTrendSignal>
+  ): Promise<TrendSignal | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(trendSignals)
+        .set({ ...data, updatedAt: new Date() } as any)
+        .where(eq(trendSignals.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating trend signal:", error);
+      return undefined;
+    }
+  }
+
+  async deleteTrendSignal(id: string): Promise<void> {
+    await this.db.delete(trendSignals).where(eq(trendSignals.id, id));
+  }
+
+  // ----------------------------------------------------------------------------
+  // STRATEGIC ANALYSES
+  // ----------------------------------------------------------------------------
+
+  async getStrategicAnalyses(
+    ventureId: string,
+    filters?: { framework?: string; status?: string }
+  ): Promise<StrategicAnalysis[]> {
+    try {
+      const conditions = [eq(strategicAnalyses.ventureId, ventureId)];
+
+      if (filters?.framework) {
+        conditions.push(eq(strategicAnalyses.framework, filters.framework as any));
+      }
+      if (filters?.status) {
+        conditions.push(eq(strategicAnalyses.status, filters.status as any));
+      }
+
+      return await this.db
+        .select()
+        .from(strategicAnalyses)
+        .where(and(...conditions))
+        .orderBy(desc(strategicAnalyses.createdAt));
+    } catch (error) {
+      console.error("Error fetching strategic analyses:", error);
+      return [];
+    }
+  }
+
+  async getStrategicAnalysis(id: string): Promise<StrategicAnalysis | undefined> {
+    try {
+      const [analysis] = await this.db
+        .select()
+        .from(strategicAnalyses)
+        .where(eq(strategicAnalyses.id, id));
+      return analysis;
+    } catch (error) {
+      console.error("Error fetching strategic analysis:", error);
+      return undefined;
+    }
+  }
+
+  async createStrategicAnalysis(data: InsertStrategicAnalysis): Promise<StrategicAnalysis> {
+    const [analysis] = await this.db
+      .insert(strategicAnalyses)
+      .values(data as any)
+      .returning();
+    return analysis;
+  }
+
+  async updateStrategicAnalysis(
+    id: string,
+    data: Partial<InsertStrategicAnalysis>
+  ): Promise<StrategicAnalysis | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(strategicAnalyses)
+        .set({ ...data, updatedAt: new Date() } as any)
+        .where(eq(strategicAnalyses.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating strategic analysis:", error);
+      return undefined;
+    }
+  }
+
+  async deleteStrategicAnalysis(id: string): Promise<void> {
+    await this.db.delete(strategicAnalyses).where(eq(strategicAnalyses.id, id));
+  }
+
+  // ----------------------------------------------------------------------------
+  // WHAT-IF QUESTIONS
+  // ----------------------------------------------------------------------------
+
+  async getWhatIfQuestions(
+    ventureId: string,
+    filters?: { category?: string; explored?: boolean }
+  ): Promise<WhatIfQuestion[]> {
+    try {
+      const conditions = [eq(whatIfQuestions.ventureId, ventureId)];
+
+      if (filters?.category) {
+        conditions.push(eq(whatIfQuestions.category, filters.category as any));
+      }
+      if (filters?.explored !== undefined) {
+        conditions.push(eq(whatIfQuestions.explored, filters.explored));
+      }
+
+      return await this.db
+        .select()
+        .from(whatIfQuestions)
+        .where(and(...conditions))
+        .orderBy(desc(whatIfQuestions.createdAt));
+    } catch (error) {
+      console.error("Error fetching what-if questions:", error);
+      return [];
+    }
+  }
+
+  async getWhatIfQuestion(id: string): Promise<WhatIfQuestion | undefined> {
+    try {
+      const [question] = await this.db
+        .select()
+        .from(whatIfQuestions)
+        .where(eq(whatIfQuestions.id, id));
+      return question;
+    } catch (error) {
+      console.error("Error fetching what-if question:", error);
+      return undefined;
+    }
+  }
+
+  async createWhatIfQuestion(data: InsertWhatIfQuestion): Promise<WhatIfQuestion> {
+    const [question] = await this.db
+      .insert(whatIfQuestions)
+      .values(data)
+      .returning();
+    return question;
+  }
+
+  async updateWhatIfQuestion(
+    id: string,
+    data: Partial<InsertWhatIfQuestion>
+  ): Promise<WhatIfQuestion | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(whatIfQuestions)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(whatIfQuestions.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating what-if question:", error);
+      return undefined;
+    }
+  }
+
+  async deleteWhatIfQuestion(id: string): Promise<void> {
+    await this.db.delete(whatIfQuestions).where(eq(whatIfQuestions.id, id));
+  }
+
+  // ----------------------------------------------------------------------------
+  // FORESIGHT CONVERSATIONS
+  // ----------------------------------------------------------------------------
+
+  async getForesightConversations(ventureId: string, limit: number = 50): Promise<ForesightConversation[]> {
+    try {
+      return await this.db
+        .select()
+        .from(foresightConversations)
+        .where(eq(foresightConversations.ventureId, ventureId))
+        .orderBy(foresightConversations.createdAt)
+        .limit(limit);
+    } catch (error) {
+      console.error("Error fetching foresight conversations:", error);
+      return [];
+    }
+  }
+
+  async createForesightConversation(data: InsertForesightConversation): Promise<ForesightConversation> {
+    const [conversation] = await this.db
+      .insert(foresightConversations)
+      .values(data as any)
+      .returning();
+    return conversation;
+  }
+
+  async clearForesightConversations(ventureId: string): Promise<void> {
+    await this.db
+      .delete(foresightConversations)
+      .where(eq(foresightConversations.ventureId, ventureId));
+  }
+
+  // ----------------------------------------------------------------------------
+  // FORESIGHT DASHBOARD SUMMARY
+  // ----------------------------------------------------------------------------
+
+  async getForesightSummary(ventureId: string): Promise<{
+    scenarioCount: number;
+    scenariosByQuadrant: Record<string, number>;
+    indicatorsByStatus: { green: number; yellow: number; red: number };
+    recentSignals: TrendSignal[];
+    unexploredQuestions: number;
+  }> {
+    try {
+      // Get all scenarios for the venture
+      const scenarios = await this.getVentureScenarios(ventureId);
+
+      // Count scenarios by quadrant
+      const scenariosByQuadrant: Record<string, number> = {
+        growth: 0,
+        collapse: 0,
+        transformation: 0,
+        constraint: 0,
+      };
+      scenarios.forEach(s => {
+        if (s.quadrant) {
+          scenariosByQuadrant[s.quadrant] = (scenariosByQuadrant[s.quadrant] || 0) + 1;
+        }
+      });
+
+      // Get indicators and count by status
+      const indicators = await this.getScenarioIndicators({ ventureId });
+      const indicatorsByStatus = {
+        green: indicators.filter(i => i.currentStatus === 'green').length,
+        yellow: indicators.filter(i => i.currentStatus === 'yellow').length,
+        red: indicators.filter(i => i.currentStatus === 'red').length,
+      };
+
+      // Get recent signals (last 5)
+      const allSignals = await this.getTrendSignals(ventureId);
+      const recentSignals = allSignals.slice(0, 5);
+
+      // Count unexplored questions
+      const questions = await this.getWhatIfQuestions(ventureId, { explored: false });
+      const unexploredQuestions = questions.length;
+
+      return {
+        scenarioCount: scenarios.length,
+        scenariosByQuadrant,
+        indicatorsByStatus,
+        recentSignals,
+        unexploredQuestions,
+      };
+    } catch (error) {
+      console.error("Error fetching foresight summary:", error);
+      return {
+        scenarioCount: 0,
+        scenariosByQuadrant: { growth: 0, collapse: 0, transformation: 0, constraint: 0 },
+        indicatorsByStatus: { green: 0, yellow: 0, red: 0 },
+        recentSignals: [],
+        unexploredQuestions: 0,
+      };
     }
   }
 
