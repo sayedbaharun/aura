@@ -1563,3 +1563,39 @@ export const insertPersonSchema = createInsertSchema(people).omit({
 
 export type InsertPerson = z.infer<typeof insertPersonSchema>;
 export type Person = typeof people.$inferSelect;
+
+// ----------------------------------------------------------------------------
+// TRADING AI AGENT CONVERSATIONS
+// ----------------------------------------------------------------------------
+
+// Trading Conversations: Chat history for trading AI agent
+export const tradingConversations = pgTable(
+  "trading_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    role: text("role").$type<"user" | "assistant" | "system">().notNull(),
+    content: text("content").notNull(),
+    metadata: jsonb("metadata").$type<{
+      model?: string;
+      tokensUsed?: number;
+      toolCalls?: any[];
+      toolResults?: any[];
+      actionsTaken?: string[];
+      [key: string]: any;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_trading_conversations_user_id").on(table.userId),
+    index("idx_trading_conversations_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertTradingConversationSchema = createInsertSchema(tradingConversations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type TradingConversation = typeof tradingConversations.$inferSelect;
+export type InsertTradingConversation = z.infer<typeof insertTradingConversationSchema>;

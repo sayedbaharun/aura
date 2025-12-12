@@ -768,6 +768,105 @@ router.get("/ventures/:ventureId/ai/context-status", async (req: Request, res: R
 });
 
 // ============================================================================
+// TRADING AI AGENT
+// ============================================================================
+
+// Send a chat message to the trading AI agent
+router.post("/trading/chat", aiRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { message } = req.body;
+
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    // Check if OpenRouter API key is configured
+    if (!process.env.OPENROUTER_API_KEY) {
+      return res.status(503).json({
+        error: "AI service not configured",
+        message: "OpenRouter API key is not set. Please configure the OPENROUTER_API_KEY environment variable."
+      });
+    }
+
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    // Dynamically import to avoid circular dependencies
+    const { createTradingAgent } = await import("../trading-agent");
+
+    // Create and initialize the trading agent
+    const agent = await createTradingAgent(userId);
+
+    // Process the message
+    const result = await agent.chat(message);
+
+    res.json({
+      response: result.response,
+      actions: result.actions,
+      model: result.model,
+      tokensUsed: result.tokensUsed,
+    });
+  } catch (error: any) {
+    logger.error({ error }, "Error processing trading chat message");
+
+    const errorMessage = error.message || "Failed to process message";
+
+    if (errorMessage.includes('relation') && errorMessage.includes('does not exist')) {
+      return res.status(503).json({
+        error: "Trading AI agent database not initialized",
+        message: "The trading AI agent tables need to be created. Please run database migrations."
+      });
+    }
+
+    if (errorMessage.includes('All AI models failed') || errorMessage.includes('401') || errorMessage.includes('429')) {
+      return res.status(503).json({
+        error: "AI Service Unavailable",
+        message: "The AI service is currently unavailable or misconfigured. Please check your API key and credits.",
+        details: errorMessage
+      });
+    }
+
+    res.status(500).json({
+      error: errorMessage,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack,
+      details: "Check server logs for full stack trace"
+    });
+  }
+});
+
+// Get trading chat history
+router.get("/trading/chat/history", async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const history = await storage.getTradingConversations(userId, limit);
+
+    // Return in chronological order
+    res.json(history.reverse());
+  } catch (error) {
+    logger.error({ error }, "Error fetching trading chat history (returning empty)");
+    res.json([]);
+  }
+});
+
+// Clear trading chat history
+router.delete("/trading/chat/history", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    await storage.deleteTradingConversations(userId);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Error clearing trading chat history (returning success)");
+    res.json({ success: true });
+  }
+});
+
+// ============================================================================
 // PROJECT SCAFFOLDING - AI-powered project plan generation
 // ============================================================================
 

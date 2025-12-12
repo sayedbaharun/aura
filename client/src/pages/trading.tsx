@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { TrendingUp, Settings, History, Target } from "lucide-react";
+import { TrendingUp, Settings, History, Target, Bot } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TradingJournalEntry from "@/components/command-center/trading-journal-entry";
 import TradingStrategyDashboard from "@/components/trading/trading-strategy-dashboard";
 import TradingStrategiesManager from "@/components/trading/trading-strategies-manager";
 import TradingSessionIndicator from "@/components/trading/trading-session-indicator";
+import TradingAiChat from "@/components/trading/trading-ai-chat";
 import type { Day } from "@shared/schema";
 
 export default function TradingPage() {
@@ -37,7 +38,7 @@ export default function TradingPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
               Dashboard
@@ -49,6 +50,10 @@ export default function TradingPage() {
             <TabsTrigger value="journal" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Journal
+            </TabsTrigger>
+            <TabsTrigger value="ai-agent" className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              AI Agent
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
@@ -70,6 +75,10 @@ export default function TradingPage() {
             ) : (
               <TradingJournalEntry day={day || null} />
             )}
+          </TabsContent>
+
+          <TabsContent value="ai-agent" className="mt-6">
+            <TradingAiChat />
           </TabsContent>
 
           <TabsContent value="history" className="mt-6">
