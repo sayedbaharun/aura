@@ -53,6 +53,8 @@ import {
   type InsertPerson,
   type TradingConversation,
   type InsertTradingConversation,
+  type TradingAgentConfig,
+  type InsertTradingAgentConfig,
   type VentureScenario,
   type InsertVentureScenario,
   type ScenarioIndicator,
@@ -92,6 +94,7 @@ import {
   netWorthSnapshots,
   people,
   tradingConversations,
+  tradingAgentConfig,
   ventureScenarios,
   scenarioIndicators,
   trendSignals,
@@ -401,6 +404,58 @@ export class DBStorage implements IStorage {
         await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_daily_trading_checklists_date" ON "daily_trading_checklists" ("date")`);
         await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_daily_trading_checklists_strategy_id" ON "daily_trading_checklists" ("strategy_id")`);
         console.log("✅ Auto-Migration: Created daily_trading_checklists table");
+      }
+
+      // Check and create trading_conversations table
+      const tradingConversationsExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'trading_conversations'
+      `);
+
+      if (tradingConversationsExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating trading_conversations table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "trading_conversations" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "user_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+            "role" text NOT NULL,
+            "content" text NOT NULL,
+            "metadata" jsonb,
+            "created_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_trading_conversations_user_id" ON "trading_conversations" ("user_id")`);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_trading_conversations_created_at" ON "trading_conversations" ("created_at")`);
+        console.log("✅ Auto-Migration: Created trading_conversations table");
+      }
+
+      // Check and create trading_agent_config table
+      const tradingAgentConfigExists = await this.db.execute(sql`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'trading_agent_config'
+      `);
+
+      if (tradingAgentConfigExists.rows.length === 0) {
+        console.log("🔧 Auto-Migration: Creating trading_agent_config table...");
+        await this.db.execute(sql`
+          CREATE TABLE IF NOT EXISTS "trading_agent_config" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "user_id" uuid NOT NULL UNIQUE REFERENCES "users"("id") ON DELETE CASCADE,
+            "system_prompt" text,
+            "trading_style" text,
+            "instruments" text,
+            "timeframes" text,
+            "risk_rules" text,
+            "trading_hours" text,
+            "quick_actions" jsonb DEFAULT '[]',
+            "preferred_model" text,
+            "focus_areas" jsonb DEFAULT '[]',
+            "created_at" timestamp DEFAULT now() NOT NULL,
+            "updated_at" timestamp DEFAULT now() NOT NULL
+          )
+        `);
+        await this.db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_trading_agent_config_user_id" ON "trading_agent_config" ("user_id")`);
+        console.log("✅ Auto-Migration: Created trading_agent_config table");
       }
 
       // Check and create financial_account_type enum
@@ -1878,6 +1933,73 @@ export class DBStorage implements IStorage {
         .where(eq(tradingConversations.userId, userId));
     } catch (error) {
       console.error("Error deleting trading conversations (table may not exist):", error);
+    }
+  }
+
+  // Trading Agent Config
+  async getTradingAgentConfig(userId: string): Promise<TradingAgentConfig | undefined> {
+    try {
+      const results = await this.db
+        .select()
+        .from(tradingAgentConfig)
+        .where(eq(tradingAgentConfig.userId, userId))
+        .limit(1);
+      return results[0];
+    } catch (error) {
+      console.error("Error fetching trading agent config (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async upsertTradingAgentConfig(userId: string, data: Partial<InsertTradingAgentConfig>): Promise<TradingAgentConfig> {
+    try {
+      // Check if config exists
+      const existing = await this.getTradingAgentConfig(userId);
+
+      if (existing) {
+        // Update existing
+        const results = await this.db
+          .update(tradingAgentConfig)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(tradingAgentConfig.userId, userId))
+          .returning();
+        return results[0];
+      } else {
+        // Create new
+        const results = await this.db
+          .insert(tradingAgentConfig)
+          .values({ ...data, userId } as any)
+          .returning();
+        return results[0];
+      }
+    } catch (error) {
+      console.error("Error upserting trading agent config (table may not exist):", error);
+      // Return a default config object to prevent crashes
+      return {
+        id: randomUUID(),
+        userId,
+        systemPrompt: data.systemPrompt || null,
+        tradingStyle: data.tradingStyle || null,
+        instruments: data.instruments || null,
+        timeframes: data.timeframes || null,
+        riskRules: data.riskRules || null,
+        tradingHours: data.tradingHours || null,
+        quickActions: data.quickActions || [],
+        preferredModel: data.preferredModel || null,
+        focusAreas: data.focusAreas || [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+  }
+
+  async deleteTradingAgentConfig(userId: string): Promise<void> {
+    try {
+      await this.db
+        .delete(tradingAgentConfig)
+        .where(eq(tradingAgentConfig.userId, userId));
+    } catch (error) {
+      console.error("Error deleting trading agent config (table may not exist):", error);
     }
   }
 

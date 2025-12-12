@@ -1600,6 +1600,46 @@ export const insertTradingConversationSchema = createInsertSchema(tradingConvers
 export type TradingConversation = typeof tradingConversations.$inferSelect;
 export type InsertTradingConversation = z.infer<typeof insertTradingConversationSchema>;
 
+// Trading Agent Config: Configuration for the trading AI agent
+export const tradingAgentConfig = pgTable(
+  "trading_agent_config",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+
+    // Agent personality and instructions
+    systemPrompt: text("system_prompt"), // Custom system prompt additions
+    tradingStyle: text("trading_style"), // e.g., "ICT/SMC concepts", "Price Action", "Scalping"
+    instruments: text("instruments"), // e.g., "EURUSD, GBPUSD, Gold"
+    timeframes: text("timeframes"), // e.g., "15m, 1H, 4H"
+    riskRules: text("risk_rules"), // e.g., "Max 1% per trade, max 3 trades per day"
+    tradingHours: text("trading_hours"), // e.g., "London and NY sessions only"
+
+    // Quick actions - predefined prompts
+    quickActions: jsonb("quick_actions").$type<Array<{ label: string; prompt: string }>>().default([]),
+
+    // Preferences
+    preferredModel: text("preferred_model"), // e.g., "openai/gpt-4o"
+    focusAreas: jsonb("focus_areas").$type<string[]>().default([]), // e.g., ["discipline", "risk management", "journaling"]
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_trading_agent_config_user_id").on(table.userId),
+  ]
+);
+
+export const insertTradingAgentConfigSchema = createInsertSchema(tradingAgentConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TradingAgentConfig = typeof tradingAgentConfig.$inferSelect;
+export type InsertTradingAgentConfig = z.infer<typeof insertTradingAgentConfigSchema>;
+
 // ----------------------------------------------------------------------------
 // STRATEGIC FORESIGHT MODULE
 // ----------------------------------------------------------------------------

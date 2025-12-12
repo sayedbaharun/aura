@@ -866,6 +866,54 @@ router.delete("/trading/chat/history", async (req: Request, res: Response) => {
   }
 });
 
+// Get trading agent config
+router.get("/trading/agent/config", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const config = await storage.getTradingAgentConfig(userId);
+
+    // Return default config if none exists
+    if (!config) {
+      return res.json({
+        id: null,
+        userId,
+        systemPrompt: null,
+        tradingStyle: null,
+        instruments: null,
+        timeframes: null,
+        riskRules: null,
+        tradingHours: null,
+        quickActions: [],
+        preferredModel: null,
+        focusAreas: [],
+        createdAt: null,
+        updatedAt: null,
+      });
+    }
+
+    res.json(config);
+  } catch (error) {
+    logger.error({ error }, "Error fetching trading agent config");
+    res.status(500).json({ error: "Failed to fetch trading agent config" });
+  }
+});
+
+// Update trading agent config
+router.put("/trading/agent/config", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const config = await storage.upsertTradingAgentConfig(userId, req.body);
+    res.json(config);
+  } catch (error) {
+    logger.error({ error }, "Error updating trading agent config");
+    res.status(500).json({ error: "Failed to update trading agent config" });
+  }
+});
+
 // ============================================================================
 // PROJECT SCAFFOLDING - AI-powered project plan generation
 // ============================================================================
