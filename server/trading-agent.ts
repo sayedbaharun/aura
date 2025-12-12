@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import { logger } from "./logger";
 import * as modelManager from "./model-manager";
-import type { TradingStrategy, DailyTradingChecklist, Day } from "@shared/schema";
+import type { TradingStrategy, DailyTradingChecklist, Day, TradingAgentConfig } from "@shared/schema";
 
 // Initialize OpenRouter with OpenAI-compatible API
 const openai = new OpenAI({
@@ -34,6 +34,7 @@ export class TradingAgent {
   private strategies: TradingStrategy[] = [];
   private todayChecklist: DailyTradingChecklist | null = null;
   private todayDay: Day | null = null;
+  private config: TradingAgentConfig | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
@@ -46,20 +47,23 @@ export class TradingAgent {
     try {
       const today = new Date().toISOString().split("T")[0];
 
-      const [strategies, todayChecklists, todayDay] = await Promise.all([
+      const [strategies, todayChecklists, todayDay, config] = await Promise.all([
         storage.getTradingStrategies({ isActive: true }),
         storage.getDailyTradingChecklists({ date: today }),
         storage.getDayOrCreate(today),
+        storage.getTradingAgentConfig(this.userId),
       ]);
 
       this.strategies = strategies;
       this.todayChecklist = todayChecklists[0] || null;
       this.todayDay = todayDay;
+      this.config = config;
     } catch (error: any) {
       logger.error({ error }, "Error initializing trading agent");
       this.strategies = [];
       this.todayChecklist = null;
       this.todayDay = null;
+      this.config = null;
     }
   }
 
@@ -89,6 +93,48 @@ export class TradingAgent {
       ? `\nToday's Journal: ${(this.todayDay.tradingJournal as any)?.sessions?.length || 0} session(s) logged`
       : "\nNo trading journal entries for today.";
 
+    // Build personalization section from config
+    let personalization = "";
+    if (this.config) {
+      const parts: string[] = [];
+
+      if (this.config.tradingStyle) {
+        parts.push(`Trading Style: ${this.config.tradingStyle}`);
+      }
+      if (this.config.instruments) {
+        parts.push(`Instruments: ${this.config.instruments}`);
+      }
+      if (this.config.timeframes) {
+        parts.push(`Timeframes: ${this.config.timeframes}`);
+      }
+      if (this.config.tradingHours) {
+        parts.push(`Trading Hours: ${this.config.tradingHours}`);
+      }
+      if (this.config.riskRules) {
+        parts.push(`Risk Rules: ${this.config.riskRules}`);
+      }
+      if (this.config.focusAreas && this.config.focusAreas.length > 0) {
+        parts.push(`Focus Areas: ${this.config.focusAreas.join(", ")}`);
+      }
+
+      if (parts.length > 0) {
+        personalization = `\n\nTRADER PROFILE:\n${parts.map(p => `- ${p}`).join("\n")}`;
+      }
+    }
+
+    // Build focus area emphasis
+    let focusEmphasis = "";
+    if (this.config?.focusAreas && this.config.focusAreas.length > 0) {
+      focusEmphasis = `\n\nEMPHASIS AREAS (Pay special attention to these when helping the trader):
+${this.config.focusAreas.map(area => `- ${area}`).join("\n")}`;
+    }
+
+    // Add custom system prompt if configured
+    let customInstructions = "";
+    if (this.config?.systemPrompt) {
+      customInstructions = `\n\nCUSTOM INSTRUCTIONS FROM TRADER:\n${this.config.systemPrompt}`;
+    }
+
     return `You are a professional trading assistant integrated into SB-OS - a personal operating system for a trader.
 
 CURRENT CONTEXT:
@@ -98,6 +144,7 @@ CURRENT CONTEXT:
 ${strategyContext}
 ${checklistContext}
 ${journalContext}
+${personalization}
 
 YOUR CAPABILITIES:
 1. **Performance Analysis**: Review trading history, calculate P&L, win rate, and identify patterns
@@ -115,6 +162,8 @@ IMPORTANT GUIDELINES:
 - Focus on process over outcomes
 - Highlight both wins AND areas for improvement
 - Remind about the importance of "no trade is a valid trade" when appropriate
+${focusEmphasis}
+${customInstructions}
 
 Current date/time: ${new Date().toISOString()}`;
   }
@@ -732,9 +781,12 @@ Current date/time: ${new Date().toISOString()}`;
     const maxTurns = 5;
 
     for (let turn = 0; turn < maxTurns; turn++) {
+      // Use preferred model from config if set
+      const preferredModel = this.config?.preferredModel || undefined;
       const { response, metrics } = await modelManager.chatCompletion(
         { messages: conversationMessages, tools, temperature: 0.7 },
-        "complex"
+        "complex",
+        preferredModel
       );
 
       tokensUsed += metrics.tokensUsed || 0;
