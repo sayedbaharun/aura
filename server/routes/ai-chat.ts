@@ -247,26 +247,80 @@ router.post("/chat", aiRateLimiter, async (req: Request, res: Response) => {
     });
 
     const today = new Date().toISOString().split('T')[0];
-    const systemPrompt = `You are SBOS Assistant, a powerful AI assistant for SB-OS - a personal productivity operating system.
 
-CAPABILITIES:
-- Full access to ventures, projects, tasks, captures, health entries, nutrition logs, and documents
-- Can create, update, and query all data
-- Helps with planning, tracking, and insights
+    // Build comprehensive COO context
+    let cooContext = '';
+    try {
+      const { buildCOOContextSummary } = await import("../ai-coo-context-builder");
+      cooContext = await buildCOOContextSummary();
+    } catch (error) {
+      logger.warn({ error }, "Could not build COO context, continuing without it");
+    }
 
-USER CONTEXT:
-${aiContext.userName ? `Name: ${aiContext.userName}` : ''}
-${aiContext.role ? `Role: ${aiContext.role}` : ''}
+    const systemPrompt = `You are the AI Chief Operating Officer (COO) for SB-OS - Sayed Baharun's Personal Operating System.
+
+## YOUR ROLE
+You are the strategic right-hand, responsible for:
+- Overseeing the ENTIRE operating system across all ventures, trading, health, and life management
+- Providing executive-level insights and recommendations
+- Ensuring nothing falls through the cracks
+- Connecting dots across different domains (work, health, trading, personal life)
+- Being proactive about risks, opportunities, and priorities
+
+## YOUR PERSONALITY
+- Direct and efficient - no fluff
+- Strategic and systems-thinking
+- Proactive - surface issues before asked
+- Supportive but challenging when needed
+- Data-driven but emotionally intelligent
+
+## COMPLETE SYSTEM ACCESS
+You have full access to ALL data in SB-OS:
+
+**BUSINESS:**
+- Ventures (all business initiatives across SaaS, media, realty, trading, personal)
+- Projects (within ventures, with phases and budgets)
+- Tasks (all work items with priorities, due dates, focus slots)
+- Documents (SOPs, specs, templates, playbooks)
+- Captures/Inbox (unprocessed ideas and items)
+
+**TRADING:**
+- Trading strategies and daily checklists
+- Trading journal with P&L
+- Trading sessions (London, NY, Asian)
+
+**HEALTH & WELLNESS:**
+- Health metrics (sleep, energy, mood, stress, workouts)
+- Nutrition logs (meals, calories, macros)
+- Morning and evening rituals
+
+**LIFE MANAGEMENT:**
+- Shopping lists with priorities
+- Books and reading progress
+- Daily planning and reflections
+
+## CURRENT SYSTEM STATUS
+${cooContext}
+
+## USER CONTEXT
+${aiContext.userName ? `Name: ${aiContext.userName}` : 'Name: Sayed Baharun'}
+${aiContext.role ? `Role: ${aiContext.role}` : 'Role: Founder & Operator'}
 ${aiContext.goals?.length ? `Goals: ${aiContext.goals.join(', ')}` : ''}
 ${aiContext.preferences ? `Preferences: ${aiContext.preferences}` : ''}
 
-${customInstructions ? `CUSTOM INSTRUCTIONS:\n${customInstructions}\n` : ''}
-RULES:
-- Be concise but helpful
-- Use tools to fetch real data before answering questions about ventures, tasks, projects, etc.
-- When creating items, confirm what was created
-- Format responses nicely with markdown when appropriate
-- Current date: ${today}`;
+${customInstructions ? `## CUSTOM INSTRUCTIONS\n${customInstructions}\n` : ''}
+
+## OPERATIONAL RULES
+1. **Always use tools** to fetch real data - never make assumptions
+2. **Be proactive** - if you see issues (overdue tasks, low health metrics, unprocessed inbox), surface them
+3. **Connect the dots** - relate health to productivity, trading performance to mental state, etc.
+4. **Prioritize ruthlessly** - help focus on highest-leverage activities
+5. **Track patterns** - identify recurring issues or opportunities
+6. **Be concise** - deliver insights efficiently with markdown formatting
+7. **Create and update** - you can create tasks, captures, and more when asked
+8. **Challenge assumptions** - push back constructively when needed
+
+Current date: ${today}`;
 
     // Define tools for database access
     const tools: any[] = [
@@ -438,6 +492,173 @@ RULES:
           description: "Get a summary of the user's system - venture count, active projects, pending tasks, etc.",
           parameters: { type: "object", properties: {}, required: [] }
         }
+      },
+      // Trading tools
+      {
+        type: "function",
+        function: {
+          name: "get_trading_strategies",
+          description: "Get trading strategies. Use when user asks about trading strategies, setups, or rules.",
+          parameters: {
+            type: "object",
+            properties: {
+              activeOnly: { type: "boolean", description: "Only return active strategies" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_trading_checklist",
+          description: "Get today's trading checklist or a specific date. Use when user asks about their trading day, checklist, or session.",
+          parameters: {
+            type: "object",
+            properties: {
+              date: { type: "string", description: "Date (YYYY-MM-DD), defaults to today" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_trading_journal",
+          description: "Get trading journal entries from the day records. Use when user asks about their trades, P&L, or trading history.",
+          parameters: {
+            type: "object",
+            properties: {
+              startDate: { type: "string", description: "Start date (YYYY-MM-DD)" },
+              endDate: { type: "string", description: "End date (YYYY-MM-DD)" },
+              limit: { type: "number", description: "Max entries to return" }
+            }
+          }
+        }
+      },
+      // Shopping tools
+      {
+        type: "function",
+        function: {
+          name: "get_shopping_items",
+          description: "Get shopping list items. Use when user asks about shopping, what to buy, or groceries.",
+          parameters: {
+            type: "object",
+            properties: {
+              status: { type: "string", description: "Filter by status: to_buy, purchased" },
+              category: { type: "string", description: "Filter by category: groceries, personal, household, business" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "create_shopping_item",
+          description: "Add an item to the shopping list.",
+          parameters: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Item name" },
+              quantity: { type: "number", description: "Quantity needed" },
+              unit: { type: "string", description: "Unit of measure" },
+              category: { type: "string", description: "Category: groceries, personal, household, business" },
+              priority: { type: "string", description: "Priority: P1, P2, P3" },
+              store: { type: "string", description: "Preferred store" },
+              notes: { type: "string", description: "Additional notes" }
+            },
+            required: ["title"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_shopping_item",
+          description: "Update a shopping item (mark as purchased, change quantity, etc).",
+          parameters: {
+            type: "object",
+            properties: {
+              itemId: { type: "string", description: "Shopping item ID" },
+              status: { type: "string", description: "Status: to_buy, purchased" },
+              quantity: { type: "number" },
+              notes: { type: "string" }
+            },
+            required: ["itemId"]
+          }
+        }
+      },
+      // Books tools
+      {
+        type: "function",
+        function: {
+          name: "get_books",
+          description: "Get books from reading list. Use when user asks about books, reading, or what they're reading.",
+          parameters: {
+            type: "object",
+            properties: {
+              status: { type: "string", description: "Filter by status: to_read, reading, finished" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_book",
+          description: "Update a book's reading progress or status.",
+          parameters: {
+            type: "object",
+            properties: {
+              bookId: { type: "string", description: "Book ID" },
+              status: { type: "string", description: "Status: to_read, reading, finished" },
+              notes: { type: "string", description: "Reading notes or highlights" },
+              rating: { type: "number", description: "Rating 1-5" }
+            },
+            required: ["bookId"]
+          }
+        }
+      },
+      // Days and Rituals tools
+      {
+        type: "function",
+        function: {
+          name: "get_day",
+          description: "Get day record including morning/evening rituals, top 3 outcomes, mood, reflections. Use when user asks about their day, rituals, or planning.",
+          parameters: {
+            type: "object",
+            properties: {
+              date: { type: "string", description: "Date (YYYY-MM-DD), defaults to today" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_day",
+          description: "Update day record - set mood, reflections, top 3 outcomes, ritual completion.",
+          parameters: {
+            type: "object",
+            properties: {
+              date: { type: "string", description: "Date (YYYY-MM-DD)" },
+              mood: { type: "string", description: "Mood: low, medium, high, peak" },
+              top3Outcomes: { type: "array", items: { type: "object" }, description: "Array of {text, completed} for top 3 priorities" },
+              oneThingToShip: { type: "string", description: "Single most important deliverable" },
+              reflectionAm: { type: "string", description: "Morning intention/reflection" },
+              reflectionPm: { type: "string", description: "Evening review/reflection" },
+              primaryVentureFocus: { type: "string", description: "Venture ID to focus on" }
+            },
+            required: ["date"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_full_system_overview",
+          description: "Get comprehensive overview of entire SB-OS system - all ventures, projects, tasks, health, trading, shopping, books. Use for executive summaries or big-picture questions.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
       }
     ];
 
@@ -523,6 +744,139 @@ RULES:
               todayTasks: todayTasks.length,
               unclarifiedCaptures: captures.filter(c => !c.clarified).length
             });
+          }
+          // Trading tool handlers
+          case "get_trading_strategies": {
+            const strategies = await storage.getTradingStrategies();
+            const filtered = args.activeOnly ? strategies.filter(s => s.isActive) : strategies;
+            return JSON.stringify(filtered.map(s => ({
+              id: s.id, name: s.name, description: s.description, isActive: s.isActive, isDefault: s.isDefault
+            })));
+          }
+          case "get_trading_checklist": {
+            const checklistDate = args.date || today;
+            const checklist = await storage.getDailyTradingChecklistByDate(checklistDate).catch(() => null);
+            if (!checklist) {
+              return JSON.stringify({ message: `No trading checklist for ${checklistDate}` });
+            }
+            // Access data from the nested data property
+            const data = checklist.data;
+            return JSON.stringify({
+              id: checklist.id,
+              date: checklist.date,
+              strategyId: checklist.strategyId,
+              instrument: data?.instrument,
+              session: data?.session,
+              mentalState: data?.mentalState,
+              primarySetup: data?.primarySetup,
+              highImpactNews: data?.highImpactNews,
+              trades: data?.trades,
+              endOfSessionReview: data?.endOfSessionReview,
+              values: data?.values,
+            });
+          }
+          case "get_trading_journal": {
+            const startDate = args.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const endDate = args.endDate || today;
+            const limit = args.limit || 30;
+            const days = await storage.getDays({ dateGte: startDate, dateLte: endDate });
+            const journalEntries = days
+              .filter(d => d.tradingJournal && Object.keys(d.tradingJournal as object).length > 0)
+              .slice(0, limit)
+              .map(d => ({
+                date: d.date,
+                tradingJournal: d.tradingJournal,
+              }));
+            return JSON.stringify(journalEntries);
+          }
+          // Shopping tool handlers
+          case "get_shopping_items": {
+            const items = await storage.getShoppingItems();
+            let filtered = items;
+            if (args.status) {
+              filtered = filtered.filter(i => i.status === args.status);
+            }
+            if (args.category) {
+              filtered = filtered.filter(i => i.category === args.category);
+            }
+            return JSON.stringify(filtered.map(i => ({
+              id: i.id, title: i.title, quantity: i.quantity, unit: i.unit,
+              category: i.category, priority: i.priority, status: i.status, store: i.store
+            })));
+          }
+          case "create_shopping_item": {
+            const item = await storage.createShoppingItem({
+              title: args.title,
+              quantity: args.quantity || 1,
+              unit: args.unit || null,
+              category: args.category || 'groceries',
+              priority: args.priority || 'P2',
+              status: 'to_buy',
+              store: args.store || null,
+              notes: args.notes || null,
+            });
+            return JSON.stringify({ success: true, item: { id: item.id, title: item.title } });
+          }
+          case "update_shopping_item": {
+            const { itemId, ...updates } = args;
+            const item = await storage.updateShoppingItem(itemId, updates);
+            return JSON.stringify({ success: true, item: item ? { id: item.id, title: item.title, status: item.status } : null });
+          }
+          // Books tool handlers
+          case "get_books": {
+            const books = await storage.getBooks();
+            const filtered = args.status ? books.filter(b => b.status === args.status) : books;
+            return JSON.stringify(filtered.map(b => ({
+              id: b.id, title: b.title, author: b.author, status: b.status,
+              platform: b.platform, rating: b.rating
+            })));
+          }
+          case "update_book": {
+            const { bookId, ...bookUpdates } = args;
+            const book = await storage.updateBook(bookId, bookUpdates);
+            return JSON.stringify({ success: true, book: book ? { id: book.id, title: book.title, status: book.status } : null });
+          }
+          // Day and Rituals tool handlers
+          case "get_day": {
+            const dayDate = args.date || today;
+            const day = await storage.getDay(dayDate).catch(() => null);
+            if (!day) {
+              return JSON.stringify({ message: `No day record for ${dayDate}` });
+            }
+            return JSON.stringify({
+              id: day.id,
+              date: day.date,
+              title: day.title,
+              mood: day.mood,
+              top3Outcomes: day.top3Outcomes,
+              oneThingToShip: day.oneThingToShip,
+              reflectionAm: day.reflectionAm,
+              reflectionPm: day.reflectionPm,
+              primaryVentureFocus: day.primaryVentureFocus,
+              morningRituals: day.morningRituals,
+              eveningRituals: day.eveningRituals,
+              tradingJournal: day.tradingJournal,
+            });
+          }
+          case "update_day": {
+            const dayDate = args.date || today;
+            let day = await storage.getDay(dayDate).catch(() => null);
+            if (!day) {
+              // Create the day if it doesn't exist
+              day = await storage.createDay({
+                id: `day_${dayDate}`,
+                date: dayDate,
+              });
+            }
+            const { date: _, ...dayUpdates } = args;
+            const updated = await storage.updateDay(day.id, dayUpdates);
+            return JSON.stringify({ success: true, day: updated ? { id: updated.id, date: updated.date, mood: updated.mood } : null });
+          }
+          // Full system overview
+          case "get_full_system_overview": {
+            const { buildSystemOverview } = await import("../ai-coo-context-builder");
+            const overview = await buildSystemOverview();
+            return JSON.stringify(overview);
           }
           default:
             return JSON.stringify({ error: "Unknown tool" });
