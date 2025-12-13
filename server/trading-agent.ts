@@ -762,7 +762,7 @@ Current date/time: ${new Date().toISOString()}`;
   /**
    * Process a user message and generate a response
    */
-  async chat(userMessage: string): Promise<{
+  async chat(userMessage: string, sessionId?: string): Promise<{
     response: string;
     actions: TradingAgentAction[];
     tokensUsed?: number;
@@ -774,8 +774,8 @@ Current date/time: ${new Date().toISOString()}`;
 
     const actions: TradingAgentAction[] = [];
 
-    // Get conversation history
-    const history = await storage.getTradingConversations(this.userId, 10);
+    // Get conversation history for this session
+    const history = await storage.getTradingConversations(this.userId, 10, sessionId);
 
     // Build messages for AI
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -790,6 +790,7 @@ Current date/time: ${new Date().toISOString()}`;
     // Save user message
     await storage.createTradingConversation({
       userId: this.userId,
+      sessionId: sessionId || null,
       role: "user",
       content: userMessage,
     });
@@ -856,6 +857,7 @@ Current date/time: ${new Date().toISOString()}`;
     // Save assistant response
     await storage.createTradingConversation({
       userId: this.userId,
+      sessionId: sessionId || null,
       role: "assistant",
       content: finalResponse,
       metadata: {

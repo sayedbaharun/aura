@@ -51,6 +51,8 @@ import {
   type InsertNetWorthSnapshot,
   type Person,
   type InsertPerson,
+  type TradingChatSession,
+  type InsertTradingChatSession,
   type TradingConversation,
   type InsertTradingConversation,
   type TradingAgentConfig,
@@ -95,6 +97,7 @@ import {
   accountSnapshots,
   netWorthSnapshots,
   people,
+  tradingChatSessions,
   tradingConversations,
   tradingAgentConfig,
   tradingKnowledgeDocs,
@@ -1891,12 +1894,94 @@ export class DBStorage implements IStorage {
   }
 
   // ============================================================================
+  // TRADING AI AGENT CHAT SESSIONS
+  // ============================================================================
+
+  async getTradingChatSessions(userId: string): Promise<TradingChatSession[]> {
+    try {
+      return await this.db
+        .select()
+        .from(tradingChatSessions)
+        .where(eq(tradingChatSessions.userId, userId))
+        .orderBy(desc(tradingChatSessions.updatedAt));
+    } catch (error) {
+      console.error("Error fetching trading chat sessions (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getTradingChatSession(id: string): Promise<TradingChatSession | undefined> {
+    try {
+      const [session] = await this.db
+        .select()
+        .from(tradingChatSessions)
+        .where(eq(tradingChatSessions.id, id))
+        .limit(1);
+      return session;
+    } catch (error) {
+      console.error("Error fetching trading chat session (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async createTradingChatSession(data: InsertTradingChatSession): Promise<TradingChatSession> {
+    try {
+      const [session] = await this.db
+        .insert(tradingChatSessions)
+        .values(data as any)
+        .returning();
+      return session;
+    } catch (error) {
+      console.error("Error creating trading chat session:", error);
+      throw error;
+    }
+  }
+
+  async updateTradingChatSession(
+    id: string,
+    updates: Partial<InsertTradingChatSession>
+  ): Promise<TradingChatSession | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(tradingChatSessions)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(tradingChatSessions.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating trading chat session:", error);
+      throw error;
+    }
+  }
+
+  async deleteTradingChatSession(id: string): Promise<void> {
+    try {
+      // Messages are deleted via CASCADE
+      await this.db
+        .delete(tradingChatSessions)
+        .where(eq(tradingChatSessions.id, id));
+    } catch (error) {
+      console.error("Error deleting trading chat session:", error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
   // TRADING AI AGENT CONVERSATIONS
   // ============================================================================
 
   async createTradingConversation(data: InsertTradingConversation): Promise<TradingConversation> {
     try {
       const results = await this.db.insert(tradingConversations).values(data as any).returning();
+
+      // Update the session's updatedAt timestamp if sessionId is provided
+      if (data.sessionId) {
+        await this.db
+          .update(tradingChatSessions)
+          .set({ updatedAt: new Date() })
+          .where(eq(tradingChatSessions.id, data.sessionId));
+      }
+
       return results[0];
     } catch (error) {
       console.error("Error creating trading conversation (table may not exist):", error);
@@ -1904,6 +1989,7 @@ export class DBStorage implements IStorage {
       return {
         id: randomUUID(),
         userId: data.userId,
+        sessionId: data.sessionId || null,
         role: data.role as any,
         content: data.content,
         metadata: data.metadata as any || null,
@@ -1914,13 +2000,20 @@ export class DBStorage implements IStorage {
 
   async getTradingConversations(
     userId: string,
-    limit: number = 20
+    limit: number = 20,
+    sessionId?: string
   ): Promise<TradingConversation[]> {
     try {
+      const conditions = [eq(tradingConversations.userId, userId)];
+
+      if (sessionId) {
+        conditions.push(eq(tradingConversations.sessionId, sessionId));
+      }
+
       return await this.db
         .select()
         .from(tradingConversations)
-        .where(eq(tradingConversations.userId, userId))
+        .where(and(...conditions))
         .orderBy(desc(tradingConversations.createdAt))
         .limit(limit);
     } catch (error) {
@@ -1929,11 +2022,17 @@ export class DBStorage implements IStorage {
     }
   }
 
-  async deleteTradingConversations(userId: string): Promise<void> {
+  async deleteTradingConversations(userId: string, sessionId?: string): Promise<void> {
     try {
+      const conditions = [eq(tradingConversations.userId, userId)];
+
+      if (sessionId) {
+        conditions.push(eq(tradingConversations.sessionId, sessionId));
+      }
+
       await this.db
         .delete(tradingConversations)
-        .where(eq(tradingConversations.userId, userId));
+        .where(and(...conditions));
     } catch (error) {
       console.error("Error deleting trading conversations (table may not exist):", error);
     }
