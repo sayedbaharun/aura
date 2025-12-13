@@ -14,6 +14,36 @@ import { DEFAULT_USER_ID } from "./constants";
 
 const router = Router();
 
+// Helper function to calculate venture health score (0-100)
+function calculateVentureHealth(
+  projects: any[],
+  tasks: any[],
+  stalledProjects: any[],
+  overdueTasks: any[],
+  recentActivity: number
+): number {
+  let score = 100;
+
+  // Penalize for stalled projects (-15 each, max -45)
+  score -= Math.min(stalledProjects.length * 15, 45);
+
+  // Penalize for overdue tasks (-5 each, max -25)
+  score -= Math.min(overdueTasks.length * 5, 25);
+
+  // Penalize for no recent activity (-20)
+  if (recentActivity === 0 && tasks.length > 0) {
+    score -= 20;
+  }
+
+  // Bonus for high completion rate (+10)
+  const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
+  if (tasks.length > 0 && (completedTasks / tasks.length) > 0.7) {
+    score += 10;
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
 // Configure multer for knowledge doc file uploads (in-memory storage for base64 encoding)
 const knowledgeDocUpload = multer({
   storage: multer.memoryStorage(),
@@ -298,6 +328,11 @@ You have full access to ALL data in SB-OS:
 - Shopping lists with priorities
 - Books and reading progress
 - Daily planning and reflections
+
+**PEOPLE/CRM:**
+- Contacts and relationships (personal, professional, investors, mentors, etc.)
+- Follow-up tracking and reminders
+- Network management across ventures
 
 ## CURRENT SYSTEM STATUS
 ${cooContext}
@@ -659,6 +694,111 @@ Current date: ${today}`;
           description: "Get comprehensive overview of entire SB-OS system - all ventures, projects, tasks, health, trading, shopping, books. Use for executive summaries or big-picture questions.",
           parameters: { type: "object", properties: {}, required: [] }
         }
+      },
+      // People/CRM tools
+      {
+        type: "function",
+        function: {
+          name: "get_people",
+          description: "Get contacts and relationships. Use when user asks about contacts, people, relationships, network, or CRM.",
+          parameters: {
+            type: "object",
+            properties: {
+              relationship: { type: "string", description: "Filter by type: personal_friend, professional_contact, mentor, mentee, investor, founder, employee, contractor, client, prospect, family" },
+              importance: { type: "string", description: "Filter by importance: critical, high, standard, low" },
+              ventureId: { type: "string", description: "Filter by associated venture" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_people_needing_followup",
+          description: "Get contacts who need follow-up (overdue or upcoming). Use when user asks about who to reach out to, follow-ups, or relationship maintenance.",
+          parameters: {
+            type: "object",
+            properties: {
+              includeUpcoming: { type: "boolean", description: "Include people with follow-ups in next 7 days" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "create_person",
+          description: "Add a new contact to the CRM.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Person's name" },
+              email: { type: "string", description: "Email address" },
+              phone: { type: "string", description: "Phone number" },
+              company: { type: "string", description: "Company name" },
+              jobTitle: { type: "string", description: "Job title" },
+              relationship: { type: "string", description: "Relationship type" },
+              importance: { type: "string", description: "Importance level" },
+              howWeMet: { type: "string", description: "How you met this person" },
+              ventureId: { type: "string", description: "Associated venture" },
+              notes: { type: "string", description: "Notes about this person" }
+            },
+            required: ["name"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_person",
+          description: "Update a contact's information or log an interaction.",
+          parameters: {
+            type: "object",
+            properties: {
+              personId: { type: "string", description: "Person ID to update" },
+              lastContactDate: { type: "string", description: "Date of last contact (YYYY-MM-DD)" },
+              nextFollowUp: { type: "string", description: "Next follow-up date (YYYY-MM-DD)" },
+              notes: { type: "string", description: "Updated notes" },
+              importance: { type: "string", description: "Updated importance level" }
+            },
+            required: ["personId"]
+          }
+        }
+      },
+      // Pattern Analysis tools
+      {
+        type: "function",
+        function: {
+          name: "analyze_health_productivity",
+          description: "Analyze correlation between health metrics and task completion over time. Use when user asks about patterns, how health affects work, or productivity insights.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Number of days to analyze (default 30)" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "analyze_weekly_patterns",
+          description: "Get weekly patterns and trends across ventures, tasks, health, and trading. Use for weekly reviews or trend analysis.",
+          parameters: {
+            type: "object",
+            properties: {
+              weeks: { type: "number", description: "Number of weeks to analyze (default 4)" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_venture_health_report",
+          description: "Get health report for each venture - activity, task completion rate, stalled projects. Use when user asks how ventures are doing or which need attention.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
       }
     ];
 
@@ -877,6 +1017,353 @@ Current date: ${today}`;
             const { buildSystemOverview } = await import("../ai-coo-context-builder");
             const overview = await buildSystemOverview();
             return JSON.stringify(overview);
+          }
+          // People/CRM tool handlers
+          case "get_people": {
+            const people = await storage.getPeople({
+              relationship: args.relationship,
+              importance: args.importance,
+              ventureId: args.ventureId,
+            });
+            return JSON.stringify(people.map(p => ({
+              id: p.id,
+              name: p.name,
+              email: p.email,
+              phone: p.phone,
+              company: p.company,
+              jobTitle: p.jobTitle,
+              relationship: p.relationship,
+              importance: p.importance,
+              lastContactDate: p.lastContactDate,
+              nextFollowUp: p.nextFollowUp,
+              contactFrequency: p.contactFrequency,
+              ventureId: p.ventureId,
+              tags: p.tags,
+            })));
+          }
+          case "get_people_needing_followup": {
+            const allPeople = await storage.getPeople();
+            const now = new Date();
+            const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const todayStr = today;
+            const weekFromNowStr = weekFromNow.toISOString().split('T')[0];
+
+            const overdue = allPeople.filter(p =>
+              p.nextFollowUp && p.nextFollowUp < todayStr
+            ).map(p => ({
+              id: p.id,
+              name: p.name,
+              company: p.company,
+              relationship: p.relationship,
+              importance: p.importance,
+              nextFollowUp: p.nextFollowUp,
+              lastContactDate: p.lastContactDate,
+              daysOverdue: Math.floor((now.getTime() - new Date(p.nextFollowUp!).getTime()) / (1000 * 60 * 60 * 24)),
+            }));
+
+            const upcoming = args.includeUpcoming ? allPeople.filter(p =>
+              p.nextFollowUp && p.nextFollowUp >= todayStr && p.nextFollowUp <= weekFromNowStr
+            ).map(p => ({
+              id: p.id,
+              name: p.name,
+              company: p.company,
+              relationship: p.relationship,
+              importance: p.importance,
+              nextFollowUp: p.nextFollowUp,
+              lastContactDate: p.lastContactDate,
+            })) : [];
+
+            return JSON.stringify({
+              overdue: overdue.sort((a, b) => b.daysOverdue - a.daysOverdue),
+              upcoming: upcoming,
+              summary: {
+                overdueCount: overdue.length,
+                upcomingCount: upcoming.length,
+                criticalOverdue: overdue.filter(p => p.importance === 'critical').length,
+              }
+            });
+          }
+          case "create_person": {
+            const person = await storage.createPerson({
+              name: args.name,
+              email: args.email || null,
+              phone: args.phone || null,
+              company: args.company || null,
+              jobTitle: args.jobTitle || null,
+              relationship: args.relationship || null,
+              importance: args.importance || 'standard',
+              howWeMet: args.howWeMet || null,
+              ventureId: args.ventureId || null,
+              notes: args.notes || null,
+            });
+            return JSON.stringify({ success: true, person: { id: person.id, name: person.name } });
+          }
+          case "update_person": {
+            const { personId, ...personUpdates } = args;
+            const person = await storage.updatePerson(personId, personUpdates);
+            return JSON.stringify({ success: true, person: person ? { id: person.id, name: person.name } : null });
+          }
+          // Pattern Analysis tool handlers
+          case "analyze_health_productivity": {
+            const numDays = args.days || 30;
+            const startDate = new Date(Date.now() - numDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+            const [healthEntries, tasks, days] = await Promise.all([
+              storage.getHealthEntries({ dateGte: startDate }),
+              storage.getTasks({}),
+              storage.getDays({ dateGte: startDate, dateLte: today }),
+            ]);
+
+            // Build daily metrics
+            const dailyData: Record<string, { health: any; tasksCompleted: number; tasksTotal: number }> = {};
+
+            healthEntries.forEach(h => {
+              if (h.date) {
+                dailyData[h.date] = {
+                  health: {
+                    sleepHours: h.sleepHours,
+                    energyLevel: h.energyLevel,
+                    mood: h.mood,
+                    stressLevel: h.stressLevel,
+                    workoutDone: h.workoutDone,
+                  },
+                  tasksCompleted: 0,
+                  tasksTotal: 0,
+                };
+              }
+            });
+
+            // Count tasks by focus date
+            tasks.forEach(t => {
+              if (t.focusDate && dailyData[t.focusDate]) {
+                dailyData[t.focusDate].tasksTotal++;
+                if (t.status === 'completed') {
+                  dailyData[t.focusDate].tasksCompleted++;
+                }
+              }
+            });
+
+            // Calculate correlations
+            const dataPoints = Object.entries(dailyData).filter(([_, d]) => d.health && d.tasksTotal > 0);
+
+            let highSleepProductivity = 0, lowSleepProductivity = 0;
+            let highEnergyProductivity = 0, lowEnergyProductivity = 0;
+            let workoutDayProductivity = 0, noWorkoutProductivity = 0;
+            let highSleepCount = 0, lowSleepCount = 0;
+            let highEnergyCount = 0, lowEnergyCount = 0;
+            let workoutCount = 0, noWorkoutCount = 0;
+
+            dataPoints.forEach(([_, d]) => {
+              const completionRate = d.tasksTotal > 0 ? d.tasksCompleted / d.tasksTotal : 0;
+
+              if (d.health.sleepHours >= 7) {
+                highSleepProductivity += completionRate;
+                highSleepCount++;
+              } else {
+                lowSleepProductivity += completionRate;
+                lowSleepCount++;
+              }
+
+              if (d.health.energyLevel >= 4) {
+                highEnergyProductivity += completionRate;
+                highEnergyCount++;
+              } else {
+                lowEnergyProductivity += completionRate;
+                lowEnergyCount++;
+              }
+
+              if (d.health.workoutDone) {
+                workoutDayProductivity += completionRate;
+                workoutCount++;
+              } else {
+                noWorkoutProductivity += completionRate;
+                noWorkoutCount++;
+              }
+            });
+
+            return JSON.stringify({
+              period: { startDate, endDate: today, daysAnalyzed: dataPoints.length },
+              correlations: {
+                sleep: {
+                  highSleep: highSleepCount > 0 ? Math.round((highSleepProductivity / highSleepCount) * 100) : null,
+                  lowSleep: lowSleepCount > 0 ? Math.round((lowSleepProductivity / lowSleepCount) * 100) : null,
+                  insight: highSleepCount > 0 && lowSleepCount > 0
+                    ? `${Math.round((highSleepProductivity / highSleepCount) * 100)}% completion on 7+ hrs sleep vs ${Math.round((lowSleepProductivity / lowSleepCount) * 100)}% on less`
+                    : "Not enough data",
+                },
+                energy: {
+                  highEnergy: highEnergyCount > 0 ? Math.round((highEnergyProductivity / highEnergyCount) * 100) : null,
+                  lowEnergy: lowEnergyCount > 0 ? Math.round((lowEnergyProductivity / lowEnergyCount) * 100) : null,
+                  insight: highEnergyCount > 0 && lowEnergyCount > 0
+                    ? `${Math.round((highEnergyProductivity / highEnergyCount) * 100)}% completion on high energy vs ${Math.round((lowEnergyProductivity / lowEnergyCount) * 100)}% on low`
+                    : "Not enough data",
+                },
+                workout: {
+                  workoutDays: workoutCount > 0 ? Math.round((workoutDayProductivity / workoutCount) * 100) : null,
+                  noWorkout: noWorkoutCount > 0 ? Math.round((noWorkoutProductivity / noWorkoutCount) * 100) : null,
+                  insight: workoutCount > 0 && noWorkoutCount > 0
+                    ? `${Math.round((workoutDayProductivity / workoutCount) * 100)}% completion on workout days vs ${Math.round((noWorkoutProductivity / noWorkoutCount) * 100)}% without`
+                    : "Not enough data",
+                },
+              },
+              healthAverages: {
+                avgSleep: healthEntries.length > 0 ? (healthEntries.reduce((s, h) => s + (h.sleepHours || 0), 0) / healthEntries.length).toFixed(1) : null,
+                avgEnergy: healthEntries.length > 0 ? (healthEntries.reduce((s, h) => s + (h.energyLevel || 0), 0) / healthEntries.length).toFixed(1) : null,
+                workoutRate: healthEntries.length > 0 ? Math.round((healthEntries.filter(h => h.workoutDone).length / healthEntries.length) * 100) : null,
+              },
+              recommendation: highSleepCount > 0 && lowSleepCount > 0 &&
+                (highSleepProductivity / highSleepCount) > (lowSleepProductivity / lowSleepCount) * 1.2
+                ? "Sleep significantly impacts your productivity. Prioritize 7+ hours."
+                : "Continue monitoring patterns for more insights.",
+            });
+          }
+          case "analyze_weekly_patterns": {
+            const numWeeks = args.weeks || 4;
+            const startDate = new Date(Date.now() - numWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+            const [tasks, healthEntries, tradingChecklists] = await Promise.all([
+              storage.getTasks({}),
+              storage.getHealthEntries({ dateGte: startDate }),
+              storage.getDailyTradingChecklists({ }).catch(() => []),
+            ]);
+
+            // Group by week
+            const weeks: Record<string, {
+              tasksCompleted: number;
+              tasksCreated: number;
+              avgSleep: number[];
+              avgEnergy: number[];
+              workouts: number;
+              tradingSessions: number;
+            }> = {};
+
+            const getWeekKey = (dateStr: string) => {
+              const d = new Date(dateStr);
+              const weekStart = new Date(d);
+              weekStart.setDate(d.getDate() - d.getDay());
+              return weekStart.toISOString().split('T')[0];
+            };
+
+            // Process tasks
+            tasks.forEach(t => {
+              if (t.completedAt) {
+                const weekKey = getWeekKey(new Date(t.completedAt).toISOString().split('T')[0]);
+                if (!weeks[weekKey]) weeks[weekKey] = { tasksCompleted: 0, tasksCreated: 0, avgSleep: [], avgEnergy: [], workouts: 0, tradingSessions: 0 };
+                weeks[weekKey].tasksCompleted++;
+              }
+              if (t.createdAt) {
+                const createdDate = new Date(t.createdAt).toISOString().split('T')[0];
+                if (createdDate >= startDate) {
+                  const weekKey = getWeekKey(createdDate);
+                  if (!weeks[weekKey]) weeks[weekKey] = { tasksCompleted: 0, tasksCreated: 0, avgSleep: [], avgEnergy: [], workouts: 0, tradingSessions: 0 };
+                  weeks[weekKey].tasksCreated++;
+                }
+              }
+            });
+
+            // Process health
+            healthEntries.forEach(h => {
+              if (h.date) {
+                const weekKey = getWeekKey(h.date);
+                if (!weeks[weekKey]) weeks[weekKey] = { tasksCompleted: 0, tasksCreated: 0, avgSleep: [], avgEnergy: [], workouts: 0, tradingSessions: 0 };
+                if (h.sleepHours) weeks[weekKey].avgSleep.push(h.sleepHours);
+                if (h.energyLevel) weeks[weekKey].avgEnergy.push(h.energyLevel);
+                if (h.workoutDone) weeks[weekKey].workouts++;
+              }
+            });
+
+            // Process trading
+            tradingChecklists.forEach((tc: any) => {
+              if (tc.date) {
+                const weekKey = getWeekKey(tc.date);
+                if (!weeks[weekKey]) weeks[weekKey] = { tasksCompleted: 0, tasksCreated: 0, avgSleep: [], avgEnergy: [], workouts: 0, tradingSessions: 0 };
+                weeks[weekKey].tradingSessions++;
+              }
+            });
+
+            const weeklyData = Object.entries(weeks)
+              .filter(([weekKey]) => weekKey >= startDate)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([weekKey, data]) => ({
+                week: weekKey,
+                tasksCompleted: data.tasksCompleted,
+                tasksCreated: data.tasksCreated,
+                avgSleep: data.avgSleep.length > 0 ? (data.avgSleep.reduce((a, b) => a + b, 0) / data.avgSleep.length).toFixed(1) : null,
+                avgEnergy: data.avgEnergy.length > 0 ? (data.avgEnergy.reduce((a, b) => a + b, 0) / data.avgEnergy.length).toFixed(1) : null,
+                workouts: data.workouts,
+                tradingSessions: data.tradingSessions,
+              }));
+
+            return JSON.stringify({
+              weeks: weeklyData,
+              trends: {
+                tasksTrend: weeklyData.length >= 2
+                  ? weeklyData[weeklyData.length - 1].tasksCompleted > weeklyData[0].tasksCompleted ? "improving" : "declining"
+                  : "insufficient data",
+                healthTrend: "see weekly data",
+              },
+            });
+          }
+          case "get_venture_health_report": {
+            const [ventures, projects, tasks] = await Promise.all([
+              storage.getVentures(),
+              storage.getProjects(),
+              storage.getTasks({}),
+            ]);
+
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+            const ventureReports = ventures.map(v => {
+              const ventureProjects = projects.filter(p => p.ventureId === v.id);
+              const ventureTasks = tasks.filter(t => t.ventureId === v.id);
+
+              const completedTasks = ventureTasks.filter(t => t.status === 'completed');
+              const recentActivity = ventureTasks.filter(t =>
+                t.updatedAt && new Date(t.updatedAt) > thirtyDaysAgo
+              ).length;
+
+              const stalledProjects = ventureProjects.filter(p => {
+                const projectTasks = tasks.filter(t => t.projectId === p.id);
+                const recentTaskActivity = projectTasks.some(t =>
+                  t.updatedAt && new Date(t.updatedAt) > thirtyDaysAgo
+                );
+                return p.status === 'in_progress' && !recentTaskActivity && projectTasks.length > 0;
+              });
+
+              const overdueTasks = ventureTasks.filter(t =>
+                t.dueDate && t.dueDate < today && t.status !== 'completed' && t.status !== 'on_hold'
+              );
+
+              return {
+                id: v.id,
+                name: v.name,
+                status: v.status,
+                domain: v.domain,
+                metrics: {
+                  totalProjects: ventureProjects.length,
+                  activeProjects: ventureProjects.filter(p => p.status === 'in_progress').length,
+                  stalledProjects: stalledProjects.length,
+                  totalTasks: ventureTasks.length,
+                  completedTasks: completedTasks.length,
+                  completionRate: ventureTasks.length > 0 ? Math.round((completedTasks.length / ventureTasks.length) * 100) : 0,
+                  overdueTasks: overdueTasks.length,
+                  recentActivity: recentActivity,
+                },
+                stalledProjectNames: stalledProjects.map(p => p.name),
+                healthScore: calculateVentureHealth(ventureProjects, ventureTasks, stalledProjects, overdueTasks, recentActivity),
+                needsAttention: stalledProjects.length > 0 || overdueTasks.length > 3 || recentActivity === 0,
+              };
+            });
+
+            return JSON.stringify({
+              ventures: ventureReports.sort((a, b) => a.healthScore - b.healthScore),
+              summary: {
+                totalVentures: ventures.length,
+                needingAttention: ventureReports.filter(v => v.needsAttention).length,
+                healthiest: ventureReports.sort((a, b) => b.healthScore - a.healthScore)[0]?.name,
+                mostConcerning: ventureReports.sort((a, b) => a.healthScore - b.healthScore)[0]?.name,
+              },
+            });
           }
           default:
             return JSON.stringify({ error: "Unknown tool" });

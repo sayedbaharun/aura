@@ -103,6 +103,14 @@ export interface SystemOverview {
     byType: Record<string, number>;
     recentlyUpdated: number;
   };
+
+  // People/CRM
+  people: {
+    total: number;
+    byRelationship: Record<string, number>;
+    needingFollowUp: number;
+    criticalContacts: number;
+  };
 }
 
 /**
@@ -127,6 +135,7 @@ export async function buildSystemOverview(): Promise<SystemOverview> {
       books,
       dayData,
       docs,
+      people,
     ] = await Promise.all([
       storage.getVentures(),
       storage.getProjects(),
@@ -140,6 +149,7 @@ export async function buildSystemOverview(): Promise<SystemOverview> {
       storage.getBooks(),
       storage.getDay(today).catch(() => null),
       storage.getDocs({}),
+      storage.getPeople().catch(() => []),
     ]);
 
     // Calculate venture stats with project/task counts
@@ -267,6 +277,21 @@ export async function buildSystemOverview(): Promise<SystemOverview> {
       ventureByStatus[status] = (ventureByStatus[status] || 0) + 1;
     });
 
+    // People/CRM stats
+    const peopleByRelationship: Record<string, number> = {};
+    let needingFollowUp = 0;
+    let criticalContacts = 0;
+    people.forEach(p => {
+      const rel = p.relationship || 'other';
+      peopleByRelationship[rel] = (peopleByRelationship[rel] || 0) + 1;
+      if (p.nextFollowUp && p.nextFollowUp < today) {
+        needingFollowUp++;
+      }
+      if (p.importance === 'critical') {
+        criticalContacts++;
+      }
+    });
+
     return {
       ventures: {
         total: ventures.length,
@@ -312,6 +337,12 @@ export async function buildSystemOverview(): Promise<SystemOverview> {
         total: docs.length,
         byType: docByType,
         recentlyUpdated,
+      },
+      people: {
+        total: people.length,
+        byRelationship: peopleByRelationship,
+        needingFollowUp,
+        criticalContacts,
       },
     };
   } catch (error) {
@@ -425,7 +456,17 @@ export async function buildCOOContextSummary(): Promise<string> {
   // Knowledge Base
   context += `### KNOWLEDGE BASE\n`;
   context += `Total docs: ${overview.docs.total} | Recently updated: ${overview.docs.recentlyUpdated}\n`;
-  context += `Types: ${Object.entries(overview.docs.byType).map(([t, c]) => `${t}: ${c}`).join(', ')}\n`;
+  context += `Types: ${Object.entries(overview.docs.byType).map(([t, c]) => `${t}: ${c}`).join(', ')}\n\n`;
+
+  // People/CRM
+  if (overview.people.total > 0) {
+    context += `### PEOPLE/CRM (${overview.people.total})\n`;
+    if (overview.people.needingFollowUp > 0) {
+      context += `⚠️ **${overview.people.needingFollowUp} contacts need follow-up**\n`;
+    }
+    context += `Critical contacts: ${overview.people.criticalContacts}\n`;
+    context += `By relationship: ${Object.entries(overview.people.byRelationship).map(([r, c]) => `${r}: ${c}`).join(', ')}\n`;
+  }
 
   return context;
 }
