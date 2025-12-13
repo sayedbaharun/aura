@@ -141,8 +141,25 @@ router.post("/sync", async (req: Request, res: Response) => {
       }
     }
 
-    // Optionally complete synced tasks in TickTick
-    if (req.body.completeAfterSync) {
+    // Track cleared tasks
+    let cleared = 0;
+
+    // Clear inbox by deleting synced tasks from TickTick
+    if (req.body.clearInboxAfterSync) {
+      for (const item of result.items) {
+        if (item.captureId) {
+          try {
+            await ticktick.deleteTask(inboxProjectId, item.tickTickId);
+            cleared++;
+            logger.info({ tickTickId: item.tickTickId }, "Deleted TickTick task after sync");
+          } catch (error) {
+            logger.warn({ error, tickTickId: item.tickTickId }, "Failed to delete TickTick task after sync");
+          }
+        }
+      }
+    }
+    // Legacy: complete tasks instead of deleting (keeps them in TickTick completed section)
+    else if (req.body.completeAfterSync) {
       for (const item of result.items) {
         if (item.captureId) {
           try {
@@ -157,7 +174,8 @@ router.post("/sync", async (req: Request, res: Response) => {
     res.json({
       success: true,
       ...result,
-      message: `Synced ${result.synced} new items, skipped ${result.skipped} existing items`,
+      cleared,
+      message: `Synced ${result.synced} new items, skipped ${result.skipped} existing items${cleared > 0 ? `, cleared ${cleared} from TickTick inbox` : ''}`,
     });
 
   } catch (error) {
