@@ -610,7 +610,7 @@ export default function TradingKnowledgeManager() {
               <div className="space-y-2">
                 <Label htmlFor="edit-category">Category</Label>
                 <Select
-                  value={selectedDoc.category}
+                  value={selectedDoc.category || "other"}
                   onValueChange={(value) => setSelectedDoc({ ...selectedDoc, category: value })}
                 >
                   <SelectTrigger>
