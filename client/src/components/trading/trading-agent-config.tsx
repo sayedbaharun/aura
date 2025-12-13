@@ -70,7 +70,7 @@ export default function TradingAgentConfig() {
   const [timeframes, setTimeframes] = useState("");
   const [riskRules, setRiskRules] = useState("");
   const [tradingHours, setTradingHours] = useState("");
-  const [preferredModel, setPreferredModel] = useState("");
+  const [preferredModel, setPreferredModel] = useState("auto");
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [quickActions, setQuickActions] = useState<Array<{ label: string; prompt: string }>>([]);
 
@@ -109,7 +109,7 @@ export default function TradingAgentConfig() {
       setTimeframes(config.timeframes || "");
       setRiskRules(config.riskRules || "");
       setTradingHours(config.tradingHours || "");
-      setPreferredModel(config.preferredModel || "");
+      setPreferredModel(config.preferredModel || "auto");
       setFocusAreas(config.focusAreas || []);
       setQuickActions(config.quickActions || []);
     }
@@ -145,7 +145,7 @@ export default function TradingAgentConfig() {
       timeframes: timeframes || null,
       riskRules: riskRules || null,
       tradingHours: tradingHours || null,
-      preferredModel: preferredModel || null,
+      preferredModel: preferredModel === "auto" ? null : preferredModel,
       focusAreas,
       quickActions,
     });
@@ -311,7 +311,7 @@ export default function TradingAgentConfig() {
                 <SelectValue placeholder="Auto (default)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Auto (default)</SelectItem>
+                <SelectItem value="auto">Auto (default)</SelectItem>
                 {models.map((model) => (
                   <SelectItem key={model.id} value={model.id}>
                     {model.name}
