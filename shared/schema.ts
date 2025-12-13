@@ -1568,12 +1568,38 @@ export type Person = typeof people.$inferSelect;
 // TRADING AI AGENT CONVERSATIONS
 // ----------------------------------------------------------------------------
 
+// Trading Chat Sessions: Individual chat threads for trading AI agent
+export const tradingChatSessions = pgTable(
+  "trading_chat_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    title: text("title").notNull().default("New Chat"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_trading_chat_sessions_user_id").on(table.userId),
+    index("idx_trading_chat_sessions_updated_at").on(table.updatedAt),
+  ]
+);
+
+export const insertTradingChatSessionSchema = createInsertSchema(tradingChatSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TradingChatSession = typeof tradingChatSessions.$inferSelect;
+export type InsertTradingChatSession = z.infer<typeof insertTradingChatSessionSchema>;
+
 // Trading Conversations: Chat history for trading AI agent
 export const tradingConversations = pgTable(
   "trading_conversations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    sessionId: uuid("session_id").references(() => tradingChatSessions.id, { onDelete: "cascade" }),
     role: text("role").$type<"user" | "assistant" | "system">().notNull(),
     content: text("content").notNull(),
     metadata: jsonb("metadata").$type<{
@@ -1588,6 +1614,7 @@ export const tradingConversations = pgTable(
   },
   (table) => [
     index("idx_trading_conversations_user_id").on(table.userId),
+    index("idx_trading_conversations_session_id").on(table.sessionId),
     index("idx_trading_conversations_created_at").on(table.createdAt),
   ]
 );

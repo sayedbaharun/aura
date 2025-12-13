@@ -795,13 +795,82 @@ router.get("/ventures/:ventureId/ai/context-status", async (req: Request, res: R
 });
 
 // ============================================================================
-// TRADING AI AGENT
+// TRADING AI AGENT - CHAT SESSIONS
+// ============================================================================
+
+// Get all chat sessions for the user
+router.get("/trading/chat/sessions", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const sessions = await storage.getTradingChatSessions(userId);
+    res.json(sessions);
+  } catch (error) {
+    logger.error({ error }, "Error fetching trading chat sessions");
+    res.json([]);
+  }
+});
+
+// Create a new chat session
+router.post("/trading/chat/sessions", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const { title } = req.body;
+
+    const session = await storage.createTradingChatSession({
+      userId,
+      title: title || "New Chat",
+    });
+
+    res.status(201).json(session);
+  } catch (error) {
+    logger.error({ error }, "Error creating trading chat session");
+    res.status(500).json({ error: "Failed to create chat session" });
+  }
+});
+
+// Update a chat session (rename)
+router.patch("/trading/chat/sessions/:sessionId", async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const { title } = req.body;
+
+    const session = await storage.updateTradingChatSession(sessionId, { title });
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.json(session);
+  } catch (error) {
+    logger.error({ error }, "Error updating trading chat session");
+    res.status(500).json({ error: "Failed to update chat session" });
+  }
+});
+
+// Delete a chat session and its messages
+router.delete("/trading/chat/sessions/:sessionId", async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+
+    await storage.deleteTradingChatSession(sessionId);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Error deleting trading chat session");
+    res.status(500).json({ error: "Failed to delete chat session" });
+  }
+});
+
+// ============================================================================
+// TRADING AI AGENT - CHAT MESSAGES
 // ============================================================================
 
 // Send a chat message to the trading AI agent
 router.post("/trading/chat", aiRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { message } = req.body;
+    const { message, sessionId } = req.body;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message is required" });
@@ -824,8 +893,8 @@ router.post("/trading/chat", aiRateLimiter, async (req: Request, res: Response) 
     // Create and initialize the trading agent
     const agent = await createTradingAgent(userId);
 
-    // Process the message
-    const result = await agent.chat(message);
+    // Process the message with session context
+    const result = await agent.chat(message, sessionId);
 
     res.json({
       response: result.response,
@@ -861,15 +930,16 @@ router.post("/trading/chat", aiRateLimiter, async (req: Request, res: Response) 
   }
 });
 
-// Get trading chat history
+// Get trading chat history for a session
 router.get("/trading/chat/history", async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
+    const sessionId = req.query.sessionId as string | undefined;
 
     await ensureDefaultUserExists();
     const userId = DEFAULT_USER_ID;
 
-    const history = await storage.getTradingConversations(userId, limit);
+    const history = await storage.getTradingConversations(userId, limit, sessionId);
 
     // Return in chronological order
     res.json(history.reverse());
@@ -879,13 +949,14 @@ router.get("/trading/chat/history", async (req: Request, res: Response) => {
   }
 });
 
-// Clear trading chat history
+// Clear trading chat history for a session
 router.delete("/trading/chat/history", async (req: Request, res: Response) => {
   try {
     await ensureDefaultUserExists();
     const userId = DEFAULT_USER_ID;
+    const sessionId = req.query.sessionId as string | undefined;
 
-    await storage.deleteTradingConversations(userId);
+    await storage.deleteTradingConversations(userId, sessionId);
     res.json({ success: true });
   } catch (error) {
     logger.error({ error }, "Error clearing trading chat history (returning success)");
