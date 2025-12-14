@@ -799,6 +799,85 @@ Current date: ${today}`;
           description: "Get health report for each venture - activity, task completion rate, stalled projects. Use when user asks how ventures are doing or which need attention.",
           parameters: { type: "object", properties: {}, required: [] }
         }
+      },
+      // Financial tools
+      {
+        type: "function",
+        function: {
+          name: "get_financial_overview",
+          description: "Get financial overview across all projects - budgets, spending, revenue generated. Use when user asks about money, budgets, ROI, or financial health.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
+      },
+      // Document search tool
+      {
+        type: "function",
+        function: {
+          name: "search_doc_content",
+          description: "Search inside document content. Use when user wants to find something in their docs, SOPs, or knowledge base.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "Search query to find in document titles and content" },
+              type: { type: "string", description: "Filter by doc type: sop, prompt, spec, template, playbook" },
+              ventureId: { type: "string", description: "Filter by venture" }
+            },
+            required: ["query"]
+          }
+        }
+      },
+      // Morning briefing tool
+      {
+        type: "function",
+        function: {
+          name: "get_morning_briefing",
+          description: "Get a comprehensive morning briefing covering today's tasks, health status, urgent items, calendar, and actionable recommendations. Use when user says 'good morning', 'briefing', or asks for a daily summary.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
+      },
+      // Complete task tool (convenience)
+      {
+        type: "function",
+        function: {
+          name: "complete_task",
+          description: "Mark a task as completed. Use when user says they finished a task or wants to complete an item.",
+          parameters: {
+            type: "object",
+            properties: {
+              taskId: { type: "string", description: "Task ID to complete" },
+              notes: { type: "string", description: "Optional completion notes" }
+            },
+            required: ["taskId"]
+          }
+        }
+      },
+      // Reschedule task tool
+      {
+        type: "function",
+        function: {
+          name: "reschedule_task",
+          description: "Move a task to a different date or time slot. Use when user wants to reschedule, defer, or move a task.",
+          parameters: {
+            type: "object",
+            properties: {
+              taskId: { type: "string", description: "Task ID to reschedule" },
+              newFocusDate: { type: "string", description: "New focus date (YYYY-MM-DD)" },
+              newFocusSlot: { type: "string", description: "New time slot: deep_work_1, deep_work_2, admin_block_1, admin_block_2, morning_routine, evening_review, meetings, buffer" },
+              newDueDate: { type: "string", description: "New due date if changing deadline (YYYY-MM-DD)" },
+              reason: { type: "string", description: "Reason for rescheduling" }
+            },
+            required: ["taskId"]
+          }
+        }
+      },
+      // Overdue tasks tool
+      {
+        type: "function",
+        function: {
+          name: "get_overdue_tasks",
+          description: "Get all overdue tasks that need attention. Use when user asks about overdue items, what's late, or things they've missed.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
       }
     ];
 
@@ -1362,6 +1441,272 @@ Current date: ${today}`;
                 needingAttention: ventureReports.filter(v => v.needsAttention).length,
                 healthiest: ventureReports.sort((a, b) => b.healthScore - a.healthScore)[0]?.name,
                 mostConcerning: ventureReports.sort((a, b) => a.healthScore - b.healthScore)[0]?.name,
+              },
+            });
+          }
+          // Financial overview handler
+          case "get_financial_overview": {
+            const projects = await storage.getProjects();
+            const ventures = await storage.getVentures();
+
+            // Aggregate by venture
+            const ventureFinancials = ventures.map(v => {
+              const ventureProjects = projects.filter(p => p.ventureId === v.id);
+              const totalBudget = ventureProjects.reduce((sum, p) => sum + (p.budget || 0), 0);
+              const totalSpent = ventureProjects.reduce((sum, p) => sum + (p.budgetSpent || 0), 0);
+              const totalRevenue = ventureProjects.reduce((sum, p) => sum + (p.revenueGenerated || 0), 0);
+
+              return {
+                ventureId: v.id,
+                ventureName: v.name,
+                projectCount: ventureProjects.length,
+                totalBudget,
+                totalSpent,
+                remaining: totalBudget - totalSpent,
+                utilizationRate: totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0,
+                totalRevenue,
+                roi: totalSpent > 0 ? Math.round(((totalRevenue - totalSpent) / totalSpent) * 100) : 0,
+              };
+            }).filter(v => v.totalBudget > 0 || v.totalRevenue > 0);
+
+            const totals = {
+              totalBudget: projects.reduce((sum, p) => sum + (p.budget || 0), 0),
+              totalSpent: projects.reduce((sum, p) => sum + (p.budgetSpent || 0), 0),
+              totalRevenue: projects.reduce((sum, p) => sum + (p.revenueGenerated || 0), 0),
+            };
+
+            const overBudgetProjects = projects.filter(p =>
+              p.budget && p.budgetSpent && p.budgetSpent > p.budget
+            ).map(p => ({ id: p.id, name: p.name, overBy: (p.budgetSpent || 0) - (p.budget || 0) }));
+
+            return JSON.stringify({
+              byVenture: ventureFinancials,
+              totals: {
+                ...totals,
+                remaining: totals.totalBudget - totals.totalSpent,
+                netProfit: totals.totalRevenue - totals.totalSpent,
+                overallROI: totals.totalSpent > 0 ? Math.round(((totals.totalRevenue - totals.totalSpent) / totals.totalSpent) * 100) : 0,
+              },
+              alerts: {
+                overBudgetProjects,
+                highSpendVentures: ventureFinancials.filter(v => v.utilizationRate > 90),
+              },
+            });
+          }
+          // Document search handler
+          case "search_doc_content": {
+            const docs = await storage.getDocs({ type: args.type, ventureId: args.ventureId });
+            const query = args.query.toLowerCase();
+
+            // Search in title, body, and content
+            const matches = docs.filter(d => {
+              const titleMatch = d.title?.toLowerCase().includes(query);
+              const bodyMatch = d.body?.toLowerCase().includes(query);
+              const contentMatch = typeof d.content === 'string' && d.content.toLowerCase().includes(query);
+              const tagsMatch = d.tags?.toLowerCase().includes(query);
+              return titleMatch || bodyMatch || contentMatch || tagsMatch;
+            }).map(d => {
+              // Find context snippet
+              let snippet = '';
+              const body = d.body || '';
+              const idx = body.toLowerCase().indexOf(query);
+              if (idx !== -1) {
+                const start = Math.max(0, idx - 50);
+                const end = Math.min(body.length, idx + query.length + 50);
+                snippet = '...' + body.slice(start, end) + '...';
+              }
+              return {
+                id: d.id,
+                title: d.title,
+                type: d.type,
+                ventureId: d.ventureId,
+                snippet: snippet || d.body?.slice(0, 100) || '',
+                matchLocation: d.title?.toLowerCase().includes(query) ? 'title' : 'body',
+              };
+            });
+
+            return JSON.stringify({
+              query: args.query,
+              matches: matches.slice(0, 10),
+              totalMatches: matches.length,
+            });
+          }
+          // Morning briefing handler
+          case "get_morning_briefing": {
+            const [
+              todayTasks,
+              ventures,
+              projects,
+              captures,
+              healthEntries,
+              day,
+              allPeople,
+            ] = await Promise.all([
+              storage.getTasksForToday(today),
+              storage.getVentures(),
+              storage.getProjects(),
+              storage.getCaptures({ clarified: false }),
+              storage.getHealthEntries({ dateGte: today, dateLte: today }),
+              storage.getDay(today).catch(() => null),
+              storage.getPeople(),
+            ]);
+
+            // Get overdue tasks
+            const allTasks = await storage.getTasks({});
+            const overdueTasks = allTasks.filter(t =>
+              t.dueDate && t.dueDate < today && t.status !== 'completed' && t.status !== 'on_hold'
+            );
+
+            // Get people needing follow-up
+            const overdueFollowUps = allPeople.filter(p =>
+              p.nextFollowUp && p.nextFollowUp < today
+            );
+
+            // Health status
+            const todayHealth = healthEntries[0];
+
+            // Stalled projects
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const stalledProjects = projects.filter(p => {
+              if (p.status !== 'in_progress') return false;
+              const projectTasks = allTasks.filter(t => t.projectId === p.id);
+              const hasRecentActivity = projectTasks.some(t =>
+                t.updatedAt && new Date(t.updatedAt) > thirtyDaysAgo
+              );
+              return !hasRecentActivity && projectTasks.length > 0;
+            });
+
+            // Build briefing
+            const briefing = {
+              date: today,
+              dayTitle: day?.title || 'No day title set',
+              mood: day?.mood || 'not set',
+              top3Outcomes: day?.top3Outcomes || [],
+              oneThingToShip: day?.oneThingToShip || 'Not set',
+              health: todayHealth ? {
+                sleepHours: todayHealth.sleepHours,
+                energyLevel: todayHealth.energyLevel,
+                mood: todayHealth.mood,
+                workoutPlanned: !todayHealth.workoutDone,
+              } : { message: 'No health data logged yet today' },
+              tasks: {
+                todayCount: todayTasks.length,
+                byPriority: {
+                  P0: todayTasks.filter(t => t.priority === 'P0').length,
+                  P1: todayTasks.filter(t => t.priority === 'P1').length,
+                  P2: todayTasks.filter(t => t.priority === 'P2').length,
+                },
+                highPriorityTasks: todayTasks.filter(t => t.priority === 'P0' || t.priority === 'P1').map(t => ({
+                  id: t.id, title: t.title, priority: t.priority, focusSlot: t.focusSlot
+                })),
+              },
+              alerts: {
+                overdueTasks: overdueTasks.length,
+                overdueTasksList: overdueTasks.slice(0, 5).map(t => ({ id: t.id, title: t.title, dueDate: t.dueDate })),
+                unclarifiedCaptures: captures.length,
+                stalledProjects: stalledProjects.length,
+                stalledProjectNames: stalledProjects.map(p => p.name),
+                overdueFollowUps: overdueFollowUps.length,
+                overdueFollowUpPeople: overdueFollowUps.slice(0, 3).map(p => ({ name: p.name, lastFollowUp: p.nextFollowUp })),
+              },
+              recommendations: [] as string[],
+            };
+
+            // Generate recommendations
+            if (overdueTasks.length > 0) {
+              briefing.recommendations.push(`Address ${overdueTasks.length} overdue tasks - consider rescheduling or delegating`);
+            }
+            if (captures.length > 5) {
+              briefing.recommendations.push(`Process inbox - ${captures.length} unclarified items waiting`);
+            }
+            if (!todayHealth) {
+              briefing.recommendations.push('Log morning health metrics for tracking');
+            }
+            if (stalledProjects.length > 0) {
+              briefing.recommendations.push(`Review stalled projects: ${stalledProjects.map(p => p.name).join(', ')}`);
+            }
+            if (overdueFollowUps.length > 0) {
+              briefing.recommendations.push(`Reach out to ${overdueFollowUps.length} contacts with overdue follow-ups`);
+            }
+            if (!day?.top3Outcomes || (day.top3Outcomes as any[]).length === 0) {
+              briefing.recommendations.push('Set your top 3 outcomes for today');
+            }
+
+            return JSON.stringify(briefing);
+          }
+          // Complete task handler
+          case "complete_task": {
+            const task = await storage.updateTask(args.taskId, {
+              status: 'completed',
+              completedAt: new Date(),
+              notes: args.notes ? (await storage.getTask(args.taskId))?.notes + '\n\n[Completion note]: ' + args.notes : undefined,
+            });
+            if (!task) {
+              return JSON.stringify({ success: false, error: 'Task not found' });
+            }
+            return JSON.stringify({
+              success: true,
+              task: { id: task.id, title: task.title, status: task.status, completedAt: task.completedAt }
+            });
+          }
+          // Reschedule task handler
+          case "reschedule_task": {
+            const updates: any = {};
+            if (args.newFocusDate) updates.focusDate = args.newFocusDate;
+            if (args.newFocusSlot) updates.focusSlot = args.newFocusSlot;
+            if (args.newDueDate) updates.dueDate = args.newDueDate;
+
+            const existingTask = await storage.getTask(args.taskId);
+            if (!existingTask) {
+              return JSON.stringify({ success: false, error: 'Task not found' });
+            }
+
+            // Add reschedule note
+            if (args.reason) {
+              updates.notes = (existingTask.notes || '') + `\n\n[Rescheduled ${today}]: ${args.reason}`;
+            }
+
+            const task = await storage.updateTask(args.taskId, updates);
+            return JSON.stringify({
+              success: true,
+              task: {
+                id: task?.id,
+                title: task?.title,
+                oldFocusDate: existingTask.focusDate,
+                newFocusDate: task?.focusDate,
+                oldFocusSlot: existingTask.focusSlot,
+                newFocusSlot: task?.focusSlot,
+              },
+              message: `Task "${task?.title}" rescheduled to ${args.newFocusDate || 'same date'}${args.newFocusSlot ? ` (${args.newFocusSlot})` : ''}`,
+            });
+          }
+          // Overdue tasks handler
+          case "get_overdue_tasks": {
+            const allTasks = await storage.getTasks({});
+            const overdue = allTasks.filter(t =>
+              t.dueDate && t.dueDate < today && t.status !== 'completed' && t.status !== 'on_hold'
+            ).map(t => ({
+              id: t.id,
+              title: t.title,
+              dueDate: t.dueDate,
+              daysOverdue: Math.floor((new Date(today).getTime() - new Date(t.dueDate!).getTime()) / (1000 * 60 * 60 * 24)),
+              priority: t.priority,
+              ventureId: t.ventureId,
+              projectId: t.projectId,
+            })).sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+            return JSON.stringify({
+              count: overdue.length,
+              tasks: overdue,
+              summary: {
+                critical: overdue.filter(t => t.daysOverdue > 7).length,
+                thisWeek: overdue.filter(t => t.daysOverdue <= 7).length,
+                byPriority: {
+                  P0: overdue.filter(t => t.priority === 'P0').length,
+                  P1: overdue.filter(t => t.priority === 'P1').length,
+                  P2: overdue.filter(t => t.priority === 'P2').length,
+                  P3: overdue.filter(t => t.priority === 'P3').length,
+                },
               },
             });
           }
