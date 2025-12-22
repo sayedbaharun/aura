@@ -57,11 +57,14 @@ import { PRE_TRADE_MENTAL_CLEARING } from "./trading-constants";
 interface Trade {
   id: string;
   time: string;
-  pair: string;
+  symbol: string;  // Trading symbol (e.g., XAUUSD, EURUSD)
+  pair?: string;   // Legacy field - use symbol instead
   direction: "long" | "short";
   entryPrice: string;
   stopLoss: string;
   takeProfit?: string;
+  openDate: string;   // Date trade was opened (YYYY-MM-DD)
+  closeDate?: string; // Date trade was closed (for multi-day trades)
   result?: "win" | "loss" | "breakeven" | "pending";
   pnl?: number;
   notes?: string;
@@ -90,6 +93,7 @@ export default function TradingStrategyDashboard() {
   const [newTrade, setNewTrade] = useState<Partial<Trade>>({
     direction: "long",
     result: "pending",
+    openDate: today,
   });
 
   // Get the currently selected checklist
@@ -245,23 +249,25 @@ export default function TradingStrategyDashboard() {
 
   // Add trade
   const handleAddTrade = () => {
-    if (!checklistData || !newTrade.pair || !newTrade.entryPrice || !newTrade.stopLoss) return;
+    if (!checklistData || !newTrade.symbol || !newTrade.entryPrice || !newTrade.stopLoss) return;
 
     const trade: Trade = {
       id: crypto.randomUUID(),
       time: format(new Date(), "HH:mm"),
-      pair: newTrade.pair,
+      symbol: newTrade.symbol,
       direction: newTrade.direction || "long",
       entryPrice: newTrade.entryPrice,
       stopLoss: newTrade.stopLoss,
       takeProfit: newTrade.takeProfit,
+      openDate: newTrade.openDate || today,
+      closeDate: newTrade.closeDate,
       result: "pending",
     };
 
     const trades = [...(checklistData.trades || []), trade];
     setChecklistData({ ...checklistData, trades });
     updateChecklistMutation.mutate({ trades });
-    setNewTrade({ direction: "long", result: "pending" });
+    setNewTrade({ direction: "long", result: "pending", openDate: today });
   };
 
   // Update trade result
@@ -723,55 +729,73 @@ export default function TradingStrategyDashboard() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Add Trade Form */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-            <Input
-              placeholder="Pair (XAU/USD)"
-              value={newTrade.pair || ""}
-              onChange={(e) => setNewTrade({ ...newTrade, pair: e.target.value })}
-            />
-            <Select
-              value={newTrade.direction}
-              onValueChange={(v) => setNewTrade({ ...newTrade, direction: v as "long" | "short" })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="long">Long</SelectItem>
-                <SelectItem value="short">Short</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              placeholder="Entry Price"
-              value={newTrade.entryPrice || ""}
-              onChange={(e) => setNewTrade({ ...newTrade, entryPrice: e.target.value })}
-            />
-            <Input
-              placeholder="Stop Loss"
-              value={newTrade.stopLoss || ""}
-              onChange={(e) => setNewTrade({ ...newTrade, stopLoss: e.target.value })}
-            />
-            <Input
-              placeholder="Take Profit"
-              value={newTrade.takeProfit || ""}
-              onChange={(e) => setNewTrade({ ...newTrade, takeProfit: e.target.value })}
-            />
-            <Button onClick={handleAddTrade} size="sm">
-              <Plus className="h-4 w-4" />
-            </Button>
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <Input
+                placeholder="Symbol (XAUUSD)"
+                value={newTrade.symbol || ""}
+                onChange={(e) => setNewTrade({ ...newTrade, symbol: e.target.value.toUpperCase() })}
+              />
+              <Select
+                value={newTrade.direction}
+                onValueChange={(v) => setNewTrade({ ...newTrade, direction: v as "long" | "short" })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="long">Long</SelectItem>
+                  <SelectItem value="short">Short</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Entry Price"
+                value={newTrade.entryPrice || ""}
+                onChange={(e) => setNewTrade({ ...newTrade, entryPrice: e.target.value })}
+              />
+              <Input
+                placeholder="Stop Loss"
+                value={newTrade.stopLoss || ""}
+                onChange={(e) => setNewTrade({ ...newTrade, stopLoss: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <Input
+                placeholder="Take Profit"
+                value={newTrade.takeProfit || ""}
+                onChange={(e) => setNewTrade({ ...newTrade, takeProfit: e.target.value })}
+              />
+              <Input
+                type="date"
+                placeholder="Open Date"
+                value={newTrade.openDate || today}
+                onChange={(e) => setNewTrade({ ...newTrade, openDate: e.target.value })}
+              />
+              <Input
+                type="date"
+                placeholder="Close Date"
+                value={newTrade.closeDate || ""}
+                onChange={(e) => setNewTrade({ ...newTrade, closeDate: e.target.value })}
+              />
+              <Button onClick={handleAddTrade} size="sm" className="w-full">
+                <Plus className="h-4 w-4 mr-1" /> Add Trade
+              </Button>
+            </div>
           </div>
 
           {/* Trades Table */}
           {checklistData.trades && checklistData.trades.length > 0 ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Pair</TableHead>
+                  <TableHead>Symbol</TableHead>
                   <TableHead>Direction</TableHead>
                   <TableHead>Entry</TableHead>
                   <TableHead>SL</TableHead>
                   <TableHead>TP</TableHead>
+                  <TableHead>Open</TableHead>
+                  <TableHead>Close</TableHead>
                   <TableHead>Result</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -779,8 +803,7 @@ export default function TradingStrategyDashboard() {
               <TableBody>
                 {checklistData.trades.map((trade) => (
                   <TableRow key={trade.id}>
-                    <TableCell>{trade.time}</TableCell>
-                    <TableCell>{trade.pair}</TableCell>
+                    <TableCell className="font-medium">{trade.symbol || trade.pair}</TableCell>
                     <TableCell>
                       <Badge variant={trade.direction === "long" ? "default" : "destructive"}>
                         {trade.direction}
@@ -789,6 +812,8 @@ export default function TradingStrategyDashboard() {
                     <TableCell>{trade.entryPrice}</TableCell>
                     <TableCell>{trade.stopLoss}</TableCell>
                     <TableCell>{trade.takeProfit || "-"}</TableCell>
+                    <TableCell className="text-xs">{trade.openDate || "-"}</TableCell>
+                    <TableCell className="text-xs">{trade.closeDate || "-"}</TableCell>
                     <TableCell>
                       <Select
                         value={trade.result || "pending"}
@@ -818,6 +843,7 @@ export default function TradingStrategyDashboard() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <p>No trades logged today</p>
