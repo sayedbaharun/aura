@@ -1,13 +1,14 @@
 {
   "name": "SB-OS",
-  "short_name": "SBOS",
-  "description": "Personal operating system for managing ventures, projects, tasks, health, and knowledge",
-  "start_url": "/",
+  "short_name": "SB-OS",
+  "description": "Personal Operating System for Entrepreneurs",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#3b82f6",
-  "orientation": "any",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
   "scope": "/",
+  "id": "sb-os-pwa",
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -70,14 +71,28 @@
       "name": "Command Center",
       "short_name": "Today",
       "description": "View today's tasks and overview",
-      "url": "/command-center",
+      "url": "/dashboard",
       "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {
-      "name": "Captures",
+      "name": "Quick Capture",
       "short_name": "Capture",
-      "description": "Quick capture inbox",
-      "url": "/captures",
+      "description": "Capture a quick thought",
+      "url": "/capture",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Morning Ritual",
+      "short_name": "Morning",
+      "description": "Start your morning ritual",
+      "url": "/morning",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Health",
+      "short_name": "Health",
+      "description": "Log health metrics",
+      "url": "/health-hub",
       "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     }
   ]

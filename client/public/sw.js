@@ -6,6 +6,10 @@ const DYNAMIC_CACHE = 'sbos-dynamic-v3';
 // Assets to cache immediately on install
 const STATIC_ASSETS = [
   '/',
+  '/dashboard',
+  '/capture',
+  '/morning',
+  '/health-hub',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png'
@@ -26,12 +30,13 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  const currentCaches = [STATIC_CACHE, DYNAMIC_CACHE];
   event.waitUntil(
     caches.keys()
       .then((keys) => {
         return Promise.all(
           keys
-            .filter((key) => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
+            .filter((key) => !currentCaches.includes(key))
             .map((key) => {
               console.log('[SW] Removing old cache:', key);
               return caches.delete(key);
