@@ -31,6 +31,11 @@ import {
   Zap,
   Heart,
   Moon,
+  Ban,
+  Plus,
+  Trash2,
+  Check,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -39,6 +44,12 @@ import { Link } from "wouter";
 interface WeeklyBig3 {
   text: string;
   completed: boolean;
+}
+
+interface NotToDoItem {
+  item: string;
+  reason: string;
+  status: "pending" | "honored" | "violated";
 }
 
 interface Week {
@@ -53,6 +64,7 @@ interface Week {
   reviewNotes: string | null;
   wins: string[] | null;
   improvements: string[] | null;
+  notToDo: NotToDoItem[] | null;
   metrics: {
     tasksCompleted?: number;
     deepWorkHours?: number;
@@ -100,6 +112,11 @@ export default function WeeklyPlanning() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [wins, setWins] = useState<string[]>(["", "", ""]);
   const [improvements, setImprovements] = useState<string[]>(["", ""]);
+  const [notToDo, setNotToDo] = useState<NotToDoItem[]>([
+    { item: "", reason: "", status: "pending" },
+    { item: "", reason: "", status: "pending" },
+    { item: "", reason: "", status: "pending" },
+  ]);
 
   // Fetch current week
   const { data: week, isLoading } = useQuery<Week>({
@@ -153,6 +170,11 @@ export default function WeeklyPlanning() {
       setReviewNotes(week.reviewNotes || "");
       setWins(week.wins && week.wins.length > 0 ? week.wins : ["", "", ""]);
       setImprovements(week.improvements && week.improvements.length > 0 ? week.improvements : ["", ""]);
+      setNotToDo(week.notToDo && week.notToDo.length > 0 ? week.notToDo : [
+        { item: "", reason: "", status: "pending" },
+        { item: "", reason: "", status: "pending" },
+        { item: "", reason: "", status: "pending" },
+      ]);
     }
   }, [week]);
 
@@ -167,6 +189,7 @@ export default function WeeklyPlanning() {
         reviewNotes: reviewNotes || null,
         wins: wins.filter(w => w.trim()),
         improvements: improvements.filter(i => i.trim()),
+        notToDo: notToDo.filter(n => n.item.trim()),
       };
 
       const res = await apiRequest("PATCH", `/api/weeks/${weekId}`, payload);
@@ -204,6 +227,22 @@ export default function WeeklyPlanning() {
     const updated = [...weeklyBig3];
     updated[index] = { ...updated[index], [field]: value };
     setWeeklyBig3(updated);
+  };
+
+  const updateNotToDo = (index: number, field: keyof NotToDoItem, value: any) => {
+    const updated = [...notToDo];
+    updated[index] = { ...updated[index], [field]: value };
+    setNotToDo(updated);
+  };
+
+  const addNotToDoItem = () => {
+    setNotToDo([...notToDo, { item: "", reason: "", status: "pending" }]);
+  };
+
+  const removeNotToDoItem = (index: number) => {
+    if (notToDo.length > 1) {
+      setNotToDo(notToDo.filter((_, i) => i !== index));
+    }
   };
 
   const completedBig3 = weeklyBig3.filter(b => b.completed && b.text.trim()).length;
@@ -416,6 +455,91 @@ export default function WeeklyPlanning() {
           </Card>
         </div>
       </div>
+
+      {/* Not-To-Do List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Ban className="h-5 w-5 text-red-500" />
+            Not-To-Do This Week
+          </CardTitle>
+          <CardDescription>
+            Things you commit to avoiding or eliminating this week
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {notToDo.map((item, index) => (
+            <div key={index} className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 space-y-2">
+                  <Input
+                    placeholder={`I will NOT...`}
+                    value={item.item}
+                    onChange={(e) => updateNotToDo(index, "item", e.target.value)}
+                    className="font-medium"
+                  />
+                  <Input
+                    placeholder="Reason (why is this important to avoid?)"
+                    value={item.reason}
+                    onChange={(e) => updateNotToDo(index, "reason", e.target.value)}
+                    className="text-sm text-muted-foreground"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  {/* Status buttons */}
+                  <div className="flex gap-1">
+                    <Button
+                      variant={item.status === "honored" ? "default" : "outline"}
+                      size="icon"
+                      className={`h-8 w-8 ${item.status === "honored" ? "bg-green-600 hover:bg-green-700" : ""}`}
+                      onClick={() => updateNotToDo(index, "status", item.status === "honored" ? "pending" : "honored")}
+                      title="Mark as honored"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={item.status === "violated" ? "default" : "outline"}
+                      size="icon"
+                      className={`h-8 w-8 ${item.status === "violated" ? "bg-red-600 hover:bg-red-700" : ""}`}
+                      onClick={() => updateNotToDo(index, "status", item.status === "violated" ? "pending" : "violated")}
+                      title="Mark as violated"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeNotToDoItem(index)}
+                    disabled={notToDo.length <= 1}
+                    title="Remove item"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              {item.status !== "pending" && (
+                <Badge
+                  variant={item.status === "honored" ? "default" : "destructive"}
+                  className={item.status === "honored" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : ""}
+                >
+                  {item.status === "honored" ? "✓ Honored" : "✗ Violated"}
+                </Badge>
+              )}
+            </div>
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addNotToDoItem}
+            className="w-full"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Not-To-Do Item
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Planning Notes */}
       <Card>
