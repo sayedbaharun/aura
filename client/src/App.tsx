@@ -35,6 +35,8 @@ import AllTasks from "@/pages/all-tasks";
 import CommandCenterV2 from "@/pages/command-center-v2";
 import PeoplePage from "@/pages/people";
 import NotFound from "@/pages/not-found";
+import MobileQuickActions from "@/components/mobile/mobile-quick-actions";
+import InstallPrompt from "@/components/mobile/install-prompt";
 import { useEffect } from "react";
 import { dailyRemindersService } from "@/lib/daily-reminders";
 
@@ -77,7 +79,7 @@ function Router() {
             <Route path="/people" component={PeoplePage} />
             <Route path="/capture" component={CapturePage} />
             <Route path="/trading" component={TradingPage} />
-            <Route path="/command-center" component={CommandCenter} />
+            <Route path="/command-center-v1" component={CommandCenter} />
             <Route path="/ai-chat" component={AiChat} />
             <Route path="/tasks" component={AllTasks} />
             <Route component={NotFound} />
@@ -98,6 +100,9 @@ function App() {
             <Router />
             <CaptureModal />
             <TaskDetailModal />
+            {/* Mobile-specific components */}
+            <MobileQuickActions />
+            <InstallPrompt />
           </TooltipProvider>
         </TaskDetailModalProvider>
       </CaptureModalProvider>
