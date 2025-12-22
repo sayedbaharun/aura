@@ -171,11 +171,13 @@ ${personalization}
 
 YOUR CAPABILITIES:
 1. **Performance Analysis**: Review trading history, calculate P&L, win rate, and identify patterns
-2. **Strategy Management**: Help manage trading strategies and checklists
-3. **Trade Journaling**: Log trades, sessions, and lessons learned
+2. **Strategy Management**: Help manage trading strategies, create new strategies, and manage checklists
+3. **Trade Journaling**: Log trades (including multi-day positions with open/close dates), sessions, and lessons
 4. **Pre-Trade Analysis**: Help evaluate setups against strategy criteria
 5. **Post-Session Review**: Analyze trading sessions and extract lessons
 6. **Psychology Support**: Help maintain trading discipline and emotional awareness
+7. **Real-Time Research**: Search the internet for current market news, prices, economic data, and trading information
+8. **Strategy Creation**: Create and save new trading strategies with custom checklist sections
 
 IMPORTANT GUIDELINES:
 - Always be objective and data-driven in analysis
@@ -285,23 +287,26 @@ Current date/time: ${new Date().toISOString()}`;
         type: "function",
         function: {
           name: "log_trade",
-          description: "Log a trade to today's checklist",
+          description: "Log a trade to today's checklist. Supports multi-day trades with open/close dates.",
           parameters: {
             type: "object",
             properties: {
-              instrument: { type: "string", description: "Trading instrument (e.g., EURUSD, BTCUSD)" },
+              symbol: { type: "string", description: "Trading symbol (e.g., XAUUSD, EURUSD, BTCUSD)" },
+              instrument: { type: "string", description: "Alias for symbol - trading instrument" },
               direction: { type: "string", enum: ["long", "short"], description: "Trade direction" },
               entryPrice: { type: "number", description: "Entry price" },
               exitPrice: { type: "number", description: "Exit price (optional if trade is open)" },
               stopLoss: { type: "number", description: "Stop loss price" },
               takeProfit: { type: "number", description: "Take profit price" },
+              openDate: { type: "string", description: "Date trade was opened (YYYY-MM-DD), defaults to today" },
+              closeDate: { type: "string", description: "Date trade was closed (YYYY-MM-DD), for multi-day trades" },
               pnl: { type: "number", description: "Profit/loss amount" },
               pnlPercent: { type: "number", description: "Profit/loss percentage" },
               notes: { type: "string", description: "Trade notes and observations" },
               setup: { type: "string", description: "Setup type that triggered the trade" },
               followedPlan: { type: "boolean", description: "Did you follow your trading plan?" },
             },
-            required: ["instrument", "direction"],
+            required: ["direction"],
           },
         },
       },
@@ -352,6 +357,61 @@ Current date/time: ${new Date().toISOString()}`;
               notes: { type: "string", description: "Additional context about the setup" },
             },
             required: ["instrument", "direction", "setup"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "web_search",
+          description: "Search the internet for real-time market information, news, economic data, or trading concepts. Use this to get current prices, news events, economic calendar data, or research trading strategies.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "Search query for market info, news, or trading concepts" },
+              type: { type: "string", enum: ["news", "price", "economic", "general"], description: "Type of information to search for" },
+            },
+            required: ["query"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "create_strategy",
+          description: "Create a new trading strategy with checklist sections. The strategy will be saved and available for daily use.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Strategy name" },
+              description: { type: "string", description: "Strategy description" },
+              isDefault: { type: "boolean", description: "Set as default strategy" },
+              sections: {
+                type: "array",
+                description: "Checklist sections for the strategy",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Section name (e.g., Pre-Market Analysis, Entry Criteria)" },
+                    items: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          label: { type: "string", description: "Checklist item label" },
+                          type: { type: "string", enum: ["checkbox", "text", "number", "select"], description: "Input type" },
+                          required: { type: "boolean", description: "Is this item required?" },
+                          options: { type: "array", items: { type: "string" }, description: "Options for select type" },
+                        },
+                        required: ["label", "type"],
+                      },
+                    },
+                  },
+                  required: ["name", "items"],
+                },
+              },
+            },
+            required: ["name", "sections"],
           },
         },
       },
@@ -602,6 +662,9 @@ Current date/time: ${new Date().toISOString()}`;
           const today = new Date().toISOString().split("T")[0];
           let checklist = await storage.getDailyTradingChecklistByDate(today);
 
+          // Use symbol or instrument (symbol takes precedence)
+          const tradeSymbol = args.symbol || args.instrument || "UNKNOWN";
+
           if (!checklist) {
             // Get default strategy to create checklist
             const defaultStrategy = await storage.getDefaultTradingStrategy();
@@ -617,7 +680,7 @@ Current date/time: ${new Date().toISOString()}`;
               data: {
                 strategyId: defaultStrategy.id,
                 strategyName: defaultStrategy.name,
-                instrument: args.instrument,
+                instrument: tradeSymbol,
                 values: {},
                 trades: [],
               },
@@ -626,30 +689,30 @@ Current date/time: ${new Date().toISOString()}`;
 
           const trade = {
             id: `trade_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            instrument: args.instrument,
+            time: new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" }),
+            symbol: tradeSymbol,
             direction: args.direction,
-            entryPrice: args.entryPrice,
-            exitPrice: args.exitPrice,
-            stopLoss: args.stopLoss,
-            takeProfit: args.takeProfit,
+            entryPrice: args.entryPrice?.toString() || "",
+            stopLoss: args.stopLoss?.toString() || "",
+            takeProfit: args.takeProfit?.toString(),
+            openDate: args.openDate || today,
+            closeDate: args.closeDate,
+            result: args.pnl !== undefined ? (args.pnl > 0 ? "win" : args.pnl < 0 ? "loss" : "breakeven") : "pending",
             pnl: args.pnl,
-            pnlPercent: args.pnlPercent,
             notes: args.notes,
-            setup: args.setup,
-            followedPlan: args.followedPlan,
           };
 
           const existingTrades = checklist.data.trades || [];
           await storage.updateDailyTradingChecklist(checklist.id, {
             data: {
               ...checklist.data,
-              trades: [...existingTrades, trade],
+              trades: [...existingTrades, trade as any],
             },
           });
 
+          const isMultiDay = args.closeDate && args.closeDate !== args.openDate;
           return {
-            result: `Trade logged: ${args.direction.toUpperCase()} ${args.instrument}${args.pnl !== undefined ? ` (P&L: ${args.pnl})` : ""}`,
+            result: `Trade logged: ${args.direction.toUpperCase()} ${tradeSymbol}${isMultiDay ? ` (${args.openDate} to ${args.closeDate})` : ""}${args.pnl !== undefined ? ` P&L: ${args.pnl}` : ""}`,
             action: {
               action: "log_trade",
               entityType: "trade",
@@ -739,6 +802,111 @@ Current date/time: ${new Date().toISOString()}`;
               } : null,
               reminder: "Remember to check: 1) Does this align with your strategy criteria? 2) Is risk/reward favorable? 3) What's your emotional state? 4) Is this a high-probability setup?",
             }),
+          };
+        }
+
+        case "web_search": {
+          // Use OpenRouter to search the web via Perplexity or similar
+          const searchQuery = args.query;
+          const searchType = args.type || "general";
+
+          try {
+            // Use a web-enabled model for search
+            const searchResponse = await openai.chat.completions.create({
+              model: "perplexity/llama-3.1-sonar-small-128k-online",
+              messages: [
+                {
+                  role: "system",
+                  content: `You are a trading research assistant. Search for current, real-time information about: ${searchType === "news" ? "market news and events" : searchType === "price" ? "current prices and market data" : searchType === "economic" ? "economic calendar and data releases" : "trading and market information"}. Provide factual, up-to-date information with sources when available.`,
+                },
+                {
+                  role: "user",
+                  content: searchQuery,
+                },
+              ],
+              max_tokens: 1000,
+            });
+
+            const searchResult = searchResponse.choices[0]?.message?.content || "No results found";
+
+            return {
+              result: JSON.stringify({
+                query: searchQuery,
+                type: searchType,
+                results: searchResult,
+                timestamp: new Date().toISOString(),
+              }),
+              action: {
+                action: "web_search",
+                parameters: { query: searchQuery, type: searchType },
+                result: "success",
+              },
+            };
+          } catch (searchError: any) {
+            logger.error({ searchError }, "Web search failed");
+            return {
+              result: `Web search failed: ${searchError.message}. Try rephrasing your query.`,
+              action: {
+                action: "web_search",
+                parameters: args,
+                result: "failed",
+                errorMessage: searchError.message,
+              },
+            };
+          }
+        }
+
+        case "create_strategy": {
+          // Create a new trading strategy
+          const { name, description, isDefault, sections } = args;
+
+          // Build the strategy config
+          const config = {
+            sections: sections.map((section: any, sectionIndex: number) => ({
+              id: `section_${Date.now()}_${sectionIndex}`,
+              name: section.name,
+              items: section.items.map((item: any, itemIndex: number) => ({
+                id: `item_${Date.now()}_${sectionIndex}_${itemIndex}`,
+                label: item.label,
+                type: item.type || "checkbox",
+                required: item.required || false,
+                options: item.options || [],
+              })),
+            })),
+          };
+
+          const strategy = await storage.createTradingStrategy({
+            name,
+            description: description || "",
+            isActive: true,
+            isDefault: isDefault || false,
+            config,
+          });
+
+          // Update strategies cache
+          this.strategies = await storage.getTradingStrategies({ isActive: true });
+
+          return {
+            result: JSON.stringify({
+              success: true,
+              strategy: {
+                id: strategy.id,
+                name: strategy.name,
+                description: strategy.description,
+                sections: config.sections.map(s => ({
+                  name: s.name,
+                  itemCount: s.items.length,
+                })),
+              },
+              message: `Trading strategy "${name}" created successfully with ${sections.length} sections.`,
+            }),
+            action: {
+              action: "create_strategy",
+              entityType: "trading_strategy",
+              entityId: strategy.id,
+              parameters: { name, sectionCount: sections.length },
+              result: "success",
+            },
           };
         }
 

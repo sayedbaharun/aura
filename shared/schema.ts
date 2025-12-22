@@ -1479,11 +1479,14 @@ export interface DailyTradingChecklistData {
   trades: {
     id: string;
     time: string;
-    pair: string;
+    symbol: string;  // Trading symbol (e.g., XAUUSD, EURUSD)
+    pair?: string;   // Legacy field - use symbol instead
     direction: 'long' | 'short';
     entryPrice: string;
     stopLoss: string;
     takeProfit?: string;
+    openDate: string;   // Date trade was opened (YYYY-MM-DD)
+    closeDate?: string; // Date trade was closed (for multi-day trades)
     result?: 'win' | 'loss' | 'breakeven' | 'pending';
     pnl?: number;
     notes?: string;
