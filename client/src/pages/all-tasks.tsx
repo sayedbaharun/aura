@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
@@ -24,6 +24,7 @@ import {
   FolderKanban,
   Layers,
   Upload,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -160,6 +161,9 @@ export default function AllTasks() {
   const [focusDateFilter, setFocusDateFilter] = useState<Date | undefined>(undefined);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
+  // Selection state for bulk operations
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+
   // Sort state
   const [sortField, setSortField] = useState<SortField>("priority");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -216,6 +220,24 @@ export default function AllTasks() {
     },
     onError: () => {
       toast({ title: "Failed to delete task", variant: "destructive" });
+    },
+  });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (taskIds: string[]) => {
+      // Delete tasks sequentially to avoid overwhelming the server
+      for (const taskId of taskIds) {
+        await apiRequest("DELETE", `/api/tasks/${taskId}`);
+      }
+    },
+    onSuccess: (_, taskIds) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      setSelectedTasks(new Set());
+      toast({ title: `${taskIds.length} task${taskIds.length > 1 ? "s" : ""} deleted` });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete some tasks", variant: "destructive" });
     },
   });
 
@@ -439,6 +461,42 @@ export default function AllTasks() {
     }
   };
 
+  // Selection handlers
+  const toggleTaskSelection = useCallback((taskId: string) => {
+    setSelectedTasks((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedTasks.size === filteredAndSortedTasks.length) {
+      setSelectedTasks(new Set());
+    } else {
+      setSelectedTasks(new Set(filteredAndSortedTasks.map((t) => t.id)));
+    }
+  }, [filteredAndSortedTasks, selectedTasks.size]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedTasks(new Set());
+  }, []);
+
+  const handleBulkDelete = useCallback(() => {
+    if (selectedTasks.size === 0) return;
+    const count = selectedTasks.size;
+    if (confirm(`Are you sure you want to delete ${count} task${count > 1 ? "s" : ""}? This cannot be undone.`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedTasks));
+    }
+  }, [selectedTasks, bulkDeleteMutation]);
+
+  const isAllSelected = filteredAndSortedTasks.length > 0 && selectedTasks.size === filteredAndSortedTasks.length;
+  const isSomeSelected = selectedTasks.size > 0 && selectedTasks.size < filteredAndSortedTasks.length;
+
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
       return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
@@ -629,6 +687,42 @@ export default function AllTasks() {
           </Card>
         </div>
 
+        {/* Bulk Actions Bar */}
+        {selectedTasks.size > 0 && (
+          <Card className="bg-destructive/10 border-destructive/20">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  <span className="font-medium">
+                    {selectedTasks.size} task{selectedTasks.size > 1 ? "s" : ""} selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSelection}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleteMutation.isPending}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {bulkDeleteMutation.isPending
+                      ? "Deleting..."
+                      : `Delete ${selectedTasks.size} Task${selectedTasks.size > 1 ? "s" : ""}`}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tasks Table */}
         <Card>
           <CardContent className="p-0 overflow-x-auto">
@@ -646,6 +740,18 @@ export default function AllTasks() {
               <Table className="min-w-[1200px]">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        ref={(el) => {
+                          if (el) {
+                            (el as HTMLButtonElement).dataset.state = isSomeSelected ? "indeterminate" : isAllSelected ? "checked" : "unchecked";
+                          }
+                        }}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead className="w-[50px] text-muted-foreground font-medium">NO</TableHead>
                     <TableHead className="w-[40px]"></TableHead>
                     <TableHead className="w-[50px]">
@@ -741,16 +847,26 @@ export default function AllTasks() {
                         key={task.id}
                         className={cn(
                           "cursor-pointer group",
-                          task.status === "completed" && "opacity-60"
+                          task.status === "completed" && "opacity-60",
+                          selectedTasks.has(task.id) && "bg-muted/50"
                         )}
                         onClick={() => openTaskDetail(task.id)}
                       >
+                        {/* Selection Checkbox */}
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedTasks.has(task.id)}
+                            onCheckedChange={() => toggleTaskSelection(task.id)}
+                            aria-label={`Select task: ${task.title}`}
+                          />
+                        </TableCell>
+
                         {/* Row Number */}
                         <TableCell className="font-mono text-muted-foreground text-lg">
                           {String(index + 1).padStart(2, "0")}
                         </TableCell>
 
-                        {/* Checkbox */}
+                        {/* Status Toggle Checkbox */}
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={task.status === "completed"}
