@@ -11,6 +11,8 @@ import {
   type InsertCaptureItem,
   type Day,
   type InsertDay,
+  type Week,
+  type InsertWeek,
   type HealthEntry,
   type InsertHealthEntry,
   type NutritionEntry,
@@ -77,6 +79,7 @@ import {
   tasks,
   captureItems,
   days,
+  weeks,
   healthEntries,
   nutritionEntries,
   docs,
@@ -177,6 +180,15 @@ export interface IStorage {
   createDay(data: InsertDay): Promise<Day>;
   updateDay(date: string, data: Partial<InsertDay>): Promise<Day | undefined>;
   deleteDay(date: string): Promise<void>;
+
+  // Weeks
+  getWeeks(filters?: { year?: number }): Promise<Week[]>;
+  getWeek(id: string): Promise<Week | undefined>;
+  getWeekByDate(date: string): Promise<Week | undefined>;
+  getCurrentWeek(): Promise<Week | undefined>;
+  getWeekOrCreate(year: number, weekNumber: number): Promise<Week>;
+  createWeek(data: InsertWeek): Promise<Week>;
+  updateWeek(id: string, data: Partial<InsertWeek>): Promise<Week | undefined>;
 
   // Health Entries
   getHealthEntries(filters?: { dateGte?: string; dateLte?: string }): Promise<HealthEntry[]>;
@@ -1127,6 +1139,93 @@ export class DBStorage implements IStorage {
 
   async deleteDay(date: string): Promise<void> {
     await this.db.delete(days).where(eq(days.date, date));
+  }
+
+  // ============================================================================
+  // WEEKS
+  // ============================================================================
+
+  async getWeeks(filters?: { year?: number }): Promise<Week[]> {
+    const conditions = [];
+
+    if (filters?.year) {
+      conditions.push(eq(weeks.year, filters.year));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(weeks)
+      .where(whereClause)
+      .orderBy(desc(weeks.year), desc(weeks.weekNumber));
+  }
+
+  async getWeek(id: string): Promise<Week | undefined> {
+    const [week] = await this.db
+      .select()
+      .from(weeks)
+      .where(eq(weeks.id, id))
+      .limit(1);
+    return week;
+  }
+
+  async getWeekByDate(date: string): Promise<Week | undefined> {
+    // Find the week that contains this date
+    const targetDate = new Date(date);
+    const year = targetDate.getFullYear();
+
+    // Get ISO week number
+    const startOfYear = new Date(year, 0, 1);
+    const days_diff = Math.floor((targetDate.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+    const weekNumber = Math.ceil((days_diff + startOfYear.getDay() + 1) / 7);
+
+    const weekId = `week_${year}-${String(weekNumber).padStart(2, '0')}`;
+    return this.getWeek(weekId);
+  }
+
+  async getCurrentWeek(): Promise<Week | undefined> {
+    const today = new Date().toISOString().split('T')[0];
+    return this.getWeekByDate(today);
+  }
+
+  async getWeekOrCreate(year: number, weekNumber: number): Promise<Week> {
+    const weekId = `week_${year}-${String(weekNumber).padStart(2, '0')}`;
+    let week = await this.getWeek(weekId);
+
+    if (!week) {
+      // Calculate the Monday of this week
+      const jan1 = new Date(year, 0, 1);
+      const daysToMonday = (weekNumber - 1) * 7 - jan1.getDay() + 1;
+      const weekStart = new Date(year, 0, 1 + daysToMonday);
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+
+      week = await this.createWeek({
+        id: weekId,
+        weekStart: weekStartStr,
+        weekNumber,
+        year,
+      });
+    }
+
+    return week;
+  }
+
+  async createWeek(insertWeek: InsertWeek): Promise<Week> {
+    const [week] = await this.db
+      .insert(weeks)
+      .values(insertWeek as any)
+      .returning();
+    return week;
+  }
+
+  async updateWeek(id: string, updates: Partial<InsertWeek>): Promise<Week | undefined> {
+    const [updated] = await this.db
+      .update(weeks)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(weeks.id, id))
+      .returning();
+    return updated;
   }
 
   // ============================================================================
