@@ -25,6 +25,7 @@ import SettingsCategoriesPage from "@/pages/settings-categories";
 import CalendarPage from "@/pages/calendar";
 import MorningRitual from "@/pages/morning-ritual";
 import EveningReview from "@/pages/evening-review";
+import WeeklyPlanning from "@/pages/weekly-planning";
 import Shopping from "@/pages/shopping";
 import Books from "@/pages/books";
 import Finance from "@/pages/finance";
@@ -73,6 +74,7 @@ function Router() {
             <Route path="/morning/:date" component={MorningRitual} />
             <Route path="/evening" component={EveningReview} />
             <Route path="/evening/:date" component={EveningReview} />
+            <Route path="/weekly" component={WeeklyPlanning} />
             <Route path="/shopping" component={Shopping} />
             <Route path="/books" component={Books} />
             <Route path="/finance" component={Finance} />

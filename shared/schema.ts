@@ -672,6 +672,64 @@ export const insertDaySchema = createInsertSchema(days)
 export type InsertDay = z.infer<typeof insertDaySchema>;
 export type Day = typeof days.$inferSelect;
 
+// WEEKS: Weekly planning (Sunday ritual)
+export const weeks = pgTable(
+  "weeks",
+  {
+    id: text("id").primaryKey(), // Format: "week_YYYY-WW" (e.g., "week_2025-52")
+    weekStart: date("week_start").notNull(), // Monday of the week
+    weekNumber: integer("week_number").notNull(), // 1-53
+    year: integer("year").notNull(),
+    // Weekly Big 3 outcomes
+    weeklyBig3: jsonb("weekly_big_3").$type<{
+      text: string;
+      completed: boolean;
+    }[]>(),
+    // Primary venture focus for the week
+    primaryVentureFocus: uuid("primary_venture_focus").references(() => ventures.id, {
+      onDelete: "set null"
+    }),
+    // Week theme/intention
+    theme: text("theme"),
+    // Sunday planning reflection
+    planningNotes: text("planning_notes"),
+    // End of week review
+    reviewNotes: text("review_notes"),
+    // What went well
+    wins: jsonb("wins").$type<string[]>(),
+    // What to improve
+    improvements: jsonb("improvements").$type<string[]>(),
+    // Metrics summary (auto-calculated or manual)
+    metrics: jsonb("metrics").$type<{
+      tasksCompleted?: number;
+      tasksPlanned?: number;
+      deepWorkHours?: number;
+      tradingPnl?: number;
+      avgEnergy?: number;
+      avgSleep?: number;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_weeks_week_start").on(table.weekStart),
+    index("idx_weeks_year_week").on(table.year, table.weekNumber),
+    index("idx_weeks_primary_venture_focus").on(table.primaryVentureFocus),
+  ]
+);
+
+export const insertWeekSchema = createInsertSchema(weeks)
+  .omit({
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    weekStart: dateStringRequiredSchema,
+  });
+
+export type InsertWeek = z.infer<typeof insertWeekSchema>;
+export type Week = typeof weeks.$inferSelect;
+
 // HEALTH ENTRIES: Daily health metrics
 export const healthEntries = pgTable(
   "health_entries",

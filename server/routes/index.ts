@@ -18,6 +18,7 @@ import phasesRoutes from "./phases";
 import tasksRoutes from "./tasks";
 import capturesRoutes from "./captures";
 import daysRoutes from "./days";
+import weeksRoutes from "./weeks";
 import healthRoutes from "./health";
 import nutritionRoutes from "./nutrition";
 import docsRoutes from "./docs";
@@ -99,6 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/tasks', tasksRoutes);
   app.use('/api/captures', capturesRoutes);
   app.use('/api/days', daysRoutes);
+  app.use('/api/weeks', weeksRoutes);
 
   // ============================================================================
   // HEALTH & NUTRITION

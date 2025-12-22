@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Circle, Clock, Inbox, ChevronRight, Flame, AlertTriangle, CheckCircle2, Target, Calendar, Video, MapPin, Moon, Sun } from "lucide-react";
+import { Circle, Clock, Inbox, ChevronRight, Flame, AlertTriangle, CheckCircle2, Target, Calendar, CalendarDays, Video, MapPin, Moon, Sun } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import QuickLogModal from "@/components/health-hub/quick-log-modal";
 
@@ -87,6 +87,16 @@ export default function CommandCenterV2() {
             return res.json();
         },
         refetchInterval: 60000 // Refresh every minute
+    });
+
+    // Fetch current week data
+    const { data: weekData, isLoading: isLoadingWeek } = useQuery({
+        queryKey: ["weeks-current"],
+        queryFn: async () => {
+            const res = await fetch("/api/weeks/current");
+            if (!res.ok) throw new Error("Failed to fetch week");
+            return res.json();
+        }
     });
 
     // Update time every minute
@@ -380,6 +390,75 @@ export default function CommandCenterV2() {
                                         </div>
                                     )}
                                 </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Week Summary Card */}
+                    <Card
+                        onClick={() => navigate("/weekly")}
+                        className="cursor-pointer hover:bg-muted/30 transition-colors"
+                    >
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <CalendarDays className="h-4 w-4" />
+                                This Week
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoadingWeek ? (
+                                <div className="space-y-2">
+                                    <Skeleton className="h-4 w-20" />
+                                    <Skeleton className="h-3 w-full" />
+                                    <Skeleton className="h-3 w-full" />
+                                </div>
+                            ) : weekData ? (
+                                <>
+                                    <div className="text-sm font-medium mb-2">
+                                        Week {weekData.weekNumber}
+                                        {weekData.theme && (
+                                            <span className="text-muted-foreground font-normal"> • {weekData.theme}</span>
+                                        )}
+                                    </div>
+                                    {weekData.weeklyBig3 && weekData.weeklyBig3.length > 0 ? (
+                                        <div className="space-y-1.5">
+                                            {weekData.weeklyBig3.map((goal: { text: string; completed: boolean }, i: number) => (
+                                                <div key={i} className="flex items-start gap-2 text-xs">
+                                                    <div className={`h-4 w-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                                        goal.completed
+                                                            ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+                                                            : 'bg-muted text-muted-foreground'
+                                                    }`}>
+                                                        {goal.completed ? (
+                                                            <CheckCircle2 className="h-3 w-3" />
+                                                        ) : (
+                                                            <Circle className="h-2 w-2" />
+                                                        )}
+                                                    </div>
+                                                    <span className={goal.completed ? 'line-through text-muted-foreground' : ''}>
+                                                        {goal.text || `Goal ${i + 1}`}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            No weekly goals set
+                                        </p>
+                                    )}
+                                    <div className="mt-3 pt-2 border-t flex items-center justify-between text-xs text-muted-foreground">
+                                        <span>Plan your week</span>
+                                        <ChevronRight className="h-3 w-3" />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    <p className="mb-2">Week not planned yet</p>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span>Start planning</span>
+                                        <ChevronRight className="h-3 w-3" />
+                                    </div>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
