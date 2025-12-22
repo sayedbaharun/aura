@@ -461,12 +461,15 @@ export default function FearSettingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Related Venture (optional)</Label>
-                  <Select value={ventureId} onValueChange={setVentureId}>
+                  <Select
+                    value={ventureId || "__none__"}
+                    onValueChange={(val) => setVentureId(val === "__none__" ? "" : val)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select venture..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__none__">None</SelectItem>
                       {activeVentures.map((v: Venture) => (
                         <SelectItem key={v.id} value={v.id}>
                           {v.icon} {v.name}
@@ -477,12 +480,15 @@ export default function FearSettingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Related Project (optional)</Label>
-                  <Select value={projectId} onValueChange={setProjectId}>
+                  <Select
+                    value={projectId || "__none__"}
+                    onValueChange={(val) => setProjectId(val === "__none__" ? "" : val)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select project..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__none__">None</SelectItem>
                       {filteredProjects.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name}
