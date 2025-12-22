@@ -73,6 +73,8 @@ import {
   type InsertWhatIfQuestion,
   type ForesightConversation,
   type InsertForesightConversation,
+  type FearSetting,
+  type InsertFearSetting,
   ventures,
   projects,
   phases,
@@ -110,6 +112,7 @@ import {
   strategicAnalyses,
   whatIfQuestions,
   foresightConversations,
+  fearSettings,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
@@ -3417,6 +3420,71 @@ export class DBStorage implements IStorage {
         unexploredQuestions: 0,
       };
     }
+  }
+
+  // ----------------------------------------------------------------------------
+  // FEAR SETTINGS
+  // ----------------------------------------------------------------------------
+
+  async getFearSettings(filters?: { userId?: string; ventureId?: string; status?: string }): Promise<FearSetting[]> {
+    try {
+      let query = this.db.select().from(fearSettings);
+      const conditions = [];
+
+      if (filters?.userId) {
+        conditions.push(eq(fearSettings.userId, filters.userId));
+      }
+      if (filters?.ventureId) {
+        conditions.push(eq(fearSettings.ventureId, filters.ventureId));
+      }
+      if (filters?.status) {
+        conditions.push(eq(fearSettings.status, filters.status as any));
+      }
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+
+      return await query.orderBy(desc(fearSettings.createdAt));
+    } catch (error) {
+      console.error("Error fetching fear settings:", error);
+      return [];
+    }
+  }
+
+  async getFearSetting(id: string): Promise<FearSetting | undefined> {
+    try {
+      const [result] = await this.db
+        .select()
+        .from(fearSettings)
+        .where(eq(fearSettings.id, id))
+        .limit(1);
+      return result;
+    } catch (error) {
+      console.error("Error fetching fear setting:", error);
+      return undefined;
+    }
+  }
+
+  async createFearSetting(data: InsertFearSetting): Promise<FearSetting> {
+    const [result] = await this.db
+      .insert(fearSettings)
+      .values(data as any)
+      .returning();
+    return result;
+  }
+
+  async updateFearSetting(id: string, updates: Partial<InsertFearSetting>): Promise<FearSetting | undefined> {
+    const [result] = await this.db
+      .update(fearSettings)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(fearSettings.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteFearSetting(id: string): Promise<void> {
+    await this.db.delete(fearSettings).where(eq(fearSettings.id, id));
   }
 
 }

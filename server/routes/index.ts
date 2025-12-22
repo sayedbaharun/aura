@@ -34,6 +34,7 @@ import { strategiesRouter, checklistsRouter } from "./trading";
 import ticktickRoutes from "./ticktick";
 import aiChatRoutes from "./ai-chat";
 import foresightRoutes from "./foresight";
+import fearSettingsRoutes from "./fear-settings";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -145,6 +146,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Venture-scoped scenario planning, indicators, signals, analyses
   // ============================================================================
   app.use('/api/ventures/:ventureId/foresight', foresightRoutes);
+
+  // ============================================================================
+  // DECISION MAKING
+  // Fear-setting exercises for major decisions
+  // ============================================================================
+  app.use('/api/fear-settings', fearSettingsRoutes);
 
   // ============================================================================
   // AI & CHAT

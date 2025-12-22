@@ -699,6 +699,12 @@ export const weeks = pgTable(
     wins: jsonb("wins").$type<string[]>(),
     // What to improve
     improvements: jsonb("improvements").$type<string[]>(),
+    // Not-To-Do list for the week (things to avoid/eliminate)
+    notToDo: jsonb("not_to_do").$type<{
+      item: string;
+      reason: string;
+      status: "pending" | "honored" | "violated";
+    }[]>(),
     // Metrics summary (auto-calculated or manual)
     metrics: jsonb("metrics").$type<{
       tasksCompleted?: number;
@@ -2099,5 +2105,103 @@ export const foresightConversationsRelations = relations(foresightConversations,
   user: one(users, {
     fields: [foresightConversations.userId],
     references: [users.id],
+  }),
+}));
+
+// FEAR SETTINGS: Tim Ferriss-style fear-setting exercise for decisions
+export const fearSettingDecisionTypeEnum = pgEnum("fear_setting_decision_type", [
+  "venture",
+  "project",
+  "life_change",
+  "investment",
+  "other",
+]);
+
+export const fearSettingStatusEnum = pgEnum("fear_setting_status", [
+  "draft",
+  "completed",
+  "reviewed",
+  "decided",
+]);
+
+export const fearSettingDecisionEnum = pgEnum("fear_setting_decision", [
+  "proceed",
+  "pause",
+  "abandon",
+  "need_more_info",
+]);
+
+export const fearSettings = pgTable(
+  "fear_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    // What decision are you facing?
+    title: text("title").notNull(),
+    description: text("description"),
+    decisionType: fearSettingDecisionTypeEnum("decision_type").default("other"),
+    // Optional links to venture/project
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    // Page 1: Define fears (What could go wrong?)
+    fears: jsonb("fears").$type<{
+      fear: string;
+      severity: number; // 1-10
+    }[]>(),
+    // Page 2: Prevent (How to minimize each fear?)
+    preventions: jsonb("preventions").$type<{
+      fearIndex: number;
+      prevention: string;
+      effort: number; // 1-10 (effort to implement prevention)
+    }[]>(),
+    // Page 3: Repair (If it happens, how to recover?)
+    repairs: jsonb("repairs").$type<{
+      fearIndex: number;
+      repair: string;
+      reversibility: number; // 1-10 (how reversible is the damage)
+    }[]>(),
+    // Cost of inaction
+    costSixMonths: text("cost_six_months"),
+    costOneYear: text("cost_one_year"),
+    costThreeYears: text("cost_three_years"),
+    // Final decision
+    decision: fearSettingDecisionEnum("decision"),
+    decisionNotes: text("decision_notes"),
+    decidedAt: timestamp("decided_at"),
+    // Status
+    status: fearSettingStatusEnum("status").default("draft"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    reviewedAt: timestamp("reviewed_at"),
+  },
+  (table) => [
+    index("idx_fear_settings_user_id").on(table.userId),
+    index("idx_fear_settings_venture_id").on(table.ventureId),
+    index("idx_fear_settings_status").on(table.status),
+    index("idx_fear_settings_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertFearSettingSchema = createInsertSchema(fearSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFearSetting = z.infer<typeof insertFearSettingSchema>;
+export type FearSetting = typeof fearSettings.$inferSelect;
+
+export const fearSettingsRelations = relations(fearSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [fearSettings.userId],
+    references: [users.id],
+  }),
+  venture: one(ventures, {
+    fields: [fearSettings.ventureId],
+    references: [ventures.id],
+  }),
+  project: one(projects, {
+    fields: [fearSettings.projectId],
+    references: [projects.id],
   }),
 }));
