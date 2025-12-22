@@ -35,6 +35,7 @@ import ticktickRoutes from "./ticktick";
 import aiChatRoutes from "./ai-chat";
 import foresightRoutes from "./foresight";
 import fearSettingsRoutes from "./fear-settings";
+import arc2026Routes from "./arc-2026";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -169,6 +170,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // FILE UPLOADS
   // ============================================================================
   app.use('/api', uploadRoutes);
+
+  // ============================================================================
+  // SETUP UTILITIES
+  // One-time setup endpoints for initializing structures like 2026 Arc
+  // ============================================================================
+  app.use('/api/setup', arc2026Routes);
 
   const httpServer = createServer(app);
   return httpServer;
