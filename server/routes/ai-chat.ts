@@ -184,17 +184,87 @@ router.delete("/agent-prompts/:id", async (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// COO CHAT SESSIONS
+// ============================================================================
+
+// Get all COO chat sessions for the user
+router.get("/chat/sessions", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const sessions = await storage.getCooChatSessions(userId);
+    res.json(sessions);
+  } catch (error) {
+    logger.error({ error }, "Error fetching COO chat sessions");
+    res.json([]);
+  }
+});
+
+// Create a new COO chat session
+router.post("/chat/sessions", async (req: Request, res: Response) => {
+  try {
+    await ensureDefaultUserExists();
+    const userId = DEFAULT_USER_ID;
+
+    const { title } = req.body;
+
+    const session = await storage.createCooChatSession({
+      userId,
+      title: title || "New Chat",
+    });
+
+    res.status(201).json(session);
+  } catch (error) {
+    logger.error({ error }, "Error creating COO chat session");
+    res.status(500).json({ error: "Failed to create chat session" });
+  }
+});
+
+// Update a COO chat session (rename)
+router.patch("/chat/sessions/:sessionId", async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const { title } = req.body;
+
+    const session = await storage.updateCooChatSession(sessionId, { title });
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.json(session);
+  } catch (error) {
+    logger.error({ error }, "Error updating COO chat session");
+    res.status(500).json({ error: "Failed to update chat session" });
+  }
+});
+
+// Delete a COO chat session and its messages
+router.delete("/chat/sessions/:sessionId", async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+
+    await storage.deleteCooChatSession(sessionId);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Error deleting COO chat session");
+    res.status(500).json({ error: "Failed to delete chat session" });
+  }
+});
+
+// ============================================================================
 // CHAT API
 // ============================================================================
 
-// Get chat history for current user
+// Get chat history for current user (optionally by session)
 router.get("/chat/history", async (req: Request, res: Response) => {
   try {
     await ensureDefaultUserExists();
     const userId = DEFAULT_USER_ID;
     const limit = parseInt(req.query.limit as string) || 50;
+    const sessionId = req.query.sessionId as string | undefined;
 
-    const messages = await storage.getChatHistory(userId, limit);
+    const messages = await storage.getChatHistory(userId, limit, sessionId);
 
     // Return in chronological order (oldest first)
     res.json(messages.reverse());
@@ -207,7 +277,7 @@ router.get("/chat/history", async (req: Request, res: Response) => {
 // Send a chat message and get AI response
 router.post("/chat", aiRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { message } = req.body;
+    const { message, sessionId } = req.body;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message is required" });
@@ -227,6 +297,7 @@ router.post("/chat", aiRateLimiter, async (req: Request, res: Response) => {
     // Save user message
     const userMessage = await storage.createChatMessage({
       userId,
+      sessionId: sessionId || null,
       role: "user" as const,
       content: message,
       metadata: null,
@@ -240,8 +311,8 @@ router.post("/chat", aiRateLimiter, async (req: Request, res: Response) => {
     const temperature = userPrefs?.aiTemperature ?? 0.7;
     const maxTokens = userPrefs?.aiMaxTokens ?? 4096;
 
-    // Get recent chat history for context
-    const recentHistory = await storage.getChatHistory(userId, 20);
+    // Get recent chat history for context (scoped to session if provided)
+    const recentHistory = await storage.getChatHistory(userId, 20, sessionId);
     const historyMessages = recentHistory.reverse().map(msg => ({
       role: msg.role as "user" | "assistant" | "system",
       content: msg.content,
@@ -952,6 +1023,7 @@ Current date: ${today}`;
     // Save AI response
     const assistantMessage = await storage.createChatMessage({
       userId,
+      sessionId: sessionId || null,
       role: "assistant" as const,
       content: aiResponse,
       metadata: {
@@ -970,11 +1042,12 @@ Current date: ${today}`;
   }
 });
 
-// Clear chat history for current user
+// Clear chat history for current user (optionally by session)
 router.delete("/chat/history", async (req: Request, res: Response) => {
   try {
     const userId = DEFAULT_USER_ID;
-    await storage.deleteChatHistory(userId);
+    const sessionId = req.query.sessionId as string | undefined;
+    await storage.deleteChatHistory(userId, sessionId);
     res.json({ success: true });
   } catch (error) {
     logger.error({ error }, "Error clearing chat history");

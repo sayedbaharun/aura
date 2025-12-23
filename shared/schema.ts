@@ -1038,6 +1038,7 @@ export const shoppingItems = pgTable(
     status: shoppingStatusEnum("status").default("to_buy").notNull(),
     category: shoppingCategoryEnum("category").default("personal"),
     notes: text("notes"),
+    externalId: text("external_id"),  // e.g., "ticktick:task_id" for synced items
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -1046,6 +1047,7 @@ export const shoppingItems = pgTable(
     index("idx_shopping_items_priority").on(table.priority),
     index("idx_shopping_items_category").on(table.category),
     index("idx_shopping_items_created_at").on(table.createdAt),
+    index("idx_shopping_items_external_id").on(table.externalId),
   ]
 );
 
@@ -1186,38 +1188,8 @@ export const insertAccountSnapshotSchema = createInsertSchema(accountSnapshots).
 export type InsertAccountSnapshot = z.infer<typeof insertAccountSnapshotSchema>;
 export type AccountSnapshot = typeof accountSnapshots.$inferSelect;
 
-// Net Worth Snapshots: Monthly rollup for historical tracking
-export const netWorthSnapshots = pgTable(
-  "net_worth_snapshots",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    date: date("date").notNull().unique(),                           // Snapshot date (typically first of month)
-    totalAssets: real("total_assets").notNull(),
-    totalLiabilities: real("total_liabilities").notNull(),
-    netWorth: real("net_worth").notNull(),
-    breakdown: jsonb("breakdown").$type<{
-      byType: Record<string, number>;                                // { checking: 5000, savings: 10000, ... }
-      byAccount: { id: string; name: string; balance: number }[];   // Individual account balances
-    }>(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("idx_net_worth_snapshots_date").on(table.date),
-    index("idx_net_worth_snapshots_created_at").on(table.createdAt),
-  ]
-);
-
-export const insertNetWorthSnapshotSchema = createInsertSchema(netWorthSnapshots)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .extend({
-    date: dateStringRequiredSchema,
-  });
-
-export type InsertNetWorthSnapshot = z.infer<typeof insertNetWorthSnapshotSchema>;
-export type NetWorthSnapshot = typeof netWorthSnapshots.$inferSelect;
+// NOTE: netWorthSnapshots table is defined later in the file (line ~2314) with the Holdings section
+// for comprehensive net worth tracking with asset type breakdowns
 
 // ----------------------------------------------------------------------------
 // AI AGENT PROMPTS
@@ -1260,12 +1232,38 @@ export const insertAiAgentPromptSchema = createInsertSchema(aiAgentPrompts).omit
 
 export type InsertAiAgentPrompt = z.infer<typeof insertAiAgentPromptSchema>;
 
+// COO Chat Sessions: Separate conversations with the COO AI assistant
+export const cooChatSessions = pgTable(
+  "coo_chat_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    title: text("title").notNull().default("New Chat"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_coo_chat_sessions_user_id").on(table.userId),
+    index("idx_coo_chat_sessions_updated_at").on(table.updatedAt),
+  ]
+);
+
+export const insertCooChatSessionSchema = createInsertSchema(cooChatSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CooChatSession = typeof cooChatSessions.$inferSelect;
+export type InsertCooChatSession = z.infer<typeof insertCooChatSessionSchema>;
+
 // Chat Messages: Web-based AI chat conversations
 export const chatMessages = pgTable(
   "chat_messages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    sessionId: uuid("session_id").references(() => cooChatSessions.id, { onDelete: "cascade" }),
     role: text("role").$type<"user" | "assistant" | "system">().notNull(),
     content: text("content").notNull(),
     metadata: jsonb("metadata").$type<{
@@ -1278,6 +1276,7 @@ export const chatMessages = pgTable(
   },
   (table) => [
     index("idx_chat_messages_user_id").on(table.userId),
+    index("idx_chat_messages_session_id").on(table.sessionId),
     index("idx_chat_messages_created_at").on(table.createdAt),
   ]
 );
@@ -2214,3 +2213,133 @@ export const fearSettingsRelations = relations(fearSettings, ({ one }) => ({
     references: [projects.id],
   }),
 }));
+
+// ============================================================================
+// FINANCE / NET WORTH TRACKING
+// ============================================================================
+
+// Asset type enum for holdings
+export const assetTypeEnum = pgEnum('asset_type', [
+  'cash',           // Bank accounts, savings
+  'stocks',         // Individual stocks
+  'etf',            // Exchange-traded funds
+  'crypto',         // Cryptocurrency
+  'property',       // Real estate
+  'retirement',     // Pension, 401k, ISA
+  'bonds',          // Bonds, fixed income
+  'commodities',    // Gold, silver, etc.
+  'business',       // Business equity
+  'other'           // Other assets
+]);
+
+// Holdings: Individual assets/investments
+export const holdings = pgTable(
+  "holdings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+
+    // Asset details
+    name: text("name").notNull(), // e.g., "Apple Inc.", "Bitcoin", "Lloyds Savings"
+    symbol: text("symbol"), // e.g., "AAPL", "BTC", null for bank accounts
+    assetType: assetTypeEnum("asset_type").notNull(),
+    currency: text("currency").default("GBP").notNull(), // GBP, USD, EUR, etc.
+
+    // Quantity and value
+    quantity: real("quantity"), // Number of shares/units (null for cash accounts)
+    currentPrice: real("current_price"), // Price per unit (null for cash accounts)
+    currentValue: real("current_value").notNull(), // Total current value
+
+    // Cost basis for P&L tracking
+    costBasis: real("cost_basis"), // Total amount invested
+
+    // Account/platform info
+    platform: text("platform"), // e.g., "Trading 212", "Coinbase", "Nationwide"
+    accountName: text("account_name"), // e.g., "ISA", "General Investment"
+
+    // Status
+    isActive: boolean("is_active").default(true).notNull(),
+    notes: text("notes"),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_holdings_user_id").on(table.userId),
+    index("idx_holdings_asset_type").on(table.assetType),
+    index("idx_holdings_is_active").on(table.isActive),
+  ]
+);
+
+export const insertHoldingSchema = createInsertSchema(holdings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Holding = typeof holdings.$inferSelect;
+export type InsertHolding = z.infer<typeof insertHoldingSchema>;
+
+// Net Worth Snapshots: Monthly/periodic net worth records
+export const netWorthSnapshots = pgTable(
+  "net_worth_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+
+    // Snapshot date (typically end of month)
+    snapshotDate: date("snapshot_date").notNull(),
+    month: integer("month").notNull(), // 1-12
+    year: integer("year").notNull(),
+
+    // Totals by asset type
+    totalCash: real("total_cash").default(0),
+    totalStocks: real("total_stocks").default(0),
+    totalEtf: real("total_etf").default(0),
+    totalCrypto: real("total_crypto").default(0),
+    totalProperty: real("total_property").default(0),
+    totalRetirement: real("total_retirement").default(0),
+    totalBonds: real("total_bonds").default(0),
+    totalCommodities: real("total_commodities").default(0),
+    totalBusiness: real("total_business").default(0),
+    totalOther: real("total_other").default(0),
+
+    // Overall totals
+    totalAssets: real("total_assets").notNull(),
+    totalLiabilities: real("total_liabilities").default(0),
+    netWorth: real("net_worth").notNull(),
+
+    // Change tracking
+    changeFromPrevious: real("change_from_previous"), // Absolute change
+    changePercentage: real("change_percentage"), // Percentage change
+
+    // Breakdown snapshot (JSON of all holdings at this point)
+    holdingsSnapshot: jsonb("holdings_snapshot").$type<{
+      holdings: Array<{
+        name: string;
+        assetType: string;
+        value: number;
+        currency: string;
+      }>;
+    }>(),
+
+    notes: text("notes"),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_net_worth_snapshots_user_id").on(table.userId),
+    index("idx_net_worth_snapshots_date").on(table.snapshotDate),
+    index("idx_net_worth_snapshots_year_month").on(table.year, table.month),
+  ]
+);
+
+export const insertNetWorthSnapshotSchema = createInsertSchema(netWorthSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type NetWorthSnapshot = typeof netWorthSnapshots.$inferSelect;
+export type InsertNetWorthSnapshot = z.infer<typeof insertNetWorthSnapshotSchema>;

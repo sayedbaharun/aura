@@ -35,6 +35,8 @@ import {
   type InsertAiAgentPrompt,
   type ChatMessage,
   type InsertChatMessage,
+  type CooChatSession,
+  type InsertCooChatSession,
   type VentureConversation,
   type InsertVentureConversation,
   type VentureContextCache,
@@ -93,6 +95,7 @@ import {
   books,
   aiAgentPrompts,
   chatMessages,
+  cooChatSessions,
   ventureConversations,
   ventureContextCache,
   ventureAgentActions,
@@ -1785,15 +1788,106 @@ export class DBStorage implements IStorage {
   }
 
   // ============================================================================
+  // COO CHAT SESSIONS
+  // ============================================================================
+
+  async getCooChatSessions(userId: string): Promise<CooChatSession[]> {
+    try {
+      return await this.db
+        .select()
+        .from(cooChatSessions)
+        .where(eq(cooChatSessions.userId, userId))
+        .orderBy(desc(cooChatSessions.updatedAt));
+    } catch (error) {
+      console.error("Error fetching COO chat sessions (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getCooChatSession(id: string): Promise<CooChatSession | undefined> {
+    try {
+      const [session] = await this.db
+        .select()
+        .from(cooChatSessions)
+        .where(eq(cooChatSessions.id, id));
+      return session;
+    } catch (error) {
+      console.error("Error fetching COO chat session:", error);
+      return undefined;
+    }
+  }
+
+  async createCooChatSession(data: InsertCooChatSession): Promise<CooChatSession> {
+    try {
+      const [session] = await this.db
+        .insert(cooChatSessions)
+        .values(data as any)
+        .returning();
+      return session;
+    } catch (error) {
+      console.error("Error creating COO chat session:", error);
+      throw error;
+    }
+  }
+
+  async updateCooChatSession(
+    id: string,
+    updates: Partial<InsertCooChatSession>
+  ): Promise<CooChatSession | undefined> {
+    try {
+      const [session] = await this.db
+        .update(cooChatSessions)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(cooChatSessions.id, id))
+        .returning();
+      return session;
+    } catch (error) {
+      console.error("Error updating COO chat session:", error);
+      return undefined;
+    }
+  }
+
+  async deleteCooChatSession(id: string): Promise<void> {
+    try {
+      // Delete all messages in the session first
+      await this.db.delete(chatMessages).where(eq(chatMessages.sessionId, id));
+      // Then delete the session
+      await this.db.delete(cooChatSessions).where(eq(cooChatSessions.id, id));
+    } catch (error) {
+      console.error("Error deleting COO chat session:", error);
+    }
+  }
+
+  // ============================================================================
   // CHAT MESSAGES
   // ============================================================================
 
   async createChatMessage(data: InsertChatMessage): Promise<ChatMessage> {
     const results = await this.db.insert(chatMessages).values(data as any).returning();
+    // Update session's updatedAt if sessionId is provided
+    if (data.sessionId) {
+      await this.db
+        .update(cooChatSessions)
+        .set({ updatedAt: new Date() })
+        .where(eq(cooChatSessions.id, data.sessionId));
+    }
     return results[0];
   }
 
-  async getChatHistory(userId: string, limit: number = 50): Promise<ChatMessage[]> {
+  async getChatHistory(userId: string, limit: number = 50, sessionId?: string): Promise<ChatMessage[]> {
+    if (sessionId) {
+      return await this.db
+        .select()
+        .from(chatMessages)
+        .where(
+          and(
+            eq(chatMessages.userId, userId),
+            eq(chatMessages.sessionId, sessionId)
+          )
+        )
+        .orderBy(desc(chatMessages.createdAt))
+        .limit(limit);
+    }
     return await this.db
       .select()
       .from(chatMessages)
@@ -1802,8 +1896,17 @@ export class DBStorage implements IStorage {
       .limit(limit);
   }
 
-  async deleteChatHistory(userId: string): Promise<void> {
-    await this.db.delete(chatMessages).where(eq(chatMessages.userId, userId));
+  async deleteChatHistory(userId: string, sessionId?: string): Promise<void> {
+    if (sessionId) {
+      await this.db.delete(chatMessages).where(
+        and(
+          eq(chatMessages.userId, userId),
+          eq(chatMessages.sessionId, sessionId)
+        )
+      );
+    } else {
+      await this.db.delete(chatMessages).where(eq(chatMessages.userId, userId));
+    }
   }
 
   // Stub for telegram-bot.ts (Phase 2 - will implement proper messaging table)
