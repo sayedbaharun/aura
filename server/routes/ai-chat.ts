@@ -83,6 +83,11 @@ router.get("/models", async (_req: Request, res: Response) => {
   res.json(AVAILABLE_MODELS);
 });
 
+// Alias for frontend compatibility
+router.get("/ai-models", async (_req: Request, res: Response) => {
+  res.json(AVAILABLE_MODELS);
+});
+
 // ============================================================================
 // AI AGENT PROMPTS
 // ============================================================================
