@@ -83,25 +83,21 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
 const PROJECT_CONFIGS = [
   {
     name: "Health & Energy",
-    category: "admin_general" as const,
     outcome: "Optimal physical and mental performance through consistent health habits",
     notes: "Track: sleep quality, energy levels, workout consistency, nutrition adherence, weight/body composition"
   },
   {
     name: "Wealth & Ventures",
-    category: "finance" as const,
     outcome: "Revenue growth across all ventures with sustainable systems",
     notes: "Track: monthly revenue, runway, key metrics per venture, investment returns"
   },
   {
     name: "Knowledge & Skills",
-    category: "research_dev" as const,
     outcome: "Continuous learning and skill development for competitive advantage",
     notes: "Track: books read, courses completed, certifications earned, skills practiced"
   },
   {
     name: "Systems & Habits",
-    category: "admin_general" as const,
     outcome: "Bulletproof routines and systems that compound over time",
     notes: "Track: morning ritual streak, evening review streak, deep work hours, habit completion rate"
   }
@@ -160,7 +156,6 @@ Who are you becoming by Dec 31, 2026?
         name: config.name,
         ventureId: venture.id,
         status: "in_progress",
-        category: config.category,
         priority: "P1",
         startDate: "2026-01-01",
         targetEndDate: "2026-12-31",
