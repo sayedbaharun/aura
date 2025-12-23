@@ -83,7 +83,7 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
 const PROJECT_CONFIGS = [
   {
     name: "Health & Energy",
-    category: "operations" as const,
+    category: "admin_general" as const,
     outcome: "Optimal physical and mental performance through consistent health habits",
     notes: "Track: sleep quality, energy levels, workout consistency, nutrition adherence, weight/body composition"
   },
@@ -101,7 +101,7 @@ const PROJECT_CONFIGS = [
   },
   {
     name: "Systems & Habits",
-    category: "operations" as const,
+    category: "admin_general" as const,
     outcome: "Bulletproof routines and systems that compound over time",
     notes: "Track: morning ritual streak, evening review streak, deep work hours, habit completion rate"
   }
