@@ -30,10 +30,10 @@ interface Task {
 
 interface VenturesGridProps {
   viewMode: "grid" | "list";
-  statusFilter: string;
+  statusFilters: string[];
 }
 
-export default function VenturesGrid({ viewMode, statusFilter }: VenturesGridProps) {
+export default function VenturesGrid({ viewMode, statusFilters }: VenturesGridProps) {
   const [, setLocation] = useLocation();
 
   const { data: ventures = [], isLoading: venturesLoading } = useQuery<Venture[]>({
@@ -117,9 +117,10 @@ export default function VenturesGrid({ viewMode, statusFilter }: VenturesGridPro
   }
 
   // Filter ventures by status
-  const filteredVentures = statusFilter === "all"
+  // Filter by status - empty array means show all
+  const filteredVentures = statusFilters.length === 0
     ? ventures
-    : ventures.filter((v) => v.status === statusFilter);
+    : ventures.filter((v) => statusFilters.includes(v.status));
 
   if (ventures.length === 0) {
     return (
