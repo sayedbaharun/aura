@@ -14,7 +14,8 @@
     "db:push": "drizzle-kit push",
     "db:migrate:duration": "tsx scripts/run-migration.ts",
     "db:emergency-fix": "tsx scripts/emergency-fix.ts",
-    "reset-password": "tsx scripts/reset-password.ts"
+    "reset-password": "tsx scripts/reset-password.ts",
+    "setup:2026-arc": "tsx scripts/setup-2026-arc.ts"
   },
   "dependencies": {
     "@blocknote/core": "^0.42.3",
