@@ -339,6 +339,11 @@ export const userPreferences = pgTable("user_preferences", {
     goals?: string[];
     preferences?: string;
   }>(),
+  // AI Model Settings
+  aiModel: text("ai_model").default("openai/gpt-4o"),
+  aiTemperature: real("ai_temperature").default(0.7),
+  aiMaxTokens: integer("ai_max_tokens").default(4096),
+  aiStreamResponses: boolean("ai_stream_responses").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

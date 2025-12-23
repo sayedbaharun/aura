@@ -28,17 +28,18 @@ interface AISettings {
   apiKey?: string;
 }
 
+// OpenRouter model IDs - these must match exactly what OpenRouter expects
 const AI_MODELS = [
-  { value: "gpt-4-turbo", label: "GPT-4 Turbo", provider: "OpenAI" },
-  { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
-  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet", provider: "Anthropic" },
-  { value: "claude-3-opus", label: "Claude 3 Opus", provider: "Anthropic" },
-  { value: "claude-3-haiku", label: "Claude 3 Haiku", provider: "Anthropic" },
-  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro", provider: "Google" },
-  { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash", provider: "Google" },
-  { value: "llama-3.1-70b", label: "Llama 3.1 70B", provider: "Meta (via OpenRouter)" },
-  { value: "mixtral-8x7b", label: "Mixtral 8x7B", provider: "Mistral (via OpenRouter)" },
+  { value: "openai/gpt-4o", label: "GPT-4o", provider: "OpenAI", description: "Most capable, best for complex reasoning" },
+  { value: "openai/gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI", description: "Fast and efficient, good for most tasks" },
+  { value: "openai/gpt-4-turbo", label: "GPT-4 Turbo", provider: "OpenAI", description: "Strong reasoning with large context" },
+  { value: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet", provider: "Anthropic", description: "Excellent reasoning and coding" },
+  { value: "anthropic/claude-3-opus", label: "Claude 3 Opus", provider: "Anthropic", description: "Most capable Claude model" },
+  { value: "anthropic/claude-3-haiku", label: "Claude 3 Haiku", provider: "Anthropic", description: "Fastest Claude model" },
+  { value: "google/gemini-pro-1.5", label: "Gemini Pro 1.5", provider: "Google", description: "Long context, multimodal" },
+  { value: "google/gemini-flash-1.5", label: "Gemini Flash 1.5", provider: "Google", description: "Fast and efficient" },
+  { value: "meta-llama/llama-3.1-70b-instruct", label: "Llama 3.1 70B", provider: "Meta", description: "Open source, strong performance" },
+  { value: "mistralai/mixtral-8x7b-instruct", label: "Mixtral 8x7B", provider: "Mistral", description: "Open source mixture of experts" },
 ];
 
 const DEFAULT_INSTRUCTIONS = `You are a helpful AI assistant for SB-OS, a personal operating system for managing ventures, projects, tasks, health, and knowledge.
@@ -58,7 +59,7 @@ export default function AISettings() {
   });
 
   const [form, setForm] = useState<AISettings>({
-    model: "gpt-4-turbo",
+    model: "openai/gpt-4o",
     customInstructions: DEFAULT_INSTRUCTIONS,
     temperature: 0.7,
     maxTokens: 4096,
@@ -70,7 +71,7 @@ export default function AISettings() {
   useEffect(() => {
     if (settings) {
       setForm({
-        model: settings.model || "gpt-4-turbo",
+        model: settings.model || "openai/gpt-4o",
         customInstructions: settings.customInstructions || DEFAULT_INSTRUCTIONS,
         temperature: settings.temperature ?? 0.7,
         maxTokens: settings.maxTokens ?? 4096,

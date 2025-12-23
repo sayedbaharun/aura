@@ -36,6 +36,7 @@ export class TradingAgent {
   private todayDay: Day | null = null;
   private config: TradingAgentConfig | null = null;
   private knowledgeDocs: TradingKnowledgeDoc[] = [];
+  private userPreferredModel: string | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
@@ -48,12 +49,13 @@ export class TradingAgent {
     try {
       const today = new Date().toISOString().split("T")[0];
 
-      const [strategies, todayChecklists, todayDay, config, knowledgeDocs] = await Promise.all([
+      const [strategies, todayChecklists, todayDay, config, knowledgeDocs, userPrefs] = await Promise.all([
         storage.getTradingStrategies({ isActive: true }),
         storage.getDailyTradingChecklists({ date: today }),
         storage.getDayOrCreate(today),
         storage.getTradingAgentConfig(this.userId),
         storage.getTradingKnowledgeDocsForContext(this.userId),
+        storage.getUserPreferences(this.userId),
       ]);
 
       this.strategies = strategies;
@@ -61,6 +63,7 @@ export class TradingAgent {
       this.todayDay = todayDay;
       this.config = config;
       this.knowledgeDocs = knowledgeDocs;
+      this.userPreferredModel = userPrefs?.aiModel || null;
     } catch (error: any) {
       logger.error({ error }, "Error initializing trading agent");
       this.strategies = [];
@@ -68,6 +71,7 @@ export class TradingAgent {
       this.todayDay = null;
       this.config = null;
       this.knowledgeDocs = [];
+      this.userPreferredModel = null;
     }
   }
 
@@ -996,8 +1000,8 @@ Current date/time: ${new Date().toISOString()}`;
     const maxTurns = 5;
 
     for (let turn = 0; turn < maxTurns; turn++) {
-      // Use preferred model from config if set
-      const preferredModel = this.config?.preferredModel || undefined;
+      // Use preferred model: trading config > user global preference > default
+      const preferredModel = this.config?.preferredModel || this.userPreferredModel || undefined;
       const { response, metrics } = await modelManager.chatCompletion(
         { messages: conversationMessages, tools, temperature: 0.7 },
         "complex",
