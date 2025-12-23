@@ -107,7 +107,11 @@ router.get("/ai", async (req: Request, res: Response) => {
   try {
     const prefs = await storage.getUserPreferences(DEFAULT_USER_ID);
     res.json({
-      aiInstructions: prefs?.aiInstructions || "",
+      model: prefs?.aiModel || "openai/gpt-4o",
+      customInstructions: prefs?.aiInstructions || "",
+      temperature: prefs?.aiTemperature ?? 0.7,
+      maxTokens: prefs?.aiMaxTokens ?? 4096,
+      streamResponses: prefs?.aiStreamResponses ?? true,
       aiContext: prefs?.aiContext || {
         userName: "",
         role: "",
@@ -124,11 +128,23 @@ router.get("/ai", async (req: Request, res: Response) => {
 // Update AI assistant settings
 router.patch("/ai", async (req: Request, res: Response) => {
   try {
-    const { aiInstructions, aiContext } = req.body;
+    const { model, customInstructions, temperature, maxTokens, streamResponses, aiContext } = req.body;
     const updates: any = {};
 
-    if (aiInstructions !== undefined) {
-      updates.aiInstructions = aiInstructions;
+    if (model !== undefined) {
+      updates.aiModel = model;
+    }
+    if (customInstructions !== undefined) {
+      updates.aiInstructions = customInstructions;
+    }
+    if (temperature !== undefined) {
+      updates.aiTemperature = temperature;
+    }
+    if (maxTokens !== undefined) {
+      updates.aiMaxTokens = maxTokens;
+    }
+    if (streamResponses !== undefined) {
+      updates.aiStreamResponses = streamResponses;
     }
     if (aiContext !== undefined) {
       updates.aiContext = aiContext;
@@ -136,7 +152,11 @@ router.patch("/ai", async (req: Request, res: Response) => {
 
     const prefs = await storage.upsertUserPreferences(DEFAULT_USER_ID, updates);
     res.json({
-      aiInstructions: prefs.aiInstructions || "",
+      model: prefs.aiModel || "openai/gpt-4o",
+      customInstructions: prefs.aiInstructions || "",
+      temperature: prefs.aiTemperature ?? 0.7,
+      maxTokens: prefs.aiMaxTokens ?? 4096,
+      streamResponses: prefs.aiStreamResponses ?? true,
       aiContext: prefs.aiContext || {}
     });
   } catch (error) {

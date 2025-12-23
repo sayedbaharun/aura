@@ -24,6 +24,7 @@ export class VentureAgent {
   private venture: Venture | null = null;
   private agentConfig: AiAgentPrompt | null = null;
   private context: string = "";
+  private userPreferredModel: string | null = null;
 
   constructor(ventureId: string, userId: string) {
     this.ventureId = ventureId;
@@ -35,9 +36,10 @@ export class VentureAgent {
    */
   async initialize(): Promise<void> {
     try {
-      const [venture, agentConfig] = await Promise.all([
+      const [venture, agentConfig, userPrefs] = await Promise.all([
         storage.getVenture(this.ventureId),
         storage.getAiAgentPrompt(this.ventureId),
+        storage.getUserPreferences(this.userId),
       ]);
 
       if (!venture) {
@@ -46,6 +48,7 @@ export class VentureAgent {
 
       this.venture = venture;
       this.agentConfig = agentConfig || null;
+      this.userPreferredModel = userPrefs?.aiModel || null;
 
       // Build or get cached context - this should never throw due to internal error handling
       const refreshHours = agentConfig?.contextRefreshHours || 24;
@@ -64,6 +67,7 @@ export class VentureAgent {
       }
       this.venture = venture;
       this.agentConfig = null;
+      this.userPreferredModel = null;
       this.context = `Venture: ${venture.name}\nStatus: ${venture.status}`;
     }
   }
@@ -742,8 +746,8 @@ IMPORTANT INSTRUCTIONS:
     const maxTurns = 5;
 
     for (let turn = 0; turn < maxTurns; turn++) {
-      // Use preferred model from config if set, otherwise use complexity-based selection
-      const preferredModel = this.agentConfig?.preferredModel || undefined;
+      // Use preferred model: venture config > user global preference > default
+      const preferredModel = this.agentConfig?.preferredModel || this.userPreferredModel || undefined;
       const { response, metrics } = await modelManager.chatCompletion(
         { messages: conversationMessages, tools, temperature: 0.7 },
         "complex",

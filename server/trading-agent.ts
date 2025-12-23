@@ -36,6 +36,7 @@ export class TradingAgent {
   private todayDay: Day | null = null;
   private config: TradingAgentConfig | null = null;
   private knowledgeDocs: TradingKnowledgeDoc[] = [];
+  private userPreferredModel: string | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
@@ -48,12 +49,13 @@ export class TradingAgent {
     try {
       const today = new Date().toISOString().split("T")[0];
 
-      const [strategies, todayChecklists, todayDay, config, knowledgeDocs] = await Promise.all([
+      const [strategies, todayChecklists, todayDay, config, knowledgeDocs, userPrefs] = await Promise.all([
         storage.getTradingStrategies({ isActive: true }),
         storage.getDailyTradingChecklists({ date: today }),
         storage.getDayOrCreate(today),
         storage.getTradingAgentConfig(this.userId),
         storage.getTradingKnowledgeDocsForContext(this.userId),
+        storage.getUserPreferences(this.userId),
       ]);
 
       this.strategies = strategies;
@@ -61,6 +63,7 @@ export class TradingAgent {
       this.todayDay = todayDay;
       this.config = config;
       this.knowledgeDocs = knowledgeDocs;
+      this.userPreferredModel = userPrefs?.aiModel || null;
     } catch (error: any) {
       logger.error({ error }, "Error initializing trading agent");
       this.strategies = [];
@@ -68,6 +71,7 @@ export class TradingAgent {
       this.todayDay = null;
       this.config = null;
       this.knowledgeDocs = [];
+      this.userPreferredModel = null;
     }
   }
 
@@ -810,25 +814,47 @@ Current date/time: ${new Date().toISOString()}`;
           const searchQuery = args.query;
           const searchType = args.type || "general";
 
-          try {
-            // Use a web-enabled model for search
-            const searchResponse = await openai.chat.completions.create({
-              model: "perplexity/llama-3.1-sonar-small-128k-online",
-              messages: [
-                {
-                  role: "system",
-                  content: `You are a trading research assistant. Search for current, real-time information about: ${searchType === "news" ? "market news and events" : searchType === "price" ? "current prices and market data" : searchType === "economic" ? "economic calendar and data releases" : "trading and market information"}. Provide factual, up-to-date information with sources when available.`,
-                },
-                {
-                  role: "user",
-                  content: searchQuery,
-                },
-              ],
-              max_tokens: 1000,
-            });
+          // Available Perplexity models on OpenRouter (in order of preference)
+          const webSearchModels = [
+            "perplexity/sonar-pro",
+            "perplexity/sonar",
+            "perplexity/sonar-reasoning",
+          ];
 
-            const searchResult = searchResponse.choices[0]?.message?.content || "No results found";
+          let searchResult: string | null = null;
+          let lastError: any = null;
 
+          for (const model of webSearchModels) {
+            try {
+              logger.info({ model, query: searchQuery }, "Attempting web search");
+
+              // Use a web-enabled model for search
+              const searchResponse = await openai.chat.completions.create({
+                model,
+                messages: [
+                  {
+                    role: "system",
+                    content: `You are a trading research assistant. Search for current, real-time information about: ${searchType === "news" ? "market news and events" : searchType === "price" ? "current prices and market data" : searchType === "economic" ? "economic calendar and data releases" : "trading and market information"}. Provide factual, up-to-date information with sources when available.`,
+                  },
+                  {
+                    role: "user",
+                    content: searchQuery,
+                  },
+                ],
+                max_tokens: 1000,
+              });
+
+              searchResult = searchResponse.choices[0]?.message?.content || "No results found";
+              logger.info({ model }, "Web search successful");
+              break; // Success, exit the loop
+            } catch (modelError: any) {
+              logger.warn({ model, error: modelError.message }, "Web search model failed, trying next");
+              lastError = modelError;
+              continue; // Try next model
+            }
+          }
+
+          if (searchResult) {
             return {
               result: JSON.stringify({
                 query: searchQuery,
@@ -842,15 +868,15 @@ Current date/time: ${new Date().toISOString()}`;
                 result: "success",
               },
             };
-          } catch (searchError: any) {
-            logger.error({ searchError }, "Web search failed");
+          } else {
+            logger.error({ lastError }, "All web search models failed");
             return {
-              result: `Web search failed: ${searchError.message}. Try rephrasing your query.`,
+              result: `Web search is currently unavailable. Please check market data sources directly or try again later. Error: ${lastError?.message || "Unknown error"}`,
               action: {
                 action: "web_search",
                 parameters: args,
                 result: "failed",
-                errorMessage: searchError.message,
+                errorMessage: lastError?.message || "All web search models unavailable",
               },
             };
           }
@@ -974,8 +1000,8 @@ Current date/time: ${new Date().toISOString()}`;
     const maxTurns = 5;
 
     for (let turn = 0; turn < maxTurns; turn++) {
-      // Use preferred model from config if set
-      const preferredModel = this.config?.preferredModel || undefined;
+      // Use preferred model: trading config > user global preference > default
+      const preferredModel = this.config?.preferredModel || this.userPreferredModel || undefined;
       const { response, metrics } = await modelManager.chatCompletion(
         { messages: conversationMessages, tools, temperature: 0.7 },
         "complex",

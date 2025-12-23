@@ -227,10 +227,13 @@ router.post("/chat", aiRateLimiter, async (req: Request, res: Response) => {
       metadata: null,
     });
 
-    // Get user preferences for custom AI instructions
+    // Get user preferences for custom AI instructions and model selection
     const userPrefs = await storage.getUserPreferences(userId);
     const customInstructions = userPrefs?.aiInstructions || "";
     const aiContext = userPrefs?.aiContext || {};
+    const preferredModel = userPrefs?.aiModel || "openai/gpt-4o";
+    const temperature = userPrefs?.aiTemperature ?? 0.7;
+    const maxTokens = userPrefs?.aiMaxTokens ?? 4096;
 
     // Get recent chat history for context
     const recentHistory = await storage.getChatHistory(userId, 20);
@@ -895,11 +898,12 @@ Current date: ${today}`;
     ];
 
     let completion = await openai.chat.completions.create({
-      model: "openai/gpt-4o",
+      model: preferredModel,
       messages,
       tools,
       tool_choice: "auto",
-      max_tokens: 2000,
+      temperature,
+      max_tokens: Math.min(maxTokens, 4096), // Cap at 4096 for tool calls
     });
 
     let responseMessage = completion.choices[0]?.message;
@@ -927,11 +931,12 @@ Current date: ${today}`;
       ];
 
       completion = await openai.chat.completions.create({
-        model: "openai/gpt-4o",
+        model: preferredModel,
         messages,
         tools,
         tool_choice: "auto",
-        max_tokens: 2000,
+        temperature,
+        max_tokens: Math.min(maxTokens, 4096),
       });
 
       responseMessage = completion.choices[0]?.message;
@@ -945,7 +950,7 @@ Current date: ${today}`;
       role: "assistant" as const,
       content: aiResponse,
       metadata: {
-        model: "openai/gpt-4o",
+        model: preferredModel,
         tokensUsed: completion.usage?.total_tokens,
       } as any,
     });
