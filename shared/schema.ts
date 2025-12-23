@@ -1038,6 +1038,7 @@ export const shoppingItems = pgTable(
     status: shoppingStatusEnum("status").default("to_buy").notNull(),
     category: shoppingCategoryEnum("category").default("personal"),
     notes: text("notes"),
+    externalId: text("external_id"),  // e.g., "ticktick:task_id" for synced items
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -1046,6 +1047,7 @@ export const shoppingItems = pgTable(
     index("idx_shopping_items_priority").on(table.priority),
     index("idx_shopping_items_category").on(table.category),
     index("idx_shopping_items_created_at").on(table.createdAt),
+    index("idx_shopping_items_external_id").on(table.externalId),
   ]
 );
 
@@ -1260,12 +1262,38 @@ export const insertAiAgentPromptSchema = createInsertSchema(aiAgentPrompts).omit
 
 export type InsertAiAgentPrompt = z.infer<typeof insertAiAgentPromptSchema>;
 
+// COO Chat Sessions: Separate conversations with the COO AI assistant
+export const cooChatSessions = pgTable(
+  "coo_chat_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    title: text("title").notNull().default("New Chat"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_coo_chat_sessions_user_id").on(table.userId),
+    index("idx_coo_chat_sessions_updated_at").on(table.updatedAt),
+  ]
+);
+
+export const insertCooChatSessionSchema = createInsertSchema(cooChatSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CooChatSession = typeof cooChatSessions.$inferSelect;
+export type InsertCooChatSession = z.infer<typeof insertCooChatSessionSchema>;
+
 // Chat Messages: Web-based AI chat conversations
 export const chatMessages = pgTable(
   "chat_messages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    sessionId: uuid("session_id").references(() => cooChatSessions.id, { onDelete: "cascade" }),
     role: text("role").$type<"user" | "assistant" | "system">().notNull(),
     content: text("content").notNull(),
     metadata: jsonb("metadata").$type<{
@@ -1278,6 +1306,7 @@ export const chatMessages = pgTable(
   },
   (table) => [
     index("idx_chat_messages_user_id").on(table.userId),
+    index("idx_chat_messages_session_id").on(table.sessionId),
     index("idx_chat_messages_created_at").on(table.createdAt),
   ]
 );

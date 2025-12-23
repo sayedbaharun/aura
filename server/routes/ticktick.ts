@@ -184,6 +184,150 @@ router.post("/sync", async (req: Request, res: Response) => {
   }
 });
 
+// Sync shopping items from TickTick to SB-OS
+router.post("/sync-shopping", async (req: Request, res: Response) => {
+  try {
+    // Get the shopping project ID from request or find by name
+    let shoppingProjectId = req.body.projectId;
+
+    if (!shoppingProjectId) {
+      // Try to find a project with "shopping" in the name
+      const projects = await ticktick.getProjects();
+      const shoppingProject = projects.find(p =>
+        p.name.toLowerCase().includes('shopping')
+      );
+
+      if (!shoppingProject) {
+        return res.status(400).json({
+          error: "No shopping project found",
+          message: "Please create a project named 'Shopping' or 'SB-OS Shopping' in TickTick, or provide a projectId",
+          availableProjects: projects.map(p => ({ id: p.id, name: p.name })),
+        });
+      }
+      shoppingProjectId = shoppingProject.id;
+    }
+
+    // Fetch tasks from TickTick shopping list
+    const ticktickTasks = await ticktick.getProjectTasks(shoppingProjectId);
+
+    // Filter to only incomplete tasks
+    const incompleteTasks = ticktickTasks.filter(
+      t => t.status === ticktick.TICKTICK_STATUS.NORMAL
+    );
+
+    const result = {
+      synced: 0,
+      skipped: 0,
+      errors: [] as string[],
+      items: [] as Array<{ tickTickId: string; title: string; shoppingItemId?: string }>,
+    };
+
+    // Get existing shopping items with TickTick external IDs to avoid duplicates
+    const existingItems = await storage.getShoppingItems({});
+    const existingExternalIds = new Set(
+      existingItems
+        .filter((item: any) => item.externalId?.startsWith('ticktick:'))
+        .map((item: any) => item.externalId)
+    );
+
+    // Map TickTick priority to SB-OS priority
+    const priorityMap: Record<number, 'P1' | 'P2' | 'P3'> = {
+      [ticktick.TICKTICK_PRIORITY.HIGH]: 'P1',
+      [ticktick.TICKTICK_PRIORITY.MEDIUM]: 'P2',
+      [ticktick.TICKTICK_PRIORITY.LOW]: 'P3',
+      [ticktick.TICKTICK_PRIORITY.NONE]: 'P3',
+    };
+
+    // Process each TickTick task
+    for (const task of incompleteTasks) {
+      const externalId = `ticktick:${task.id}`;
+
+      // Skip if already synced
+      if (existingExternalIds.has(externalId)) {
+        result.skipped++;
+        result.items.push({
+          tickTickId: task.id,
+          title: task.title,
+        });
+        continue;
+      }
+
+      try {
+        // Determine category from tags or title
+        let category: 'groceries' | 'personal' | 'household' | 'business' = 'personal';
+        const titleLower = task.title.toLowerCase();
+        const tags = task.tags || [];
+        const tagsLower = tags.map(t => t.toLowerCase());
+
+        if (tagsLower.includes('groceries') || tagsLower.includes('food') ||
+            titleLower.includes('grocery') || titleLower.includes('food')) {
+          category = 'groceries';
+        } else if (tagsLower.includes('household') || tagsLower.includes('home') ||
+                   titleLower.includes('household') || titleLower.includes('house')) {
+          category = 'household';
+        } else if (tagsLower.includes('business') || tagsLower.includes('work') ||
+                   titleLower.includes('office') || titleLower.includes('work')) {
+          category = 'business';
+        }
+
+        // Create shopping item in SB-OS
+        const shoppingItem = await storage.createShoppingItem({
+          item: task.title,
+          priority: priorityMap[task.priority] || 'P2',
+          category,
+          notes: task.content || task.desc || null,
+          externalId,
+          status: 'to_buy',
+        });
+
+        result.synced++;
+        result.items.push({
+          tickTickId: task.id,
+          title: task.title,
+          shoppingItemId: shoppingItem.id,
+        });
+
+        logger.info({
+          tickTickId: task.id,
+          shoppingItemId: shoppingItem.id,
+          title: task.title,
+        }, "Synced TickTick task to shopping item");
+
+      } catch (error: any) {
+        result.errors.push(`Failed to sync item "${task.title}": ${error.message}`);
+        logger.error({ error, taskId: task.id }, "Error syncing TickTick task to shopping");
+      }
+    }
+
+    // Clear synced items from TickTick if requested
+    let cleared = 0;
+    if (req.body.clearAfterSync) {
+      for (const item of result.items) {
+        if (item.shoppingItemId) {
+          try {
+            await ticktick.deleteTask(shoppingProjectId, item.tickTickId);
+            cleared++;
+            logger.info({ tickTickId: item.tickTickId }, "Deleted TickTick shopping task after sync");
+          } catch (error) {
+            logger.warn({ error, tickTickId: item.tickTickId }, "Failed to delete TickTick task after sync");
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      ...result,
+      cleared,
+      message: `Synced ${result.synced} new shopping items, skipped ${result.skipped} existing${cleared > 0 ? `, cleared ${cleared} from TickTick` : ''}`,
+    });
+
+  } catch (error) {
+    logger.error({ error }, "Error syncing shopping from TickTick");
+    res.status(500).json({ error: "Failed to sync shopping from TickTick" });
+  }
+});
+
 // Complete a task in TickTick (after processing in SB-OS)
 router.post("/tasks/:taskId/complete", async (req: Request, res: Response) => {
   try {

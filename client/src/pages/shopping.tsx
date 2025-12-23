@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Plus, ShoppingCart, Check, Trash2, Edit } from "lucide-react";
+import { Plus, ShoppingCart, Check, Trash2, Edit, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,7 @@ interface ShoppingItem {
   status: "to_buy" | "purchased";
   category: "groceries" | "personal" | "household" | "business" | null;
   notes: string | null;
+  externalId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -105,6 +106,35 @@ export default function Shopping() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Check TickTick connection status
+  const { data: ticktickStatus } = useQuery<{ connected: boolean; error?: string }>({
+    queryKey: ["/api/ticktick/status"],
+    retry: false,
+    staleTime: 60000, // 1 minute
+  });
+
+  // TickTick sync mutation
+  const syncTickTickMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/ticktick/sync-shopping", { clearAfterSync: true });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shopping"] });
+      toast({
+        title: "Sync complete",
+        description: data.message || `Synced ${data.synced} items from TickTick`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync failed",
+        description: error.message || "Failed to sync from TickTick",
+        variant: "destructive",
+      });
     },
   });
 
@@ -191,10 +221,26 @@ export default function Shopping() {
             {toBuyCount} items to buy, {purchasedCount} purchased
           </p>
         </div>
-        <Button onClick={() => openModal()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
+        <div className="flex gap-2">
+          {ticktickStatus?.connected && (
+            <Button
+              variant="outline"
+              onClick={() => syncTickTickMutation.mutate()}
+              disabled={syncTickTickMutation.isPending}
+            >
+              {syncTickTickMutation.isPending ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Sync TickTick
+            </Button>
+          )}
+          <Button onClick={() => openModal()}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
