@@ -814,19 +814,18 @@ Current date/time: ${new Date().toISOString()}`;
           const searchQuery = args.query;
           const searchType = args.type || "general";
 
-          // Available Perplexity models on OpenRouter (in order of preference)
-          const webSearchModels = [
-            "perplexity/sonar-pro",
-            "perplexity/sonar",
-            "perplexity/sonar-reasoning",
-          ];
+          // Use configured research model if set, otherwise try Perplexity models in order
+          const configuredResearchModel = this.config?.researchModel;
+          const webSearchModels = configuredResearchModel
+            ? [configuredResearchModel, "perplexity/sonar-pro", "perplexity/sonar"]
+            : ["perplexity/sonar-pro", "perplexity/sonar", "perplexity/sonar-reasoning"];
 
           let searchResult: string | null = null;
           let lastError: any = null;
 
           for (const model of webSearchModels) {
             try {
-              logger.info({ model, query: searchQuery }, "Attempting web search");
+              logger.info({ model, query: searchQuery, isConfigured: model === configuredResearchModel }, "Attempting web search");
 
               // Use a web-enabled model for search
               const searchResponse = await openai.chat.completions.create({

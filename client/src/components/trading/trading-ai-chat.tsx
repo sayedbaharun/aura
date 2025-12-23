@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +52,7 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
+  Cpu,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -94,6 +96,15 @@ interface ChatResponse {
 
 interface TradingAgentConfigType {
   quickActions: Array<{ label: string; prompt: string }>;
+  preferredModel: string | null;
+  researchModel: string | null;
+}
+
+interface AvailableModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
 }
 
 const defaultQuickActions = [
@@ -196,7 +207,17 @@ export default function TradingAiChat() {
       const res = await fetch("/api/trading/agent/config", {
         credentials: "include",
       });
-      if (!res.ok) return { quickActions: [] };
+      if (!res.ok) return { quickActions: [], preferredModel: null, researchModel: null };
+      return await res.json();
+    },
+  });
+
+  // Fetch available AI models
+  const { data: availableModels = [] } = useQuery<AvailableModel[]>({
+    queryKey: ["/api/ai-models"],
+    queryFn: async () => {
+      const res = await fetch("/api/ai-models", { credentials: "include" });
+      if (!res.ok) return [];
       return await res.json();
     },
   });
@@ -481,18 +502,40 @@ export default function TradingAiChat() {
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const isLoading = isLoadingSessions || isLoadingMessages;
 
+  // Get model display name
+  const getModelDisplayName = (modelId: string | null | undefined) => {
+    if (!modelId) return "Auto";
+    const model = availableModels.find(m => m.id === modelId);
+    return model?.name || modelId.split('/').pop() || "Auto";
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-          <Bot className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+            <Bot className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold">Trading AI Assistant</h3>
+            <p className="text-xs text-muted-foreground">
+              Analyze performance, log trades, review strategies
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-semibold">Trading AI Assistant</h3>
-          <p className="text-xs text-muted-foreground">
-            Analyze performance, log trades, review strategies
-          </p>
+        {/* Model Info */}
+        <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md">
+            <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs">Chat: <span className="font-medium">{getModelDisplayName(agentConfig?.preferredModel)}</span></span>
+          </div>
+          {agentConfig?.researchModel && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 rounded-md">
+              <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              <span className="text-xs">Research: <span className="font-medium">{getModelDisplayName(agentConfig?.researchModel)}</span></span>
+            </div>
+          )}
         </div>
       </div>
 

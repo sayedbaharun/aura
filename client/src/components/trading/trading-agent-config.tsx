@@ -37,6 +37,7 @@ interface TradingAgentConfig {
   tradingHours: string | null;
   quickActions: Array<{ label: string; prompt: string }>;
   preferredModel: string | null;
+  researchModel: string | null;
   focusAreas: string[];
   createdAt: string | null;
   updatedAt: string | null;
@@ -71,6 +72,7 @@ export default function TradingAgentConfig() {
   const [riskRules, setRiskRules] = useState("");
   const [tradingHours, setTradingHours] = useState("");
   const [preferredModel, setPreferredModel] = useState("auto");
+  const [researchModel, setResearchModel] = useState("auto");
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [quickActions, setQuickActions] = useState<Array<{ label: string; prompt: string }>>([]);
 
@@ -110,6 +112,7 @@ export default function TradingAgentConfig() {
       setRiskRules(config.riskRules || "");
       setTradingHours(config.tradingHours || "");
       setPreferredModel(config.preferredModel || "auto");
+      setResearchModel(config.researchModel || "auto");
       setFocusAreas(config.focusAreas || []);
       setQuickActions(config.quickActions || []);
     }
@@ -146,6 +149,7 @@ export default function TradingAgentConfig() {
       riskRules: riskRules || null,
       tradingHours: tradingHours || null,
       preferredModel: preferredModel === "auto" ? null : preferredModel,
+      researchModel: researchModel === "auto" ? null : researchModel,
       focusAreas,
       quickActions,
     });
@@ -304,21 +308,48 @@ export default function TradingAgentConfig() {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="preferredModel">Preferred AI Model</Label>
-            <Select value={preferredModel} onValueChange={setPreferredModel}>
-              <SelectTrigger>
-                <SelectValue placeholder="Auto (default)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Auto (default)</SelectItem>
-                {models.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="preferredModel">Chat Model</Label>
+              <Select value={preferredModel} onValueChange={setPreferredModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Auto (default)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (default)</SelectItem>
+                  {models.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name} ({model.provider})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Model for general chat, analysis, and strategy building
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="researchModel">Research Model (Web Search)</Label>
+              <Select value={researchModel} onValueChange={setResearchModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Auto (default)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (Perplexity)</SelectItem>
+                  <SelectItem value="perplexity/sonar-pro">Perplexity Sonar Pro</SelectItem>
+                  <SelectItem value="perplexity/sonar">Perplexity Sonar</SelectItem>
+                  <SelectItem value="perplexity/sonar-reasoning">Perplexity Sonar Reasoning</SelectItem>
+                  {models.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name} ({model.provider})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Model for web search, price lookups, and news research
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

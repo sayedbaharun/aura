@@ -1718,7 +1718,8 @@ export const tradingAgentConfig = pgTable(
     quickActions: jsonb("quick_actions").$type<Array<{ label: string; prompt: string }>>().default([]),
 
     // Preferences
-    preferredModel: text("preferred_model"), // e.g., "openai/gpt-4o"
+    preferredModel: text("preferred_model"), // e.g., "openai/gpt-4o" - used for main chat
+    researchModel: text("research_model"), // e.g., "perplexity/sonar-pro" - used for web search
     focusAreas: jsonb("focus_areas").$type<string[]>().default([]), // e.g., ["discipline", "risk management", "journaling"]
 
     // Timestamps
