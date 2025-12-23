@@ -1188,38 +1188,8 @@ export const insertAccountSnapshotSchema = createInsertSchema(accountSnapshots).
 export type InsertAccountSnapshot = z.infer<typeof insertAccountSnapshotSchema>;
 export type AccountSnapshot = typeof accountSnapshots.$inferSelect;
 
-// Net Worth Snapshots: Monthly rollup for historical tracking
-export const netWorthSnapshots = pgTable(
-  "net_worth_snapshots",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    date: date("date").notNull().unique(),                           // Snapshot date (typically first of month)
-    totalAssets: real("total_assets").notNull(),
-    totalLiabilities: real("total_liabilities").notNull(),
-    netWorth: real("net_worth").notNull(),
-    breakdown: jsonb("breakdown").$type<{
-      byType: Record<string, number>;                                // { checking: 5000, savings: 10000, ... }
-      byAccount: { id: string; name: string; balance: number }[];   // Individual account balances
-    }>(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("idx_net_worth_snapshots_date").on(table.date),
-    index("idx_net_worth_snapshots_created_at").on(table.createdAt),
-  ]
-);
-
-export const insertNetWorthSnapshotSchema = createInsertSchema(netWorthSnapshots)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .extend({
-    date: dateStringRequiredSchema,
-  });
-
-export type InsertNetWorthSnapshot = z.infer<typeof insertNetWorthSnapshotSchema>;
-export type NetWorthSnapshot = typeof netWorthSnapshots.$inferSelect;
+// NOTE: netWorthSnapshots table is defined later in the file (line ~2314) with the Holdings section
+// for comprehensive net worth tracking with asset type breakdowns
 
 // ----------------------------------------------------------------------------
 // AI AGENT PROMPTS

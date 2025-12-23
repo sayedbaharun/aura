@@ -240,10 +240,12 @@ router.post("/sync-shopping", async (req: Request, res: Response) => {
 
     // Process each TickTick task
     for (const task of incompleteTasks) {
-      const externalId = `ticktick:${task.id}`;
+      // Include projectId in externalId for bidirectional sync
+      const externalId = `ticktick:${shoppingProjectId}:${task.id}`;
 
-      // Skip if already synced
-      if (existingExternalIds.has(externalId)) {
+      // Skip if already synced (check both old and new format)
+      const oldFormatId = `ticktick:${task.id}`;
+      if (existingExternalIds.has(externalId) || existingExternalIds.has(oldFormatId)) {
         result.skipped++;
         result.items.push({
           tickTickId: task.id,
