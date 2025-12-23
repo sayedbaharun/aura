@@ -2214,3 +2214,133 @@ export const fearSettingsRelations = relations(fearSettings, ({ one }) => ({
     references: [projects.id],
   }),
 }));
+
+// ============================================================================
+// FINANCE / NET WORTH TRACKING
+// ============================================================================
+
+// Asset type enum for holdings
+export const assetTypeEnum = pgEnum('asset_type', [
+  'cash',           // Bank accounts, savings
+  'stocks',         // Individual stocks
+  'etf',            // Exchange-traded funds
+  'crypto',         // Cryptocurrency
+  'property',       // Real estate
+  'retirement',     // Pension, 401k, ISA
+  'bonds',          // Bonds, fixed income
+  'commodities',    // Gold, silver, etc.
+  'business',       // Business equity
+  'other'           // Other assets
+]);
+
+// Holdings: Individual assets/investments
+export const holdings = pgTable(
+  "holdings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+
+    // Asset details
+    name: text("name").notNull(), // e.g., "Apple Inc.", "Bitcoin", "Lloyds Savings"
+    symbol: text("symbol"), // e.g., "AAPL", "BTC", null for bank accounts
+    assetType: assetTypeEnum("asset_type").notNull(),
+    currency: text("currency").default("GBP").notNull(), // GBP, USD, EUR, etc.
+
+    // Quantity and value
+    quantity: real("quantity"), // Number of shares/units (null for cash accounts)
+    currentPrice: real("current_price"), // Price per unit (null for cash accounts)
+    currentValue: real("current_value").notNull(), // Total current value
+
+    // Cost basis for P&L tracking
+    costBasis: real("cost_basis"), // Total amount invested
+
+    // Account/platform info
+    platform: text("platform"), // e.g., "Trading 212", "Coinbase", "Nationwide"
+    accountName: text("account_name"), // e.g., "ISA", "General Investment"
+
+    // Status
+    isActive: boolean("is_active").default(true).notNull(),
+    notes: text("notes"),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_holdings_user_id").on(table.userId),
+    index("idx_holdings_asset_type").on(table.assetType),
+    index("idx_holdings_is_active").on(table.isActive),
+  ]
+);
+
+export const insertHoldingSchema = createInsertSchema(holdings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Holding = typeof holdings.$inferSelect;
+export type InsertHolding = z.infer<typeof insertHoldingSchema>;
+
+// Net Worth Snapshots: Monthly/periodic net worth records
+export const netWorthSnapshots = pgTable(
+  "net_worth_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+
+    // Snapshot date (typically end of month)
+    snapshotDate: date("snapshot_date").notNull(),
+    month: integer("month").notNull(), // 1-12
+    year: integer("year").notNull(),
+
+    // Totals by asset type
+    totalCash: real("total_cash").default(0),
+    totalStocks: real("total_stocks").default(0),
+    totalEtf: real("total_etf").default(0),
+    totalCrypto: real("total_crypto").default(0),
+    totalProperty: real("total_property").default(0),
+    totalRetirement: real("total_retirement").default(0),
+    totalBonds: real("total_bonds").default(0),
+    totalCommodities: real("total_commodities").default(0),
+    totalBusiness: real("total_business").default(0),
+    totalOther: real("total_other").default(0),
+
+    // Overall totals
+    totalAssets: real("total_assets").notNull(),
+    totalLiabilities: real("total_liabilities").default(0),
+    netWorth: real("net_worth").notNull(),
+
+    // Change tracking
+    changeFromPrevious: real("change_from_previous"), // Absolute change
+    changePercentage: real("change_percentage"), // Percentage change
+
+    // Breakdown snapshot (JSON of all holdings at this point)
+    holdingsSnapshot: jsonb("holdings_snapshot").$type<{
+      holdings: Array<{
+        name: string;
+        assetType: string;
+        value: number;
+        currency: string;
+      }>;
+    }>(),
+
+    notes: text("notes"),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_net_worth_snapshots_user_id").on(table.userId),
+    index("idx_net_worth_snapshots_date").on(table.snapshotDate),
+    index("idx_net_worth_snapshots_year_month").on(table.year, table.month),
+  ]
+);
+
+export const insertNetWorthSnapshotSchema = createInsertSchema(netWorthSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type NetWorthSnapshot = typeof netWorthSnapshots.$inferSelect;
+export type InsertNetWorthSnapshot = z.infer<typeof insertNetWorthSnapshotSchema>;
