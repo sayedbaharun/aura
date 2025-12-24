@@ -3,7 +3,9 @@ import {
   Dialog,
   DialogContent,
   DialogOverlay,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -103,6 +105,9 @@ export function ImageLightbox({
         onPointerDownOutside={() => onOpenChange(false)}
         aria-describedby={undefined}
       >
+        <VisuallyHidden>
+          <DialogTitle>Image viewer</DialogTitle>
+        </VisuallyHidden>
         {/* Close button */}
         <Button
           variant="ghost"
