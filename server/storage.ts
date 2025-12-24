@@ -82,6 +82,14 @@ import {
   type UpdateDecisionMemory,
   type CloseDecisionMemory,
   type DecisionDerivedMetadata,
+  type DocAiFeedback,
+  type InsertDocAiFeedback,
+  type DocAiExample,
+  type InsertDocAiExample,
+  type DocAiPattern,
+  type InsertDocAiPattern,
+  type DocAiTeaching,
+  type InsertDocAiTeaching,
   ventures,
   projects,
   phases,
@@ -122,10 +130,15 @@ import {
   foresightConversations,
   fearSettings,
   decisionMemories,
+  docAiFeedback,
+  docAiExamples,
+  docAiPatterns,
+  docAiTeachings,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc } from "drizzle-orm";
 import { db as database } from "../db";
+import { calculateDocQuality } from "./doc-quality";
 
 export interface IStorage {
   // User operations
@@ -235,6 +248,16 @@ export interface IStorage {
   deleteDocRecursive(id: string): Promise<void>;
   reorderDocs(docIds: string[], parentId: string | null): Promise<void>;
   searchDocs(query: string): Promise<Doc[]>;
+  updateDocQualityScore(docId: string): Promise<{ qualityScore: number; aiReady: boolean }>;
+  markDocReviewed(docId: string): Promise<void>;
+  getDocsNeedingReview(limit?: number): Promise<Doc[]>;
+  getDocQualityMetrics(): Promise<{
+    totalDocs: number;
+    aiReadyDocs: number;
+    aiReadyPercent: number;
+    averageScore: number;
+    needsReview: number;
+  }>;
 
   // Attachments
   getAttachments(docId: string): Promise<Attachment[]>;
@@ -373,6 +396,37 @@ export interface IStorage {
   getEarlyCheckDecisions(asOfDate?: Date): Promise<DecisionMemory[]>;
   retrieveDecisionsForAI(query: string, tags?: string[], limit?: number): Promise<DecisionMemory[]>;
   exportDecisionMemories(): Promise<DecisionMemory[]>;
+
+  // Doc AI Feedback & Learning
+  createDocAiFeedback(data: InsertDocAiFeedback): Promise<DocAiFeedback>;
+  getDocAiFeedback(opts: { docId?: string; limit?: number }): Promise<DocAiFeedback[]>;
+  createDocAiExample(data: InsertDocAiExample): Promise<DocAiExample>;
+  getDocAiExamples(opts: {
+    fieldName: string;
+    docType: string;
+    docDomain?: string;
+    limit?: number;
+  }): Promise<DocAiExample[]>;
+  updateDocAiExampleUsage(id: string): Promise<void>;
+  createDocAiPattern(data: InsertDocAiPattern): Promise<DocAiPattern>;
+  getDocAiPatterns(opts: {
+    fieldName: string;
+    docType?: string;
+    docDomain?: string;
+  }): Promise<DocAiPattern[]>;
+  createDocAiTeaching(data: InsertDocAiTeaching): Promise<DocAiTeaching>;
+  getDocAiTeachings(opts: {
+    fieldName: string;
+    docType?: string;
+    docDomain?: string;
+    ventureId?: string;
+  }): Promise<DocAiTeaching[]>;
+  getDocAiMetrics(days: number): Promise<{
+    totalSuggestions: number;
+    acceptanceRate: number;
+    examplesCount: number;
+    teachingsCount: number;
+  }>;
 }
 
 // PostgreSQL Storage Implementation
@@ -1431,7 +1485,13 @@ export class DBStorage implements IStorage {
       .insert(docs)
       .values(insertDoc as any)
       .returning();
-    return doc;
+
+    // Auto-calculate quality score for new docs
+    await this.updateDocQualityScore(doc.id);
+
+    // Return the updated doc with quality score
+    const updatedDoc = await this.getDoc(doc.id);
+    return updatedDoc!;
   }
 
   async updateDoc(id: string, updates: Partial<InsertDoc>): Promise<Doc | undefined> {
@@ -1440,6 +1500,14 @@ export class DBStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() } as any)
       .where(eq(docs.id, id))
       .returning();
+
+    // Auto-recalculate quality score after update
+    if (updated) {
+      await this.updateDocQualityScore(id);
+      // Return the updated doc with new quality score
+      return await this.getDoc(id);
+    }
+
     return updated;
   }
 
@@ -1533,6 +1601,79 @@ export class DBStorage implements IStorage {
         updated_at = ${now}
       WHERE id IN (${sql.raw(idsStr)})
     `);
+  }
+
+  async updateDocQualityScore(docId: string): Promise<{ qualityScore: number; aiReady: boolean }> {
+    // Get the doc
+    const doc = await this.getDoc(docId);
+    if (!doc) {
+      throw new Error(`Doc not found: ${docId}`);
+    }
+
+    // Calculate quality
+    const breakdown = calculateDocQuality(doc);
+
+    // Update the doc
+    await this.db.update(docs)
+      .set({
+        qualityScore: breakdown.score,
+        aiReady: breakdown.aiReady,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(docs.id, docId));
+
+    return {
+      qualityScore: breakdown.score,
+      aiReady: breakdown.aiReady,
+    };
+  }
+
+  async markDocReviewed(docId: string): Promise<void> {
+    await this.db.update(docs)
+      .set({
+        lastReviewedAt: new Date(),
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(docs.id, docId));
+
+    // Recalculate quality score
+    await this.updateDocQualityScore(docId);
+  }
+
+  async getDocsNeedingReview(limit: number = 20): Promise<Doc[]> {
+    // Get docs with low quality scores, ordered by score ASC
+    return await this.db
+      .select()
+      .from(docs)
+      .where(eq(docs.status, 'active'))
+      .orderBy(asc(docs.qualityScore))
+      .limit(limit);
+  }
+
+  async getDocQualityMetrics(): Promise<{
+    totalDocs: number;
+    aiReadyDocs: number;
+    aiReadyPercent: number;
+    averageScore: number;
+    needsReview: number;
+  }> {
+    const allDocs = await this.db.select().from(docs).where(eq(docs.status, 'active'));
+
+    const totalDocs = allDocs.length;
+    const aiReadyDocs = allDocs.filter(d => d.aiReady).length;
+    const aiReadyPercent = totalDocs > 0 ? Math.round((aiReadyDocs / totalDocs) * 100) : 0;
+    const averageScore = totalDocs > 0
+      ? Math.round(allDocs.reduce((sum, d) => sum + (d.qualityScore || 0), 0) / totalDocs)
+      : 0;
+    const needsReview = allDocs.filter(d => (d.qualityScore || 0) < 70).length;
+
+    return {
+      totalDocs,
+      aiReadyDocs,
+      aiReadyPercent,
+      averageScore,
+      needsReview,
+    };
   }
 
   // ============================================================================
@@ -3881,6 +4022,207 @@ export class DBStorage implements IStorage {
       console.error("Error exporting decision memories:", error);
       return [];
     }
+  }
+
+  // ============================================================================
+  // DOC AI FEEDBACK & LEARNING
+  // ============================================================================
+
+  async createDocAiFeedback(data: InsertDocAiFeedback): Promise<DocAiFeedback> {
+    const [feedback] = await this.db
+      .insert(docAiFeedback)
+      .values(data)
+      .returning();
+    return feedback;
+  }
+
+  async getDocAiFeedback(opts: { docId?: string; limit?: number }): Promise<DocAiFeedback[]> {
+    const conditions = [];
+    if (opts.docId) {
+      conditions.push(eq(docAiFeedback.docId, opts.docId));
+    }
+
+    const query = this.db
+      .select()
+      .from(docAiFeedback)
+      .orderBy(desc(docAiFeedback.createdAt));
+
+    if (conditions.length > 0) {
+      query.where(and(...conditions));
+    }
+
+    if (opts.limit) {
+      query.limit(opts.limit);
+    }
+
+    return await query;
+  }
+
+  async createDocAiExample(data: InsertDocAiExample): Promise<DocAiExample> {
+    const [example] = await this.db
+      .insert(docAiExamples)
+      .values(data)
+      .returning();
+    return example;
+  }
+
+  async getDocAiExamples(opts: {
+    fieldName: string;
+    docType: string;
+    docDomain?: string;
+    limit?: number;
+  }): Promise<DocAiExample[]> {
+    const conditions = [
+      eq(docAiExamples.fieldName, opts.fieldName),
+      eq(docAiExamples.isActive, true),
+    ];
+
+    if (opts.docType) {
+      conditions.push(eq(docAiExamples.docType, opts.docType));
+    }
+
+    if (opts.docDomain) {
+      conditions.push(eq(docAiExamples.docDomain, opts.docDomain));
+    }
+
+    const query = this.db
+      .select()
+      .from(docAiExamples)
+      .where(and(...conditions))
+      .orderBy(desc(docAiExamples.successRate), desc(docAiExamples.qualityScore));
+
+    if (opts.limit) {
+      query.limit(opts.limit);
+    }
+
+    return await query;
+  }
+
+  async updateDocAiExampleUsage(id: string): Promise<void> {
+    await this.db
+      .update(docAiExamples)
+      .set({ timesUsed: sql`${docAiExamples.timesUsed} + 1` })
+      .where(eq(docAiExamples.id, id));
+  }
+
+  async createDocAiPattern(data: InsertDocAiPattern): Promise<DocAiPattern> {
+    const [pattern] = await this.db
+      .insert(docAiPatterns)
+      .values(data)
+      .returning();
+    return pattern;
+  }
+
+  async getDocAiPatterns(opts: {
+    fieldName: string;
+    docType?: string;
+    docDomain?: string;
+  }): Promise<DocAiPattern[]> {
+    const conditions = [
+      eq(docAiPatterns.fieldName, opts.fieldName),
+      eq(docAiPatterns.isActive, true),
+    ];
+
+    if (opts.docType) {
+      conditions.push(eq(docAiPatterns.docType, opts.docType));
+    }
+
+    if (opts.docDomain) {
+      conditions.push(eq(docAiPatterns.docDomain, opts.docDomain));
+    }
+
+    return await this.db
+      .select()
+      .from(docAiPatterns)
+      .where(and(...conditions));
+  }
+
+  async createDocAiTeaching(data: InsertDocAiTeaching): Promise<DocAiTeaching> {
+    const [teaching] = await this.db
+      .insert(docAiTeachings)
+      .values(data)
+      .returning();
+    return teaching;
+  }
+
+  async getDocAiTeachings(opts: {
+    fieldName: string;
+    docType?: string;
+    docDomain?: string;
+    ventureId?: string;
+  }): Promise<DocAiTeaching[]> {
+    const conditions = [
+      eq(docAiTeachings.fieldName, opts.fieldName),
+      eq(docAiTeachings.isActive, true),
+    ];
+
+    if (opts.docType) {
+      conditions.push(eq(docAiTeachings.docType, opts.docType));
+    }
+
+    if (opts.docDomain) {
+      conditions.push(eq(docAiTeachings.docDomain, opts.docDomain));
+    }
+
+    if (opts.ventureId) {
+      conditions.push(eq(docAiTeachings.ventureId, opts.ventureId));
+    }
+
+    return await this.db
+      .select()
+      .from(docAiTeachings)
+      .where(and(...conditions));
+  }
+
+  async getDocAiMetrics(days: number): Promise<{
+    totalSuggestions: number;
+    acceptanceRate: number;
+    examplesCount: number;
+    teachingsCount: number;
+  }> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    // Get feedback count
+    const feedbackResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(docAiFeedback)
+      .where(gte(docAiFeedback.createdAt, cutoffDate));
+    const totalSuggestions = Number(feedbackResult[0]?.count || 0);
+
+    // Get acceptance count (where userAction = 'accept')
+    const acceptedResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(docAiFeedback)
+      .where(
+        and(
+          gte(docAiFeedback.createdAt, cutoffDate),
+          eq(docAiFeedback.userAction, 'accept')
+        )
+      );
+    const acceptedCount = Number(acceptedResult[0]?.count || 0);
+    const acceptanceRate = totalSuggestions > 0 ? acceptedCount / totalSuggestions : 0;
+
+    // Get examples count
+    const examplesResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(docAiExamples)
+      .where(eq(docAiExamples.isActive, true));
+    const examplesCount = Number(examplesResult[0]?.count || 0);
+
+    // Get teachings count
+    const teachingsResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(docAiTeachings)
+      .where(eq(docAiTeachings.isActive, true));
+    const teachingsCount = Number(teachingsResult[0]?.count || 0);
+
+    return {
+      totalSuggestions,
+      acceptanceRate,
+      examplesCount,
+      teachingsCount,
+    };
   }
 
 }
