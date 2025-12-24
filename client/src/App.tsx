@@ -38,6 +38,7 @@ import AiChat from "@/pages/ai-chat";
 import AllTasks from "@/pages/all-tasks";
 import CommandCenterV2 from "@/pages/command-center-v2";
 import PeoplePage from "@/pages/people";
+import VentureLab from "@/pages/venture-lab";
 import NotFound from "@/pages/not-found";
 import MobileQuickActions from "@/components/mobile/mobile-quick-actions";
 import InstallPrompt from "@/components/mobile/install-prompt";
@@ -62,6 +63,7 @@ function Router() {
             <Route path="/dashboard" component={CommandCenterV2} />
             <Route path="/ventures" component={VentureHQ} />
             <Route path="/ventures/:id" component={VentureDetail} />
+            <Route path="/venture-lab" component={VentureLab} />
             <Route path="/health-hub" component={HealthHub} />
             <Route path="/nutrition" component={NutritionDashboard} />
             <Route path="/knowledge" component={KnowledgeHub} />
