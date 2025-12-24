@@ -13,6 +13,8 @@ import {
   ChevronUp,
   Save,
   ExternalLink,
+  Loader2,
+  Brain,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -270,10 +272,57 @@ export default function VentureLabPage() {
   // Research results
   const [researchResults, setResearchResults] = useState("");
 
+  // Track if AI was used for the prompt
+  const [promptMethod, setPromptMethod] = useState<"ai" | "template">("template");
+
   // Auto-focus on mount
   useEffect(() => {
     nameInputRef.current?.focus();
   }, []);
+
+  // AI-powered prompt generation mutation
+  const generatePromptMutation = useMutation({
+    mutationFn: async (data: {
+      name: string;
+      description: string;
+      domain?: string;
+      targetCustomer?: string;
+      initialThoughts?: string;
+      provider: "gemini" | "perplexity";
+    }) => {
+      const res = await apiRequest("POST", "/api/venture-lab/generate-prompt", data);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedPrompt(data.prompt);
+      setPromptMethod(data.method || "ai");
+      setStage("prompt");
+
+      if (data.method === "ai") {
+        toast({
+          title: "Intelligent prompt generated",
+          description: `AI has analyzed your idea and created a customized research prompt for ${selectedProvider === "gemini" ? "Gemini" : "Perplexity"}.`,
+        });
+      } else {
+        toast({
+          title: "Prompt generated",
+          description: `Research prompt ready for ${selectedProvider === "gemini" ? "Gemini" : "Perplexity"}.`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      // Fall back to template-based prompt on error
+      const prompt = generateResearchPrompt(idea, selectedProvider);
+      setGeneratedPrompt(prompt);
+      setPromptMethod("template");
+      setStage("prompt");
+
+      toast({
+        title: "Using template prompt",
+        description: "AI unavailable - generated template-based prompt instead.",
+      });
+    },
+  });
 
   const handleGeneratePrompt = () => {
     if (!idea.name.trim() || !idea.description.trim()) {
@@ -285,13 +334,14 @@ export default function VentureLabPage() {
       return;
     }
 
-    const prompt = generateResearchPrompt(idea, selectedProvider);
-    setGeneratedPrompt(prompt);
-    setStage("prompt");
-
-    toast({
-      title: "Prompt generated",
-      description: `Research prompt ready for ${selectedProvider === "gemini" ? "Gemini" : "Perplexity"}.`,
+    // Call AI-powered prompt generation
+    generatePromptMutation.mutate({
+      name: idea.name,
+      description: idea.description,
+      domain: idea.domain || undefined,
+      targetCustomer: idea.targetCustomer || undefined,
+      initialThoughts: idea.initialThoughts || undefined,
+      provider: selectedProvider,
     });
   };
 
@@ -543,10 +593,19 @@ export default function VentureLabPage() {
               <Button
                 onClick={handleGeneratePrompt}
                 className="w-full h-12 text-base bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500"
-                disabled={!idea.name.trim() || !idea.description.trim()}
+                disabled={!idea.name.trim() || !idea.description.trim() || generatePromptMutation.isPending}
               >
-                Generate Research Prompt
-                <ArrowRight className="ml-2 h-5 w-5" />
+                {generatePromptMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Analyzing Your Idea...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="mr-2 h-5 w-5" />
+                    Generate Intelligent Research Prompt
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -557,11 +616,27 @@ export default function VentureLabPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
+                {promptMethod === "ai" ? (
+                  <Brain className="h-5 w-5 text-purple-500" />
+                ) : (
+                  <Sparkles className="h-5 w-5" />
+                )}
                 Your Research Prompt
+                {promptMethod === "ai" && (
+                  <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-700">
+                    AI-Customized
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                Copy this prompt and paste it into {selectedProvider === "gemini" ? "Gemini" : "Perplexity"}
+                {promptMethod === "ai" ? (
+                  <>
+                    AI has analyzed your idea and created a <strong>customized</strong> research prompt.
+                    Copy and paste it into {selectedProvider === "gemini" ? "Gemini" : "Perplexity"}.
+                  </>
+                ) : (
+                  <>Copy this prompt and paste it into {selectedProvider === "gemini" ? "Gemini" : "Perplexity"}</>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -695,14 +770,25 @@ export default function VentureLabPage() {
         {stage === "idea" && (
           <Card className="bg-muted/30 border-dashed">
             <CardContent className="pt-6">
-              <h3 className="font-medium mb-2">Tips for Better Research</h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>- Be specific about the problem you're solving</li>
-                <li>- Include who you think the target customer is</li>
-                <li>- Mention any initial hypotheses you want to validate</li>
-                <li>- Use Perplexity for current market data, Gemini for strategic analysis</li>
-                <li>- Run the same prompt in both for comprehensive coverage</li>
-              </ul>
+              <div className="flex items-start gap-3">
+                <Brain className="h-5 w-5 text-purple-500 mt-0.5 shrink-0" />
+                <div>
+                  <h3 className="font-medium mb-2">AI-Powered Prompt Generation</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Our AI will analyze your idea and generate a <strong>customized research prompt</strong> that:
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>- Names specific competitors to research (not just "find competitors")</li>
+                    <li>- Asks domain-relevant questions based on your industry</li>
+                    <li>- Probes the specific customer segment you mentioned</li>
+                    <li>- Considers risks unique to your type of business</li>
+                    <li>- Requests metrics relevant to your business model</li>
+                  </ul>
+                  <p className="text-sm text-muted-foreground mt-3">
+                    <strong>Tip:</strong> The more details you provide, the more tailored your research prompt will be.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
