@@ -73,17 +73,22 @@
       body {
         /* Prevent pull-to-refresh on iOS */
         overscroll-behavior-y: contain;
-        /* Prevent text selection on long press */
-        -webkit-user-select: none;
-        user-select: none;
         /* Smooth scrolling */
         -webkit-overflow-scrolling: touch;
       }
 
-      /* Allow text selection in input fields */
-      input, textarea, [contenteditable="true"] {
-        -webkit-user-select: text;
-        user-select: text;
+      /* Prevent text selection on long press - mobile/touch only */
+      @media (hover: none) and (pointer: coarse) {
+        body {
+          -webkit-user-select: none;
+          user-select: none;
+        }
+
+        /* Allow text selection in input fields on mobile */
+        input, textarea, [contenteditable="true"] {
+          -webkit-user-select: text;
+          user-select: text;
+        }
       }
 
       /* Safe area padding for fixed elements */
