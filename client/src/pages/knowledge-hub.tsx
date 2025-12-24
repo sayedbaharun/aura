@@ -5,10 +5,14 @@ import { FiltersSidebar, DocsFilters } from "@/components/knowledge-hub/filters-
 import { DocsLibrary } from "@/components/knowledge-hub/docs-library";
 import { DocEditorModal } from "@/components/knowledge-hub/doc-editor-modal";
 import { DriveFilesBrowser } from "@/components/knowledge-hub/drive-files-browser";
+import { QualityDashboard } from "@/components/knowledge-hub/quality-dashboard";
+import { ReviewQueue } from "@/components/knowledge-hub/review-queue";
+import { AiPerformance } from "@/components/knowledge-hub/ai-performance";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Cloud } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BookOpen, Cloud, Sparkles } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -188,6 +192,10 @@ export default function KnowledgeHub() {
             <BookOpen className="h-4 w-4" />
             Local Docs
           </TabsTrigger>
+          <TabsTrigger value="quality" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            Quality Metrics
+          </TabsTrigger>
           <TabsTrigger value="drive" className="gap-2">
             <Cloud className="h-4 w-4" />
             Google Drive
@@ -216,6 +224,34 @@ export default function KnowledgeHub() {
             {/* Desktop: Sidebar */}
             <div className="hidden lg:block">
               <FiltersSidebar filters={filters} onFiltersChange={setFilters} />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="quality">
+          <div className="space-y-6">
+            {/* Quality Metrics Overview */}
+            <QualityDashboard />
+
+            {/* Review Queue and AI Performance */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Review Queue</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ReviewQueue limit={10} />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>AI Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AiPerformance />
+                </CardContent>
+              </Card>
             </div>
           </div>
         </TabsContent>

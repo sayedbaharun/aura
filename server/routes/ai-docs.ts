@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { aiDocGenerator } from "../ai-doc-generator";
+import { aiLearningService } from "../ai-learning";
 import { insertDocAiFeedbackSchema, insertDocAiTeachingSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -42,6 +43,18 @@ router.post("/feedback", async (req, res) => {
       ...data,
       editDistance,
     });
+
+    // After recording feedback, check if doc should be promoted
+    if (data.userAction === 'accepted' && data.docId) {
+      // Async - don't wait for it
+      aiLearningService.evaluateForPromotion(data.docId)
+        .then(async (shouldPromote) => {
+          if (shouldPromote) {
+            await aiLearningService.promoteToExample(data.docId!, data.fieldName);
+          }
+        })
+        .catch(console.error);
+    }
 
     res.json({ success: true });
   } catch (error) {
