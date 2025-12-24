@@ -38,6 +38,7 @@ import fearSettingsRoutes from "./fear-settings";
 import decisionMemoriesRoutes from "./decision-memories";
 import arc2026Routes from "./arc-2026";
 import aiDocsRoutes from "./ai-docs";
+import aiLearningRoutes from "./ai-learning";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -117,6 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   app.use('/api/docs', docsRoutes);
   app.use('/api/docs/ai', aiDocsRoutes);
+  app.use('/api/ai/learning', aiLearningRoutes);
   app.use('/api/attachments', attachmentsRoutes);
 
   // ============================================================================
