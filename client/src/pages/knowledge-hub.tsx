@@ -4,6 +4,7 @@ import { KnowledgeHubHeader } from "@/components/knowledge-hub/knowledge-hub-hea
 import { FiltersSidebar, DocsFilters } from "@/components/knowledge-hub/filters-sidebar";
 import { DocsLibrary } from "@/components/knowledge-hub/docs-library";
 import { DocEditorModal } from "@/components/knowledge-hub/doc-editor-modal";
+import { DocCreationWizard } from "@/components/docs/doc-creation-wizard";
 import { DriveFilesBrowser } from "@/components/knowledge-hub/drive-files-browser";
 import { QualityDashboard } from "@/components/knowledge-hub/quality-dashboard";
 import { ReviewQueue } from "@/components/knowledge-hub/review-queue";
@@ -12,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BookOpen, Cloud, Sparkles } from "lucide-react";
 import {
   AlertDialog,
@@ -50,6 +52,7 @@ export default function KnowledgeHub() {
   });
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Doc | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
@@ -127,8 +130,8 @@ export default function KnowledgeHub() {
   }, [allDocs, searchResults, searchQuery, filters]);
 
   const handleNewDoc = () => {
-    setEditingDoc(null);
-    setEditorOpen(true);
+    // Open the new creation wizard instead of the old editor
+    setWizardOpen(true);
   };
 
   const handleEditDoc = (doc: Doc) => {
@@ -261,7 +264,7 @@ export default function KnowledgeHub() {
         </TabsContent>
       </Tabs>
 
-      {/* Editor Modal */}
+      {/* Editor Modal - for editing existing docs */}
       <DocEditorModal
         open={editorOpen}
         onClose={() => {
@@ -270,6 +273,23 @@ export default function KnowledgeHub() {
         }}
         doc={editingDoc}
       />
+
+      {/* Creation Wizard - for new docs */}
+      <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
+        <DialogContent className="max-w-4xl h-[85vh] p-0 overflow-hidden">
+          <DocCreationWizard
+            onSuccess={(doc) => {
+              setWizardOpen(false);
+              queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+              toast({
+                title: "Document created",
+                description: `"${doc.title}" has been created successfully.`,
+              });
+            }}
+            onCancel={() => setWizardOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
