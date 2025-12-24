@@ -611,14 +611,14 @@ export default function TradingAiChat() {
                             {group.sessions.map((session) => (
                               <div
                                 key={session.id}
-                                className={`group flex items-center gap-1 rounded-md cursor-pointer ${
+                                className={`group flex items-center gap-1 rounded-md cursor-pointer overflow-hidden ${
                                   session.id === activeSessionId
                                     ? "bg-primary/10 text-primary"
                                     : "hover:bg-muted"
                                 }`}
                               >
                                 <button
-                                  className="flex-1 text-left px-2 py-1.5 text-sm truncate"
+                                  className="flex-1 min-w-0 text-left px-2 py-1.5 text-sm truncate"
                                   onClick={() => handleSelectSession(session.id)}
                                 >
                                   {session.title}

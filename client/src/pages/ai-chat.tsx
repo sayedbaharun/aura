@@ -400,7 +400,7 @@ export default function AiChat() {
                       {group.sessions.map((session) => (
                         <div
                           key={session.id}
-                          className={`group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer ${
+                          className={`group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer overflow-hidden ${
                             activeSessionId === session.id
                               ? "bg-primary/10 text-primary"
                               : "hover:bg-muted"
@@ -408,7 +408,7 @@ export default function AiChat() {
                           onClick={() => setActiveSessionId(session.id)}
                         >
                           <MessageSquare className="h-4 w-4 shrink-0" />
-                          <span className="flex-1 text-sm truncate">{session.title}</span>
+                          <span className="flex-1 min-w-0 text-sm truncate">{session.title}</span>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
