@@ -267,7 +267,13 @@ export default function PageTreeSidebar({
       const res = await fetch(`/api/docs/tree/${ventureId}`, {
         credentials: "include",
       });
-      return await res.json();
+      if (!res.ok) {
+        console.error("Failed to fetch doc tree:", res.status);
+        return [];
+      }
+      const data = await res.json();
+      // Ensure we always return an array
+      return Array.isArray(data) ? data : [];
     },
   });
 
