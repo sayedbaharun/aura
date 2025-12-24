@@ -20,6 +20,8 @@ import {
   RefreshCw,
   History,
   MoreVertical,
+  Camera,
+  LineChart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -83,6 +85,21 @@ interface AccountSnapshot {
   accountId: string;
   balance: number;
   note: string | null;
+  createdAt: string;
+}
+
+interface NetWorthSnapshot {
+  id: string;
+  snapshotDate: string;
+  month: number;
+  year: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+  changeFromPrevious: number | null;
+  changePercentage: number | null;
+  holdingsSnapshot: Record<string, any> | null;
+  notes: string | null;
   createdAt: string;
 }
 
@@ -151,6 +168,10 @@ export default function Finance() {
     queryKey: ["/api/finance/net-worth"],
   });
 
+  const { data: netWorthHistory = [], isLoading: historyLoading } = useQuery<NetWorthSnapshot[]>({
+    queryKey: ["/api/finance/net-worth/history"],
+  });
+
   const { data: accountHistory = [] } = useQuery<AccountSnapshot[]>({
     queryKey: ["/api/finance/accounts", selectedAccountForHistory?.id, "history"],
     enabled: !!selectedAccountForHistory,
@@ -217,6 +238,22 @@ export default function Finance() {
       queryClient.invalidateQueries({ queryKey: ["/api/finance/net-worth"] });
       toast({ title: "Balance updated", description: "Account balance has been updated." });
       closeBalanceModal();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/finance/net-worth/snapshot", {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/net-worth/history"] });
+      toast({
+        title: "Snapshot created",
+        description: "Monthly net worth snapshot has been saved."
+      });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -344,7 +381,7 @@ export default function Finance() {
             Track your net worth and financial accounts
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Switch
               id="show-inactive"
@@ -353,6 +390,14 @@ export default function Finance() {
             />
             <Label htmlFor="show-inactive" className="text-sm">Show inactive</Label>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => createSnapshotMutation.mutate()}
+            disabled={createSnapshotMutation.isPending}
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            {createSnapshotMutation.isPending ? "Saving..." : "Take Monthly Snapshot"}
+          </Button>
           <Button onClick={() => openAccountModal()}>
             <Plus className="h-4 w-4 mr-2" />
             Add Account
@@ -410,6 +455,80 @@ export default function Finance() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Net Worth History */}
+      {netWorthHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LineChart className="h-5 w-5 text-purple-600" />
+              Net Worth History
+              <Badge variant="secondary" className="ml-2">
+                {netWorthHistory.length} snapshots
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              Monthly tracking of your net worth over time
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {netWorthHistory.map((snapshot, index) => {
+                const prevSnapshot = netWorthHistory[index + 1];
+                const change = prevSnapshot
+                  ? snapshot.netWorth - prevSnapshot.netWorth
+                  : null;
+                const changePercent = prevSnapshot && prevSnapshot.netWorth !== 0
+                  ? ((snapshot.netWorth - prevSnapshot.netWorth) / prevSnapshot.netWorth) * 100
+                  : null;
+
+                return (
+                  <div
+                    key={snapshot.id}
+                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="text-center min-w-[60px]">
+                        <p className="text-lg font-bold">
+                          {format(new Date(snapshot.snapshotDate), "MMM")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(snapshot.snapshotDate), "yyyy")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-lg">
+                          {formatCurrency(snapshot.netWorth)}
+                        </p>
+                        <div className="flex gap-4 text-sm text-muted-foreground">
+                          <span className="text-green-600">
+                            Assets: {formatCurrency(snapshot.totalAssets)}
+                          </span>
+                          <span className="text-red-600">
+                            Liabilities: {formatCurrency(snapshot.totalLiabilities)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {change !== null && (
+                      <div className="text-right">
+                        <p className={`font-medium ${change >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {change >= 0 ? "+" : ""}{formatCurrency(change)}
+                        </p>
+                        {changePercent !== null && (
+                          <p className={`text-sm ${changePercent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            {changePercent >= 0 ? "+" : ""}{changePercent.toFixed(1)}%
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Assets */}
       <Card>

@@ -275,8 +275,8 @@ export interface IStorage {
 
   // Net Worth
   getNetWorth(): Promise<{ totalAssets: number; totalLiabilities: number; netWorth: number; byType: Record<string, number> }>;
-  getNetWorthSnapshots(limit?: number): Promise<NetWorthSnapshot[]>;
-  createNetWorthSnapshot(): Promise<NetWorthSnapshot>;
+  getNetWorthSnapshots(userId: string, limit?: number): Promise<NetWorthSnapshot[]>;
+  createNetWorthSnapshot(userId: string): Promise<NetWorthSnapshot>;
 
   // People / Relationships CRM
   getPeople(filters?: {
@@ -2774,12 +2774,13 @@ export class DBStorage implements IStorage {
     }
   }
 
-  async getNetWorthSnapshots(limit: number = 12): Promise<NetWorthSnapshot[]> {
+  async getNetWorthSnapshots(userId: string, limit: number = 12): Promise<NetWorthSnapshot[]> {
     try {
       return await this.db
         .select()
         .from(netWorthSnapshots)
-        .orderBy(desc(netWorthSnapshots.date))
+        .where(eq(netWorthSnapshots.userId, userId))
+        .orderBy(desc(netWorthSnapshots.snapshotDate))
         .limit(limit);
     } catch (error) {
       console.error("Error fetching net worth snapshots:", error);
@@ -2787,18 +2788,53 @@ export class DBStorage implements IStorage {
     }
   }
 
-  async createNetWorthSnapshot(): Promise<NetWorthSnapshot> {
+  async createNetWorthSnapshot(userId: string): Promise<NetWorthSnapshot> {
     const netWorth = await this.getNetWorth();
     const accounts = await this.getFinancialAccounts({ isActive: true });
 
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const month = now.getMonth() + 1; // 1-12
+    const year = now.getFullYear();
+
+    // Get previous snapshot for change calculation
+    const previousSnapshots = await this.db
+      .select()
+      .from(netWorthSnapshots)
+      .where(eq(netWorthSnapshots.userId, userId))
+      .orderBy(desc(netWorthSnapshots.snapshotDate))
+      .limit(1);
+
+    const previousSnapshot = previousSnapshots[0];
+
+    const changeFromPrevious = previousSnapshot
+      ? netWorth.netWorth - previousSnapshot.netWorth
+      : null;
+    const changePercentage = previousSnapshot && previousSnapshot.netWorth !== 0
+      ? ((netWorth.netWorth - previousSnapshot.netWorth) / previousSnapshot.netWorth) * 100
+      : null;
 
     // Check if snapshot for today already exists
     const existing = await this.db
       .select()
       .from(netWorthSnapshots)
-      .where(eq(netWorthSnapshots.date, today))
+      .where(and(
+        eq(netWorthSnapshots.userId, userId),
+        eq(netWorthSnapshots.snapshotDate, today)
+      ))
       .limit(1);
+
+    // Build holdings snapshot
+    const holdingsSnapshot = {
+      byType: netWorth.byType,
+      byAccount: accounts.map(a => ({
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        balance: a.currentBalance,
+        isAsset: a.isAsset,
+      })),
+    };
 
     if (existing.length > 0) {
       // Update existing snapshot
@@ -2808,14 +2844,9 @@ export class DBStorage implements IStorage {
           totalAssets: netWorth.totalAssets,
           totalLiabilities: netWorth.totalLiabilities,
           netWorth: netWorth.netWorth,
-          breakdown: {
-            byType: netWorth.byType,
-            byAccount: accounts.map(a => ({
-              id: a.id,
-              name: a.name,
-              balance: a.currentBalance,
-            })),
-          },
+          changeFromPrevious,
+          changePercentage,
+          holdingsSnapshot,
         })
         .where(eq(netWorthSnapshots.id, existing[0].id))
         .returning();
@@ -2826,18 +2857,16 @@ export class DBStorage implements IStorage {
     const [snapshot] = await this.db
       .insert(netWorthSnapshots)
       .values({
-        date: today,
+        userId,
+        snapshotDate: today,
+        month,
+        year,
         totalAssets: netWorth.totalAssets,
         totalLiabilities: netWorth.totalLiabilities,
         netWorth: netWorth.netWorth,
-        breakdown: {
-          byType: netWorth.byType,
-          byAccount: accounts.map(a => ({
-            id: a.id,
-            name: a.name,
-            balance: a.currentBalance,
-          })),
-        },
+        changeFromPrevious,
+        changePercentage,
+        holdingsSnapshot,
       } as any)
       .returning();
 
