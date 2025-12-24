@@ -26,6 +26,7 @@ import {
   Plug,
   Layers,
   DollarSign,
+  FlaskConical,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
 import NavItem from "./nav-item";
@@ -126,6 +127,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[]; default
         href: "/ventures",
         icon: Briefcase,
         label: "Ventures",
+      },
+      {
+        href: "/venture-lab",
+        icon: FlaskConical,
+        label: "Venture Lab",
       },
       {
         href: "/tasks",
