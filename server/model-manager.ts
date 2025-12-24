@@ -30,12 +30,27 @@ export const MODEL_CASCADE = [
 
 // Available models for selection in UI (via OpenRouter)
 export const AVAILABLE_MODELS = [
-  { id: "openai/gpt-4o", name: "GPT-4o", provider: "OpenAI", description: "Most capable, best for complex reasoning" },
+  // OpenAI models
+  { id: "openai/gpt-4.5-preview", name: "GPT-4.5 Preview", provider: "OpenAI", description: "Latest and most capable GPT model" },
+  { id: "openai/o1", name: "o1", provider: "OpenAI", description: "Advanced reasoning model for complex tasks" },
+  { id: "openai/o1-mini", name: "o1-mini", provider: "OpenAI", description: "Faster reasoning model" },
+  { id: "openai/o3-mini", name: "o3-mini", provider: "OpenAI", description: "Latest mini reasoning model" },
+  { id: "openai/gpt-4o", name: "GPT-4o", provider: "OpenAI", description: "Fast, multimodal flagship model" },
   { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", description: "Fast and efficient, good for most tasks" },
-  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic", description: "Excellent reasoning and coding" },
-  { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku", provider: "Anthropic", description: "Fastest Claude model" },
+  // Anthropic models
+  { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", description: "Latest Claude, excellent coding and reasoning" },
+  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic", description: "Previous gen, still excellent" },
+  { id: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku", provider: "Anthropic", description: "Fast and affordable Claude" },
+  { id: "anthropic/claude-3-opus", name: "Claude 3 Opus", provider: "Anthropic", description: "Most powerful Claude 3" },
+  // Google models
+  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", provider: "Google", description: "Latest Gemini, fast and capable" },
+  { id: "google/gemini-2.0-flash-thinking-exp", name: "Gemini 2.0 Flash Thinking", provider: "Google", description: "Reasoning-enhanced Gemini" },
   { id: "google/gemini-pro-1.5", name: "Gemini Pro 1.5", provider: "Google", description: "Long context, multimodal" },
-  { id: "meta-llama/llama-3.1-70b-instruct", name: "Llama 3.1 70B", provider: "Meta", description: "Open source, strong performance" },
+  // DeepSeek models
+  { id: "deepseek/deepseek-r1", name: "DeepSeek R1", provider: "DeepSeek", description: "Advanced reasoning model" },
+  { id: "deepseek/deepseek-chat", name: "DeepSeek V3", provider: "DeepSeek", description: "Latest DeepSeek chat model" },
+  // Meta models
+  { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B", provider: "Meta", description: "Latest Llama, open source" },
 ] as const;
 
 // Task complexity classification for smart model selection
