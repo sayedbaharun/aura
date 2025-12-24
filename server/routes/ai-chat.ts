@@ -756,6 +756,258 @@ Current date: ${today}`;
           description: "Get comprehensive overview of entire SB-OS system - all ventures, projects, tasks, health, trading, shopping, books. Use for executive summaries or big-picture questions.",
           parameters: { type: "object", properties: {}, required: [] }
         }
+      },
+      // === WRITE TOOLS FOR ALL ENTITIES ===
+      // Health tools
+      {
+        type: "function",
+        function: {
+          name: "create_health_entry",
+          description: "Log health metrics for a day. Use when user mentions sleep, energy, mood, workouts, weight, or how they're feeling physically.",
+          parameters: {
+            type: "object",
+            properties: {
+              date: { type: "string", description: "Date (YYYY-MM-DD), defaults to today" },
+              sleepHours: { type: "number", description: "Hours slept (e.g., 7.5)" },
+              sleepQuality: { type: "string", description: "Sleep quality: poor, fair, good, excellent" },
+              energyLevel: { type: "number", description: "Energy 1-5 scale" },
+              mood: { type: "string", description: "Mood: low, medium, high, peak" },
+              steps: { type: "number", description: "Steps walked" },
+              weightKg: { type: "number", description: "Weight in kg" },
+              stressLevel: { type: "string", description: "Stress: low, medium, high" },
+              workoutDone: { type: "boolean", description: "Did workout happen?" },
+              workoutType: { type: "string", description: "Workout type: strength, cardio, yoga, sports, none" },
+              workoutDurationMin: { type: "number", description: "Workout duration in minutes" },
+              notes: { type: "string", description: "Additional health notes" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_health_entry",
+          description: "Update an existing health entry.",
+          parameters: {
+            type: "object",
+            properties: {
+              entryId: { type: "string", description: "Health entry ID" },
+              sleepHours: { type: "number" },
+              sleepQuality: { type: "string" },
+              energyLevel: { type: "number" },
+              mood: { type: "string" },
+              steps: { type: "number" },
+              weightKg: { type: "number" },
+              stressLevel: { type: "string" },
+              workoutDone: { type: "boolean" },
+              workoutType: { type: "string" },
+              workoutDurationMin: { type: "number" },
+              notes: { type: "string" }
+            },
+            required: ["entryId"]
+          }
+        }
+      },
+      // Nutrition tools
+      {
+        type: "function",
+        function: {
+          name: "create_nutrition_entry",
+          description: "Log a meal or food intake. Use when user mentions eating, meals, food, calories, protein, or macros.",
+          parameters: {
+            type: "object",
+            properties: {
+              description: { type: "string", description: "Meal description (e.g., 'Grilled chicken salad')" },
+              mealType: { type: "string", description: "Meal type: breakfast, lunch, dinner, snack" },
+              calories: { type: "number", description: "Approximate calories" },
+              proteinG: { type: "number", description: "Protein in grams" },
+              carbsG: { type: "number", description: "Carbs in grams" },
+              fatsG: { type: "number", description: "Fats in grams" },
+              context: { type: "string", description: "Where: home, restaurant, office, travel" },
+              notes: { type: "string", description: "Additional notes" }
+            },
+            required: ["description"]
+          }
+        }
+      },
+      // Project tools
+      {
+        type: "function",
+        function: {
+          name: "create_project",
+          description: "Create a new project under a venture. Use when user wants to start a new project or initiative.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Project name" },
+              ventureId: { type: "string", description: "Parent venture ID" },
+              status: { type: "string", description: "Status: not_started, planning, in_progress, blocked, done" },
+              category: { type: "string", description: "Category: marketing, sales_biz_dev, product, tech_engineering, operations, etc." },
+              priority: { type: "string", description: "Priority: P0, P1, P2, P3" },
+              outcome: { type: "string", description: "What success looks like" },
+              notes: { type: "string", description: "Project notes and strategy" },
+              startDate: { type: "string", description: "Start date (YYYY-MM-DD)" },
+              targetEndDate: { type: "string", description: "Target end date (YYYY-MM-DD)" }
+            },
+            required: ["name", "ventureId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_project",
+          description: "Update an existing project.",
+          parameters: {
+            type: "object",
+            properties: {
+              projectId: { type: "string", description: "Project ID" },
+              name: { type: "string" },
+              status: { type: "string" },
+              priority: { type: "string" },
+              outcome: { type: "string" },
+              notes: { type: "string" },
+              targetEndDate: { type: "string" }
+            },
+            required: ["projectId"]
+          }
+        }
+      },
+      // Venture tools
+      {
+        type: "function",
+        function: {
+          name: "create_venture",
+          description: "Create a new venture/business initiative. Use when user wants to start tracking a new business or major initiative.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Venture name" },
+              domain: { type: "string", description: "Domain: saas, media, realty, trading, personal, other" },
+              status: { type: "string", description: "Status: planning, building, on_hold, ongoing, archived" },
+              oneLiner: { type: "string", description: "One-sentence description" },
+              primaryFocus: { type: "string", description: "Main strategic focus" },
+              color: { type: "string", description: "Display color (hex)" },
+              notes: { type: "string", description: "Additional notes" }
+            },
+            required: ["name"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_venture",
+          description: "Update an existing venture.",
+          parameters: {
+            type: "object",
+            properties: {
+              ventureId: { type: "string", description: "Venture ID" },
+              name: { type: "string" },
+              status: { type: "string" },
+              oneLiner: { type: "string" },
+              primaryFocus: { type: "string" },
+              notes: { type: "string" }
+            },
+            required: ["ventureId"]
+          }
+        }
+      },
+      // Doc/Note tools
+      {
+        type: "function",
+        function: {
+          name: "create_doc",
+          description: "Create a new document, note, SOP, or knowledge base entry. Use when user wants to save notes, create documentation, or record information.",
+          parameters: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Document title" },
+              type: { type: "string", description: "Type: page, sop, prompt, spec, template, playbook, meeting_notes, research" },
+              domain: { type: "string", description: "Domain: venture_ops, marketing, product, tech, trading, personal" },
+              body: { type: "string", description: "Document content (markdown)" },
+              ventureId: { type: "string", description: "Associated venture ID" },
+              projectId: { type: "string", description: "Associated project ID" },
+              tags: { type: "string", description: "Comma-separated tags" }
+            },
+            required: ["title"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_doc",
+          description: "Update an existing document.",
+          parameters: {
+            type: "object",
+            properties: {
+              docId: { type: "string", description: "Document ID" },
+              title: { type: "string" },
+              body: { type: "string" },
+              status: { type: "string", description: "Status: draft, active, archived" },
+              tags: { type: "string" }
+            },
+            required: ["docId"]
+          }
+        }
+      },
+      // Delete tools
+      {
+        type: "function",
+        function: {
+          name: "delete_task",
+          description: "Delete a task. Use when user wants to remove or delete a task.",
+          parameters: {
+            type: "object",
+            properties: {
+              taskId: { type: "string", description: "Task ID to delete" }
+            },
+            required: ["taskId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "delete_capture",
+          description: "Delete a capture/inbox item.",
+          parameters: {
+            type: "object",
+            properties: {
+              captureId: { type: "string", description: "Capture ID to delete" }
+            },
+            required: ["captureId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "delete_shopping_item",
+          description: "Delete a shopping list item.",
+          parameters: {
+            type: "object",
+            properties: {
+              itemId: { type: "string", description: "Shopping item ID to delete" }
+            },
+            required: ["itemId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "delete_book",
+          description: "Delete a book from the reading list.",
+          parameters: {
+            type: "object",
+            properties: {
+              bookId: { type: "string", description: "Book ID to delete" }
+            },
+            required: ["bookId"]
+          }
+        }
       }
     ];
 
@@ -988,6 +1240,152 @@ Current date: ${today}`;
             const { buildSystemOverview } = await import("../ai-coo-context-builder");
             const overview = await buildSystemOverview();
             return JSON.stringify(overview);
+          }
+          // === WRITE HANDLERS FOR ALL ENTITIES ===
+          // Health handlers
+          case "create_health_entry": {
+            const entryDate = args.date || today;
+            // Ensure day exists
+            let day = await storage.getDay(entryDate).catch(() => null);
+            if (!day) {
+              day = await storage.createDay({ id: `day_${entryDate}`, date: entryDate });
+            }
+            const entry = await storage.createHealthEntry({
+              dayId: day.id,
+              date: entryDate,
+              sleepHours: args.sleepHours,
+              sleepQuality: args.sleepQuality,
+              energyLevel: args.energyLevel,
+              mood: args.mood,
+              steps: args.steps,
+              weightKg: args.weightKg,
+              stressLevel: args.stressLevel,
+              workoutDone: args.workoutDone,
+              workoutType: args.workoutType,
+              workoutDurationMin: args.workoutDurationMin,
+              notes: args.notes,
+            });
+            return JSON.stringify({
+              success: true,
+              message: `Logged health entry for ${entryDate}`,
+              entry: { id: entry.id, date: entry.date, mood: entry.mood, energyLevel: entry.energyLevel }
+            });
+          }
+          case "update_health_entry": {
+            const { entryId, ...healthUpdates } = args;
+            const entry = await storage.updateHealthEntry(entryId, healthUpdates);
+            return JSON.stringify({ success: true, entry: entry ? { id: entry.id, date: entry.date } : null });
+          }
+          // Nutrition handler
+          case "create_nutrition_entry": {
+            // Ensure day exists
+            let day = await storage.getDay(today).catch(() => null);
+            if (!day) {
+              day = await storage.createDay({ id: `day_${today}`, date: today });
+            }
+            const entry = await storage.createNutritionEntry({
+              dayId: day.id,
+              datetime: new Date().toISOString(),
+              description: args.description,
+              mealType: args.mealType || "snack",
+              calories: args.calories,
+              proteinG: args.proteinG,
+              carbsG: args.carbsG,
+              fatsG: args.fatsG,
+              context: args.context,
+              notes: args.notes,
+            });
+            return JSON.stringify({
+              success: true,
+              message: `Logged ${args.mealType || "meal"}: ${args.description}`,
+              entry: { id: entry.id, description: entry.description, calories: entry.calories, proteinG: entry.proteinG }
+            });
+          }
+          // Project handlers
+          case "create_project": {
+            const project = await storage.createProject({
+              name: args.name,
+              ventureId: args.ventureId,
+              status: args.status || "not_started",
+              category: args.category,
+              priority: args.priority || "P2",
+              outcome: args.outcome,
+              notes: args.notes,
+              startDate: args.startDate,
+              targetEndDate: args.targetEndDate,
+            });
+            return JSON.stringify({
+              success: true,
+              message: `Created project "${project.name}"`,
+              project: { id: project.id, name: project.name, status: project.status }
+            });
+          }
+          case "update_project": {
+            const { projectId, ...projectUpdates } = args;
+            const project = await storage.updateProject(projectId, projectUpdates);
+            return JSON.stringify({ success: true, project: project ? { id: project.id, name: project.name, status: project.status } : null });
+          }
+          // Venture handlers
+          case "create_venture": {
+            const venture = await storage.createVenture({
+              name: args.name,
+              domain: args.domain || "other",
+              status: args.status || "planning",
+              oneLiner: args.oneLiner,
+              primaryFocus: args.primaryFocus,
+              color: args.color,
+              notes: args.notes,
+            });
+            return JSON.stringify({
+              success: true,
+              message: `Created venture "${venture.name}"`,
+              venture: { id: venture.id, name: venture.name, domain: venture.domain }
+            });
+          }
+          case "update_venture": {
+            const { ventureId, ...ventureUpdates } = args;
+            const venture = await storage.updateVenture(ventureId, ventureUpdates);
+            return JSON.stringify({ success: true, venture: venture ? { id: venture.id, name: venture.name, status: venture.status } : null });
+          }
+          // Doc handlers
+          case "create_doc": {
+            const doc = await storage.createDoc({
+              title: args.title,
+              type: args.type || "page",
+              domain: args.domain,
+              body: args.body,
+              ventureId: args.ventureId,
+              projectId: args.projectId,
+              tags: args.tags,
+              status: "active",
+            });
+            return JSON.stringify({
+              success: true,
+              message: `Created document "${doc.title}"`,
+              doc: { id: doc.id, title: doc.title, type: doc.type }
+            });
+          }
+          case "update_doc": {
+            const { docId, ...docUpdates } = args;
+            const doc = await storage.updateDoc(docId, docUpdates);
+            return JSON.stringify({ success: true, doc: doc ? { id: doc.id, title: doc.title } : null });
+          }
+          // Delete handlers
+          case "delete_task": {
+            await storage.deleteTask(args.taskId);
+            return JSON.stringify({ success: true, message: "Task deleted" });
+          }
+          case "delete_capture": {
+            await storage.deleteCaptureItem(args.captureId);
+            return JSON.stringify({ success: true, message: "Capture item deleted" });
+          }
+          case "delete_shopping_item": {
+            await storage.deleteShoppingItem(args.itemId);
+            return JSON.stringify({ success: true, message: "Shopping item deleted" });
+          }
+          case "delete_book": {
+            await storage.deleteBook(args.bookId);
+            return JSON.stringify({ success: true, message: "Book removed from reading list" });
           }
           default:
             return JSON.stringify({ error: "Unknown tool" });
