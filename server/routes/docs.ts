@@ -7,6 +7,7 @@ import { storage } from "../storage";
 import { logger } from "../logger";
 import { insertDocSchema, insertAttachmentSchema } from "@shared/schema";
 import { z } from "zod";
+import { calculateDocQuality, getQualitySuggestions } from "../doc-quality";
 
 const router = Router();
 
@@ -191,6 +192,74 @@ router.delete("/:id/recursive", async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, "Error deleting doc recursively");
     res.status(500).json({ error: "Failed to delete doc" });
+  }
+});
+
+// ============================================================================
+// QUALITY SCORING ENDPOINTS
+// ============================================================================
+
+// Recalculate quality score for a doc
+router.post("/:id/recalculate-quality", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await storage.updateDocQualityScore(id);
+    res.json(result);
+  } catch (error) {
+    logger.error({ error }, "Error recalculating quality");
+    res.status(500).json({ error: "Failed to recalculate quality" });
+  }
+});
+
+// Get quality breakdown for a doc
+router.get("/:id/quality", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const doc = await storage.getDoc(id);
+    if (!doc) {
+      return res.status(404).json({ error: "Doc not found" });
+    }
+    const breakdown = calculateDocQuality(doc);
+    const suggestions = getQualitySuggestions(doc);
+    res.json({ ...breakdown, suggestions });
+  } catch (error) {
+    logger.error({ error }, "Error getting quality");
+    res.status(500).json({ error: "Failed to get quality" });
+  }
+});
+
+// Mark doc as reviewed
+router.post("/:id/mark-reviewed", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await storage.markDocReviewed(id);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Error marking reviewed");
+    res.status(500).json({ error: "Failed to mark reviewed" });
+  }
+});
+
+// Get docs needing review
+router.get("/quality/review-queue", async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const docs = await storage.getDocsNeedingReview(limit);
+    res.json({ docs });
+  } catch (error) {
+    logger.error({ error }, "Error getting review queue");
+    res.status(500).json({ error: "Failed to get review queue" });
+  }
+});
+
+// Get quality metrics
+router.get("/quality/metrics", async (req: Request, res: Response) => {
+  try {
+    const metrics = await storage.getDocQualityMetrics();
+    res.json(metrics);
+  } catch (error) {
+    logger.error({ error }, "Error getting metrics");
+    res.status(500).json({ error: "Failed to get metrics" });
   }
 });
 

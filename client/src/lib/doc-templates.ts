@@ -3,15 +3,34 @@ import type { Doc } from "@shared/schema";
 // Extract the doc type from the Doc schema
 type DocType = NonNullable<Doc['type']>;
 
-export interface DocTemplate {
+export interface DocTemplateSection {
+  name: string;
+  description: string;
+  required: boolean;
+  placeholder?: string;
+}
+
+export interface DocTemplateConfig {
   id: string;
   name: string;
   description: string;
   icon: string;
   category: 'tracking' | 'planning' | 'reference' | 'process';
   defaultType: DocType;
+  defaultDomain?: string;
+
+  // Required structured fields for this template type
+  requiredFields: ('summary' | 'keyPoints' | 'applicableWhen' | 'prerequisites' | 'owner')[];
+
+  // Content sections for this template
+  sections: DocTemplateSection[];
+
+  // The markdown body template
   body: string;
 }
+
+// Legacy type alias for backwards compatibility
+export type DocTemplate = DocTemplateConfig;
 
 export const DOC_TEMPLATES: DocTemplate[] = [
   // TRACKING TEMPLATES
@@ -22,6 +41,13 @@ export const DOC_TEMPLATES: DocTemplate[] = [
     icon: '💳',
     category: 'tracking',
     defaultType: 'reference',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Summary', description: 'Overview of subscription status', required: true },
+      { name: 'Active Subscriptions', description: 'List of all subscriptions', required: true },
+      { name: 'Cancellation Reminders', description: 'Review schedule', required: false },
+      { name: 'Notes', description: 'Additional context', required: false },
+    ],
     body: `# Subscriptions
 
 Track all active subscriptions for this venture.
@@ -50,6 +76,12 @@ Add any relevant notes about subscription management here.
     icon: '🤝',
     category: 'tracking',
     defaultType: 'reference',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Overview', description: 'Vendor summary', required: true },
+      { name: 'Categories', description: 'Vendors by category', required: true },
+      { name: 'Notes', description: 'Rating system and review schedule', required: false },
+    ],
     body: `# Vendors & Suppliers
 
 Track all vendors and suppliers for this venture.
@@ -84,6 +116,13 @@ Track all vendors and suppliers for this venture.
     icon: '🎯',
     category: 'tracking',
     defaultType: 'research',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Question', description: 'Research question or goal', required: true },
+      { name: 'Methodology', description: 'How analysis was conducted', required: true },
+      { name: 'Findings', description: 'Competitor data and insights', required: true },
+      { name: 'Implications', description: 'Strategic implications', required: true },
+    ],
     body: `# Competitor Analysis
 
 Track key competitors and their strategies.
@@ -123,6 +162,14 @@ Track key competitors and their strategies.
     icon: '⚖️',
     category: 'tracking',
     defaultType: 'reference',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Context', description: 'Why this decision is being made', required: true },
+      { name: 'Options Considered', description: 'Alternative approaches', required: true },
+      { name: 'Decision', description: 'What was decided', required: true },
+      { name: 'Rationale', description: 'Why this option was chosen', required: true },
+      { name: 'Success Metrics', description: 'How to measure outcome', required: false },
+    ],
     body: `# Decision Log
 
 Track important decisions, context, and outcomes.
@@ -172,6 +219,13 @@ What we learned from this decision
     icon: '🚀',
     category: 'planning',
     defaultType: 'spec',
+    requiredFields: ['summary', 'keyPoints', 'owner'],
+    sections: [
+      { name: 'Overview', description: 'Project summary and objectives', required: true },
+      { name: 'Requirements', description: 'What needs to be delivered', required: true },
+      { name: 'Constraints', description: 'Limitations and boundaries', required: true },
+      { name: 'Acceptance Criteria', description: 'Definition of done', required: true },
+    ],
     body: `# Project Kickoff: [Project Name]
 
 ## Project Overview
@@ -252,6 +306,14 @@ Add any additional context or notes here.
     icon: '📝',
     category: 'planning',
     defaultType: 'meeting_notes',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Attendees', description: 'Who attended the meeting', required: true },
+      { name: 'Agenda', description: 'Topics covered', required: true },
+      { name: 'Discussion', description: 'Key points discussed', required: true },
+      { name: 'Decisions', description: 'Decisions made', required: true },
+      { name: 'Action Items', description: 'Follow-up tasks', required: true },
+    ],
     body: `# Meeting Notes: [Meeting Title]
 
 **Date**: YYYY-MM-DD
@@ -314,6 +376,13 @@ Add any additional context or notes here.
     icon: '⚡',
     category: 'planning',
     defaultType: 'page',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Sprint Goals', description: 'What we want to achieve', required: true },
+      { name: 'Committed Work', description: 'Tasks and deliverables', required: true },
+      { name: 'Capacity Planning', description: 'Team availability', required: true },
+      { name: 'Definition of Done', description: 'Completion criteria', required: true },
+    ],
     body: `# Sprint Planning: [Sprint Name]
 
 **Sprint Duration**: YYYY-MM-DD to YYYY-MM-DD (2 weeks)
@@ -387,6 +456,13 @@ Add any additional context or notes here.
     icon: '📚',
     category: 'reference',
     defaultType: 'reference',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Tools & Software', description: 'Software and tools', required: false },
+      { name: 'Articles & Blog Posts', description: 'Reading resources', required: false },
+      { name: 'Courses & Tutorials', description: 'Learning materials', required: false },
+      { name: 'Books', description: 'Recommended books', required: false },
+    ],
     body: `# Resource Library
 
 Curated resources for this venture.
@@ -445,6 +521,13 @@ Curated resources for this venture.
     icon: '📖',
     category: 'reference',
     defaultType: 'reference',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Acronyms', description: 'Common acronyms and abbreviations', required: true },
+      { name: 'Key Terms', description: 'Important terminology', required: true },
+      { name: 'Industry Jargon', description: 'Industry-specific language', required: false },
+      { name: 'Internal Terminology', description: 'Company-specific terms', required: false },
+    ],
     body: `# Glossary & Terminology
 
 Define key terms, acronyms, and jargon for this venture.
@@ -506,6 +589,15 @@ Define key terms, acronyms, and jargon for this venture.
     icon: '📋',
     category: 'process',
     defaultType: 'sop',
+    requiredFields: ['summary', 'keyPoints', 'applicableWhen', 'prerequisites', 'owner'],
+    sections: [
+      { name: 'Purpose', description: 'Why this SOP exists', required: true },
+      { name: 'Scope', description: 'When and who this applies to', required: true },
+      { name: 'Prerequisites', description: 'What is needed before starting', required: true },
+      { name: 'Steps', description: 'Step-by-step instructions', required: true },
+      { name: 'Troubleshooting', description: 'Common issues and solutions', required: true },
+      { name: 'Owner', description: 'Who maintains this SOP', required: true },
+    ],
     body: `# SOP: [Process Name]
 
 **Version**: 1.0
@@ -612,6 +704,14 @@ Why does this process exist? What problem does it solve?
     icon: '✅',
     category: 'process',
     defaultType: 'template',
+    requiredFields: ['summary', 'keyPoints'],
+    sections: [
+      { name: 'Purpose', description: 'What this checklist covers', required: true },
+      { name: 'Pre-Flight', description: 'Prerequisites before starting', required: true },
+      { name: 'Main Process', description: 'Core checklist items', required: true },
+      { name: 'Quality Assurance', description: 'QA checks', required: true },
+      { name: 'Wrap-Up', description: 'Final steps', required: true },
+    ],
     body: `# Checklist: [Process Name]
 
 **Purpose**: Brief description of what this checklist covers
@@ -677,6 +777,14 @@ All items above must be checked before considering this process complete.
     icon: '👋',
     category: 'process',
     defaultType: 'process',
+    requiredFields: ['summary', 'keyPoints', 'prerequisites', 'owner'],
+    sections: [
+      { name: 'Trigger', description: 'When to use this onboarding', required: true },
+      { name: 'Inputs', description: 'Information needed to start', required: true },
+      { name: 'Steps', description: 'Onboarding phases and tasks', required: true },
+      { name: 'Outputs', description: 'Expected outcomes', required: true },
+      { name: 'Handoffs', description: 'Transitions and handoffs', required: false },
+    ],
     body: `# Onboarding: [Name/Role]
 
 **Name**:
@@ -780,3 +888,57 @@ Use this space to document learnings, questions, and feedback about the onboardi
 `,
   },
 ];
+
+// Helper functions for template field management
+
+/**
+ * Get required fields for a specific doc type
+ * @param docType - The type of document
+ * @returns Array of required field names
+ */
+export function getRequiredFieldsForType(docType: string): string[] {
+  const template = DOC_TEMPLATES.find(t => t.defaultType === docType);
+  return template?.requiredFields || ['summary', 'keyPoints'];
+}
+
+/**
+ * Get sections for a specific doc type
+ * @param docType - The type of document
+ * @returns Array of section configurations
+ */
+export function getSectionsForType(docType: string): DocTemplateSection[] {
+  const template = DOC_TEMPLATES.find(t => t.defaultType === docType);
+  return template?.sections || [];
+}
+
+/**
+ * Check if a field is required for a specific doc type
+ * @param docType - The type of document
+ * @param fieldName - The field name to check
+ * @returns True if the field is required, false otherwise
+ */
+export function isFieldRequired(docType: string, fieldName: string): boolean {
+  const requiredFields = getRequiredFieldsForType(docType);
+  return requiredFields.includes(fieldName);
+}
+
+/**
+ * Get all available templates grouped by category
+ */
+export function getTemplatesByCategory() {
+  return {
+    tracking: DOC_TEMPLATES.filter(t => t.category === 'tracking'),
+    planning: DOC_TEMPLATES.filter(t => t.category === 'planning'),
+    reference: DOC_TEMPLATES.filter(t => t.category === 'reference'),
+    process: DOC_TEMPLATES.filter(t => t.category === 'process'),
+  };
+}
+
+/**
+ * Get a specific template by ID
+ * @param templateId - The template ID
+ * @returns The template configuration or undefined
+ */
+export function getTemplateById(templateId: string): DocTemplateConfig | undefined {
+  return DOC_TEMPLATES.find(t => t.id === templateId);
+}
