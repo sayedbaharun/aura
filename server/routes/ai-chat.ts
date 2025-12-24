@@ -336,6 +336,20 @@ router.post("/chat", aiRateLimiter, async (req: Request, res: Response) => {
       logger.warn({ error }, "Could not build COO context, continuing without it");
     }
 
+    // Check if this is a decision-related question and inject Decision Style Brief
+    let decisionStyleBrief = '';
+    try {
+      const { isDecisionQuestion, generateDecisionStyleBrief } = await import("../decision-style-brief");
+      if (isDecisionQuestion(message)) {
+        const brief = await generateDecisionStyleBrief();
+        if (brief) {
+          decisionStyleBrief = `\n${brief}\n`;
+        }
+      }
+    } catch (error) {
+      logger.warn({ error }, "Could not generate decision style brief, continuing without it");
+    }
+
     const systemPrompt = `You are the AI Chief Operating Officer (COO) for SB-OS - Sayed Baharun's Personal Operating System.
 
 ## YOUR ROLE
@@ -388,7 +402,7 @@ ${aiContext.goals?.length ? `Goals: ${aiContext.goals.join(', ')}` : ''}
 ${aiContext.preferences ? `Preferences: ${aiContext.preferences}` : ''}
 
 ${customInstructions ? `## CUSTOM INSTRUCTIONS\n${customInstructions}\n` : ''}
-
+${decisionStyleBrief}
 ## OPERATIONAL RULES
 1. **Always use tools** to fetch real data - never make assumptions
 2. **Be proactive** - if you see issues (overdue tasks, low health metrics, unprocessed inbox), surface them

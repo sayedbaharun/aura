@@ -35,6 +35,7 @@ import ticktickRoutes from "./ticktick";
 import aiChatRoutes from "./ai-chat";
 import foresightRoutes from "./foresight";
 import fearSettingsRoutes from "./fear-settings";
+import decisionMemoriesRoutes from "./decision-memories";
 import arc2026Routes from "./arc-2026";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -153,6 +154,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fear-setting exercises for major decisions
   // ============================================================================
   app.use('/api/fear-settings', fearSettingsRoutes);
+
+  // ============================================================================
+  // DECISION MEMORIES
+  // Lightweight decision capture with outcome loop for learning
+  // ============================================================================
+  app.use('/api/decision-memories', decisionMemoriesRoutes);
 
   // ============================================================================
   // AI & CHAT

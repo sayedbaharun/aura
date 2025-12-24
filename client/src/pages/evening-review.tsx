@@ -36,6 +36,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link, useRoute, useLocation } from "wouter";
+import { useDecisionModal } from "@/lib/decision-modal-store";
+import { DecisionsDueSection } from "@/components/decision-close-loop";
+import { Lightbulb } from "lucide-react";
 
 interface Task {
   id: string;
@@ -110,10 +113,30 @@ interface ReadingLog {
   pagesRead: number;
 }
 
+interface DecisionMemory {
+  id: string;
+  context: string;
+  decision: string;
+  reasoning: string | null;
+  tags: string[] | null;
+  followUpAt: string | null;
+  outcome: string | null;
+  outcomeNotes: string | null;
+  outcomeRecordedAt: string | null;
+  createdAt: string;
+  derived: {
+    canonicalSummary?: string;
+    archetype?: string;
+    riskLevel?: string;
+    reversibility?: string;
+  } | null;
+}
+
 export default function EveningReview() {
   const { toast } = useToast();
   const [, params] = useRoute("/evening/:date");
   const [, setLocation] = useLocation();
+  const { openDecisionModal } = useDecisionModal();
 
   // Use date from URL params, or default to today
   const todayDate = format(new Date(), "yyyy-MM-dd");
@@ -208,6 +231,32 @@ export default function EveningReview() {
   const readingBooks = Array.isArray(books)
     ? books.filter((b) => b.status === "reading")
     : [];
+
+  // Fetch decisions due for follow-up (only show on today's review)
+  const { data: dueDecisions = [], refetch: refetchDueDecisions } = useQuery<DecisionMemory[]>({
+    queryKey: ["/api/decision-memories/due"],
+    queryFn: async () => {
+      const res = await fetch("/api/decision-memories/due", { credentials: "include" });
+      return await res.json();
+    },
+    enabled: isViewingToday,
+  });
+
+  // Fetch decisions eligible for early signal check
+  const { data: earlyCheckDecisions = [], refetch: refetchEarlyCheck } = useQuery<DecisionMemory[]>({
+    queryKey: ["/api/decision-memories/early-check"],
+    queryFn: async () => {
+      const res = await fetch("/api/decision-memories/early-check", { credentials: "include" });
+      return await res.json();
+    },
+    enabled: isViewingToday,
+  });
+
+  // Handler for when a decision is closed
+  const handleDecisionClosed = () => {
+    refetchDueDecisions();
+    refetchEarlyCheck();
+  };
 
   // P0/P1 tasks available for all priority slots
   const priorityTasks = Array.isArray(allTasks) ? allTasks : [];
@@ -423,6 +472,15 @@ export default function EveningReview() {
               Complete
             </Badge>
           )}
+          {isViewingToday && (
+            <Button
+              variant="outline"
+              onClick={() => openDecisionModal({ source: 'evening' })}
+            >
+              <Lightbulb className="h-4 w-4 mr-2" />
+              Log Decision
+            </Button>
+          )}
           <Button onClick={handleSave} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? "Saving..." : "Complete Review"}
           </Button>
@@ -527,6 +585,15 @@ export default function EveningReview() {
           )}
         </CardContent>
       </Card>
+
+      {/* Decisions Due for Follow-up - only show on today's review when there are decisions */}
+      {isViewingToday && (dueDecisions.length > 0 || earlyCheckDecisions.length > 0) && (
+        <DecisionsDueSection
+          dueDecisions={dueDecisions}
+          earlyCheckDecisions={earlyCheckDecisions}
+          onDecisionClosed={handleDecisionClosed}
+        />
+      )}
 
       {/* Evening Reading */}
       <Card>

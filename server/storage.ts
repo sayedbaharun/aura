@@ -77,6 +77,11 @@ import {
   type InsertForesightConversation,
   type FearSetting,
   type InsertFearSetting,
+  type DecisionMemory,
+  type InsertDecisionMemory,
+  type UpdateDecisionMemory,
+  type CloseDecisionMemory,
+  type DecisionDerivedMetadata,
   ventures,
   projects,
   phases,
@@ -116,6 +121,7 @@ import {
   whatIfQuestions,
   foresightConversations,
   fearSettings,
+  decisionMemories,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql } from "drizzle-orm";
@@ -349,6 +355,24 @@ export interface IStorage {
     recentSignals: TrendSignal[];
     unexploredQuestions: number;
   }>;
+
+  // Decision Memories
+  getDecisionMemories(filters?: {
+    tags?: string[];
+    archetype?: string;
+    closed?: boolean; // true = has outcomeRecordedAt, false = no outcomeRecordedAt
+    limit?: number;
+    offset?: number;
+  }): Promise<DecisionMemory[]>;
+  getDecisionMemory(id: string): Promise<DecisionMemory | undefined>;
+  createDecisionMemory(data: InsertDecisionMemory): Promise<DecisionMemory>;
+  updateDecisionMemory(id: string, data: UpdateDecisionMemory): Promise<DecisionMemory | undefined>;
+  closeDecisionMemory(id: string, data: CloseDecisionMemory): Promise<DecisionMemory | undefined>;
+  deleteDecisionMemory(id: string): Promise<void>;
+  getDueDecisions(asOfDate?: Date): Promise<DecisionMemory[]>;
+  getEarlyCheckDecisions(asOfDate?: Date): Promise<DecisionMemory[]>;
+  retrieveDecisionsForAI(query: string, tags?: string[], limit?: number): Promise<DecisionMemory[]>;
+  exportDecisionMemories(): Promise<DecisionMemory[]>;
 }
 
 // PostgreSQL Storage Implementation
@@ -3617,6 +3641,246 @@ export class DBStorage implements IStorage {
 
   async deleteFearSetting(id: string): Promise<void> {
     await this.db.delete(fearSettings).where(eq(fearSettings.id, id));
+  }
+
+  // ----------------------------------------------------------------------------
+  // DECISION MEMORIES
+  // ----------------------------------------------------------------------------
+
+  async getDecisionMemories(filters?: {
+    tags?: string[];
+    archetype?: string;
+    closed?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<DecisionMemory[]> {
+    try {
+      const conditions = [];
+      const queryLimit = filters?.limit ?? 100;
+      const queryOffset = filters?.offset ?? 0;
+
+      // Filter by closed state (computed from outcomeRecordedAt)
+      if (filters?.closed === true) {
+        conditions.push(sql`${decisionMemories.outcomeRecordedAt} IS NOT NULL`);
+      } else if (filters?.closed === false) {
+        conditions.push(sql`${decisionMemories.outcomeRecordedAt} IS NULL`);
+      }
+
+      // Filter by archetype (in derived JSON)
+      if (filters?.archetype) {
+        conditions.push(
+          sql`${decisionMemories.derived}->>'archetype' = ${filters.archetype}`
+        );
+      }
+
+      // Filter by tags (check if any tag matches)
+      if (filters?.tags && filters.tags.length > 0) {
+        const tagConditions = filters.tags.map(
+          (tag) => sql`${decisionMemories.tags} @> ${JSON.stringify([tag])}::jsonb`
+        );
+        conditions.push(or(...tagConditions));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return await this.db
+        .select()
+        .from(decisionMemories)
+        .where(whereClause)
+        .orderBy(desc(decisionMemories.createdAt))
+        .limit(queryLimit)
+        .offset(queryOffset);
+    } catch (error) {
+      console.error("Error fetching decision memories:", error);
+      return [];
+    }
+  }
+
+  async getDecisionMemory(id: string): Promise<DecisionMemory | undefined> {
+    try {
+      const [result] = await this.db
+        .select()
+        .from(decisionMemories)
+        .where(eq(decisionMemories.id, id))
+        .limit(1);
+      return result;
+    } catch (error) {
+      console.error("Error fetching decision memory:", error);
+      return undefined;
+    }
+  }
+
+  async createDecisionMemory(data: InsertDecisionMemory): Promise<DecisionMemory> {
+    const [result] = await this.db
+      .insert(decisionMemories)
+      .values(data as any)
+      .returning();
+    return result;
+  }
+
+  async updateDecisionMemory(
+    id: string,
+    updates: UpdateDecisionMemory
+  ): Promise<DecisionMemory | undefined> {
+    const [result] = await this.db
+      .update(decisionMemories)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(decisionMemories.id, id))
+      .returning();
+    return result;
+  }
+
+  async closeDecisionMemory(
+    id: string,
+    data: CloseDecisionMemory
+  ): Promise<DecisionMemory | undefined> {
+    const [result] = await this.db
+      .update(decisionMemories)
+      .set({
+        outcome: data.outcome,
+        outcomeNotes: data.outcomeNotes,
+        outcomeRecordedAt: new Date(),
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(decisionMemories.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteDecisionMemory(id: string): Promise<void> {
+    await this.db.delete(decisionMemories).where(eq(decisionMemories.id, id));
+  }
+
+  /**
+   * Get decisions that are due for follow-up (followUpAt <= now AND outcome not recorded)
+   */
+  async getDueDecisions(asOfDate?: Date): Promise<DecisionMemory[]> {
+    const now = asOfDate || new Date();
+    try {
+      return await this.db
+        .select()
+        .from(decisionMemories)
+        .where(
+          and(
+            sql`${decisionMemories.followUpAt} IS NOT NULL`,
+            lte(decisionMemories.followUpAt, now),
+            sql`${decisionMemories.outcomeRecordedAt} IS NULL`
+          )
+        )
+        .orderBy(decisionMemories.followUpAt);
+    } catch (error) {
+      console.error("Error fetching due decisions:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Get decisions eligible for "early signal" check:
+   * - outcomeRecordedAt IS NULL
+   * - createdAt + 7 days <= now
+   * - followUpAt is either null or > now (i.e., the full follow-up isn't due yet)
+   */
+  async getEarlyCheckDecisions(asOfDate?: Date): Promise<DecisionMemory[]> {
+    const now = asOfDate || new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    try {
+      return await this.db
+        .select()
+        .from(decisionMemories)
+        .where(
+          and(
+            sql`${decisionMemories.outcomeRecordedAt} IS NULL`,
+            lte(decisionMemories.createdAt, sevenDaysAgo),
+            or(
+              sql`${decisionMemories.followUpAt} IS NULL`,
+              gte(decisionMemories.followUpAt, now)
+            )
+          )
+        )
+        .orderBy(decisionMemories.createdAt);
+    } catch (error) {
+      console.error("Error fetching early check decisions:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Retrieve decisions for AI context injection.
+   * Prioritizes: archetype match > tag overlap > recency > closed decisions
+   * Returns top N (default 10) with bias toward closed decisions.
+   */
+  async retrieveDecisionsForAI(
+    query: string,
+    tags?: string[],
+    limit: number = 10
+  ): Promise<DecisionMemory[]> {
+    try {
+      // Get closed decisions first (max 7), then open (max 3)
+      const closedLimit = Math.min(7, limit);
+      const openLimit = Math.min(3, limit - closedLimit);
+
+      // Build search conditions for text matching
+      const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+
+      // Get closed decisions
+      const closedConditions = [sql`${decisionMemories.outcomeRecordedAt} IS NOT NULL`];
+
+      // Add tag matching if provided
+      if (tags && tags.length > 0) {
+        const tagConditions = tags.map(
+          (tag) => sql`${decisionMemories.tags} @> ${JSON.stringify([tag])}::jsonb`
+        );
+        closedConditions.push(or(...tagConditions) as any);
+      }
+
+      const closedDecisions = await this.db
+        .select()
+        .from(decisionMemories)
+        .where(and(...closedConditions))
+        .orderBy(desc(decisionMemories.createdAt))
+        .limit(closedLimit);
+
+      // Get open decisions if we need more
+      let openDecisions: DecisionMemory[] = [];
+      if (openLimit > 0 && closedDecisions.length < limit) {
+        const openConditions = [sql`${decisionMemories.outcomeRecordedAt} IS NULL`];
+
+        if (tags && tags.length > 0) {
+          const tagConditions = tags.map(
+            (tag) => sql`${decisionMemories.tags} @> ${JSON.stringify([tag])}::jsonb`
+          );
+          openConditions.push(or(...tagConditions) as any);
+        }
+
+        openDecisions = await this.db
+          .select()
+          .from(decisionMemories)
+          .where(and(...openConditions))
+          .orderBy(desc(decisionMemories.createdAt))
+          .limit(openLimit);
+      }
+
+      // Combine and return
+      return [...closedDecisions, ...openDecisions].slice(0, limit);
+    } catch (error) {
+      console.error("Error retrieving decisions for AI:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Export all decision memories for backup/export
+   */
+  async exportDecisionMemories(): Promise<DecisionMemory[]> {
+    try {
+      return await this.db
+        .select()
+        .from(decisionMemories)
+        .orderBy(desc(decisionMemories.createdAt));
+    } catch (error) {
+      console.error("Error exporting decision memories:", error);
+      return [];
+    }
   }
 
 }
