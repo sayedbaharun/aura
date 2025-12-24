@@ -2343,3 +2343,108 @@ export const insertNetWorthSnapshotSchema = createInsertSchema(netWorthSnapshots
 
 export type NetWorthSnapshot = typeof netWorthSnapshots.$inferSelect;
 export type InsertNetWorthSnapshot = z.infer<typeof insertNetWorthSnapshotSchema>;
+
+// ----------------------------------------------------------------------------
+// DECISION MEMORIES: Lightweight decision capture with outcome loop
+// ----------------------------------------------------------------------------
+
+export const decisionSourceEnum = pgEnum("decision_source", [
+  "evening",
+  "weekly",
+  "capture",
+  "ai_chat",
+  "manual",
+]);
+
+export const decisionOutcomeEnum = pgEnum("decision_outcome", [
+  "success",
+  "mixed",
+  "failure",
+  "unknown",
+]);
+
+export const decisionReversibilityEnum = pgEnum("decision_reversibility", [
+  "reversible",
+  "hard_to_reverse",
+  "irreversible",
+]);
+
+export const decisionRiskLevelEnum = pgEnum("decision_risk_level", [
+  "low",
+  "medium",
+  "high",
+]);
+
+// Type for AI-derived metadata (computed at save-time)
+export interface DecisionDerivedMetadata {
+  canonicalSummary?: string; // <= 280 chars, for retrieval
+  principles?: string[]; // inferred decision principles
+  constraints?: string[]; // inferred constraints (time, money, risk, etc.)
+  reversibility?: "reversible" | "hard_to_reverse" | "irreversible";
+  riskLevel?: "low" | "medium" | "high";
+  archetype?: string; // e.g., "delegation", "resource_allocation", "tooling_choice", "pricing", "hiring"
+}
+
+export const decisionMemories = pgTable(
+  "decision_memories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Source of capture
+    source: decisionSourceEnum("source").default("manual").notNull(),
+
+    // Core decision content
+    context: text("context").notNull(), // Situation I was facing
+    decision: text("decision").notNull(), // What I chose
+    reasoning: text("reasoning"), // Free-form "why" (AI can parse structure later)
+
+    // Organization
+    tags: jsonb("tags").$type<string[]>().default([]),
+
+    // Follow-up loop
+    followUpAt: timestamp("follow_up_at"), // When to check on outcome
+
+    // Outcome (filled later when closing the loop)
+    outcome: decisionOutcomeEnum("outcome"), // success | mixed | failure | unknown
+    outcomeNotes: text("outcome_notes"), // What I learned
+    outcomeRecordedAt: timestamp("outcome_recorded_at"), // When outcome was recorded
+
+    // AI-derived metadata (computed at save-time, can be null if AI call fails)
+    derived: jsonb("derived").$type<DecisionDerivedMetadata>(),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Index for finding due decisions
+    index("idx_decision_memories_follow_up_at").on(table.followUpAt),
+    // Index for finding closed vs open decisions
+    index("idx_decision_memories_outcome_recorded_at").on(table.outcomeRecordedAt),
+    // Index for recency-based retrieval
+    index("idx_decision_memories_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertDecisionMemorySchema = createInsertSchema(decisionMemories)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    outcomeRecordedAt: true,
+  })
+  .extend({
+    followUpAt: timestampSchema,
+  });
+
+export const updateDecisionMemorySchema = insertDecisionMemorySchema.partial();
+
+export const closeDecisionMemorySchema = z.object({
+  outcome: z.enum(["success", "mixed", "failure", "unknown"]),
+  outcomeNotes: z.string().optional(),
+});
+
+export type DecisionMemory = typeof decisionMemories.$inferSelect;
+export type InsertDecisionMemory = z.infer<typeof insertDecisionMemorySchema>;
+export type UpdateDecisionMemory = z.infer<typeof updateDecisionMemorySchema>;
+export type CloseDecisionMemory = z.infer<typeof closeDecisionMemorySchema>;

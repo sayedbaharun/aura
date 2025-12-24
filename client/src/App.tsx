@@ -5,8 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CaptureModalProvider } from "@/lib/capture-modal-store";
 import { TaskDetailModalProvider } from "@/lib/task-detail-modal-store";
+import { DecisionModalProvider } from "@/lib/decision-modal-store";
 import CaptureModal from "@/components/capture-modal";
 import TaskDetailModal from "@/components/task-detail-modal";
+import DecisionQuickCapture from "@/components/decision-quick-capture";
 import Layout from "@/components/layout";
 import Landing from "@/pages/landing";
 import CommandCenter from "@/pages/command-center";
@@ -99,15 +101,18 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <CaptureModalProvider>
         <TaskDetailModalProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-            <CaptureModal />
-            <TaskDetailModal />
-            {/* Mobile-specific components */}
-            <MobileQuickActions />
-            <InstallPrompt />
-          </TooltipProvider>
+          <DecisionModalProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+              <CaptureModal />
+              <TaskDetailModal />
+              <DecisionQuickCapture />
+              {/* Mobile-specific components */}
+              <MobileQuickActions />
+              <InstallPrompt />
+            </TooltipProvider>
+          </DecisionModalProvider>
         </TaskDetailModalProvider>
       </CaptureModalProvider>
     </QueryClientProvider>

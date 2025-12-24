@@ -48,6 +48,8 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, isToday, isYesterday, isThisWeek } from "date-fns";
+import { useDecisionModal } from "@/lib/decision-modal-store";
+import { Lightbulb } from "lucide-react";
 
 interface ChatSession {
   id: string;
@@ -98,6 +100,7 @@ function groupSessionsByDate(sessions: ChatSession[]) {
 
 export default function AiChat() {
   const { toast } = useToast();
+  const { openDecisionModal } = useDecisionModal();
   const [message, setMessage] = useState("");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -107,6 +110,10 @@ export default function AiChat() {
   const [newTitle, setNewTitle] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Track dismissed "Save as Decision" prompts for this session
+  const [decisionDismissCount, setDecisionDismissCount] = useState(0);
+  const showDecisionPrompt = decisionDismissCount < 3;
 
   // Fetch chat sessions
   const { data: sessions = [], isLoading: isLoadingSessions } = useQuery<ChatSession[]>({
@@ -542,13 +549,43 @@ export default function AiChat() {
                       >
                         <div className="whitespace-pre-wrap break-words">{msg.content}</div>
                         <div
-                          className={`text-xs mt-2 ${
+                          className={`text-xs mt-2 flex items-center gap-2 ${
                             msg.role === "user"
                               ? "text-primary-foreground/70"
                               : "text-muted-foreground"
                           }`}
                         >
                           {format(new Date(msg.createdAt), "h:mm a")}
+                          {/* Save as Decision affordance for assistant messages */}
+                          {msg.role === "assistant" && showDecisionPrompt && (
+                            <>
+                              <span className="opacity-30">|</span>
+                              <button
+                                onClick={() => {
+                                  // Find the user message that preceded this one
+                                  const msgIndex = messages.findIndex((m) => m.id === msg.id);
+                                  const userMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+                                  openDecisionModal({
+                                    source: 'ai_chat',
+                                    context: userMsg?.role === 'user' ? userMsg.content : '',
+                                    decision: '',
+                                    reasoning: '',
+                                  });
+                                }}
+                                className="flex items-center gap-1 text-primary/70 hover:text-primary transition-colors"
+                              >
+                                <Lightbulb className="h-3 w-3" />
+                                Save as Decision
+                              </button>
+                              <button
+                                onClick={() => setDecisionDismissCount((c) => c + 1)}
+                                className="text-muted-foreground/50 hover:text-muted-foreground text-xs"
+                                title="Dismiss"
+                              >
+                                ×
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                       {msg.role === "user" && (

@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useDecisionModal } from "@/lib/decision-modal-store";
+import { Lightbulb } from "lucide-react";
 
 interface Capture {
   id: string;
@@ -68,6 +70,7 @@ interface Project {
 
 export default function CapturePage() {
   const { toast } = useToast();
+  const { openDecisionModal } = useDecisionModal();
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
@@ -254,14 +257,23 @@ export default function CapturePage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 md:p-6 max-w-2xl space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center">
-            <Zap className="h-5 w-5 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold">Capture</h1>
+              <p className="text-sm text-muted-foreground">Get it out of your head</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold">Capture</h1>
-            <p className="text-sm text-muted-foreground">Get it out of your head</p>
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => openDecisionModal({ source: 'capture' })}
+          >
+            <Lightbulb className="h-4 w-4 mr-2" />
+            Log Decision
+          </Button>
         </div>
 
         {/* Quick Capture Form */}
