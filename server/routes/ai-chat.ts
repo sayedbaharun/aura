@@ -697,6 +697,24 @@ Current date: ${today}`;
           }
         }
       },
+      {
+        type: "function",
+        function: {
+          name: "create_book",
+          description: "Add a new book to the reading list. Use when user wants to add a book, says 'add to my reading list', or mentions wanting to read something.",
+          parameters: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Book title" },
+              author: { type: "string", description: "Author name" },
+              status: { type: "string", description: "Status: to_read, reading, finished. Defaults to to_read" },
+              platform: { type: "string", description: "Reading platform (Kindle, Audible, Physical, etc.)" },
+              notes: { type: "string", description: "Notes about the book or why user wants to read it" }
+            },
+            required: ["title"]
+          }
+        }
+      },
       // Days and Rituals tools
       {
         type: "function",
@@ -914,6 +932,20 @@ Current date: ${today}`;
             const { bookId, ...bookUpdates } = args;
             const book = await storage.updateBook(bookId, bookUpdates);
             return JSON.stringify({ success: true, book: book ? { id: book.id, title: book.title, status: book.status } : null });
+          }
+          case "create_book": {
+            const book = await storage.createBook({
+              title: args.title,
+              author: args.author || "Unknown",
+              status: args.status || "to_read",
+              platform: args.platform || null,
+              notes: args.notes || null,
+            });
+            return JSON.stringify({
+              success: true,
+              message: `Added "${book.title}" to your reading list`,
+              book: { id: book.id, title: book.title, author: book.author, status: book.status }
+            });
           }
           // Day and Rituals tool handlers
           case "get_day": {
