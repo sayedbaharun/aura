@@ -3,13 +3,36 @@ import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./code-block";
 import { CalloutBlock } from "./callout-block";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 import { ExternalLink, ZoomIn } from "lucide-react";
 import type { Components } from "react-markdown";
+import { parseDocLinks } from "./doc-link-renderer";
 
 interface EnhancedMarkdownRendererProps {
   content: string;
   className?: string;
+}
+
+// Helper to process children and parse doc links in text nodes
+function processDocLinks(children: ReactNode): ReactNode {
+  if (typeof children === "string") {
+    // Check if there are any [[links]] in the text
+    if (children.includes("[[")) {
+      return parseDocLinks(children);
+    }
+    return children;
+  }
+
+  if (Array.isArray(children)) {
+    return children.map((child, index) => {
+      if (typeof child === "string" && child.includes("[[")) {
+        return <span key={index}>{parseDocLinks(child)}</span>;
+      }
+      return child;
+    });
+  }
+
+  return children;
 }
 
 export function EnhancedMarkdownRenderer({
@@ -128,7 +151,7 @@ export function EnhancedMarkdownRenderer({
       const { node, children, ...rest } = props;
       return (
         <td className="border border-border px-4 py-2">
-          {children}
+          {processDocLinks(children)}
         </td>
       );
     },
@@ -234,6 +257,26 @@ export function EnhancedMarkdownRenderer({
         <ol className="my-4 ml-6 list-decimal space-y-2" {...rest}>
           {children}
         </ol>
+      );
+    },
+
+    // Paragraphs - process doc links
+    p(props) {
+      const { node, children, ...rest } = props;
+      return (
+        <p className="my-4 first:mt-0 last:mb-0" {...rest}>
+          {processDocLinks(children)}
+        </p>
+      );
+    },
+
+    // List items - process doc links
+    li(props) {
+      const { node, children, ...rest } = props;
+      return (
+        <li {...rest}>
+          {processDocLinks(children)}
+        </li>
       );
     },
   };
