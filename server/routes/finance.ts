@@ -141,7 +141,7 @@ router.get("/net-worth", async (req: Request, res: Response) => {
 router.get("/net-worth/history", async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 12;
-    const snapshots = await storage.getNetWorthSnapshots(limit);
+    const snapshots = await storage.getNetWorthSnapshots(req.userId, limit);
     res.json(snapshots);
   } catch (error) {
     logger.error({ error }, "Error fetching net worth history");
@@ -152,7 +152,7 @@ router.get("/net-worth/history", async (req: Request, res: Response) => {
 // Create net worth snapshot (for manual or scheduled snapshots)
 router.post("/net-worth/snapshot", async (req: Request, res: Response) => {
   try {
-    const snapshot = await storage.createNetWorthSnapshot();
+    const snapshot = await storage.createNetWorthSnapshot(req.userId);
     res.status(201).json(snapshot);
   } catch (error) {
     logger.error({ error }, "Error creating net worth snapshot");
