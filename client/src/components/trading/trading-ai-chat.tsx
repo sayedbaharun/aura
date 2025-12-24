@@ -562,7 +562,7 @@ export default function TradingAiChat() {
             {/* Sessions Sidebar */}
             <div
               className={`flex flex-col border rounded-lg bg-muted/30 transition-all ${
-                sidebarCollapsed ? "w-10" : "w-56"
+                sidebarCollapsed ? "w-12" : "w-64"
               }`}
             >
               {/* Sidebar Header */}
