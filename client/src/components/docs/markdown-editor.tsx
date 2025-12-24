@@ -28,6 +28,7 @@ import TableToolbarButton from "./table-toolbar-button";
 import EditTableButton from "./edit-table-button";
 import { ImageUploadButton } from "./image-upload-button";
 import { BlockInsertMenu } from "./block-insert-menu";
+import { DocLinkPopover } from "./doc-link-popover";
 
 interface MarkdownEditorProps {
   value: string;
@@ -286,6 +287,15 @@ export default function MarkdownEditor({
   return (
     <div className={cn("border rounded-lg overflow-hidden flex flex-col", className)}>
       {renderToolbar()}
+
+      {/* Wiki-style [[link]] autocomplete */}
+      {!readOnly && (
+        <DocLinkPopover
+          textareaRef={textareaRef}
+          value={value}
+          onChange={onChange}
+        />
+      )}
 
       {viewMode === "edit" && renderEditor()}
 
