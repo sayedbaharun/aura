@@ -849,6 +849,20 @@ export const docs = pgTable(
     tags: jsonb("tags").$type<string[]>().default([]),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(), // Flexible metadata storage
     externalId: text("external_id"),
+
+    // AI-Queryable Structured Fields
+    summary: text("summary"), // 1-3 sentences describing the doc
+    keyPoints: jsonb("key_points").$type<string[]>().default([]), // 3-5 key insights
+    applicableWhen: text("applicable_when"), // Context for when to use this doc
+    prerequisites: jsonb("prerequisites").$type<string[]>().default([]), // Array of doc IDs
+    owner: text("owner"), // Who maintains this doc
+    relatedDocs: jsonb("related_docs").$type<string[]>().default([]), // Array of related doc IDs
+
+    // Quality Metadata
+    aiReady: boolean("ai_ready").default(false), // Meets quality threshold
+    qualityScore: integer("quality_score").default(0), // 0-100 score
+    lastReviewedAt: timestamp("last_reviewed_at"), // When last validated
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -862,6 +876,9 @@ export const docs = pgTable(
     // Performance: docs are frequently sorted by these timestamps
     index("idx_docs_created_at").on(table.createdAt),
     index("idx_docs_updated_at").on(table.updatedAt),
+    // AI Knowledge Base: filter by quality and readiness
+    index("idx_docs_ai_ready").on(table.aiReady),
+    index("idx_docs_quality_score").on(table.qualityScore),
   ]
 );
 
@@ -2448,3 +2465,162 @@ export type DecisionMemory = typeof decisionMemories.$inferSelect;
 export type InsertDecisionMemory = z.infer<typeof insertDecisionMemorySchema>;
 export type UpdateDecisionMemory = z.infer<typeof updateDecisionMemorySchema>;
 export type CloseDecisionMemory = z.infer<typeof closeDecisionMemorySchema>;
+
+// ----------------------------------------------------------------------------
+// AI KNOWLEDGE BASE: Feedback and Learning System (Phase 2)
+// ----------------------------------------------------------------------------
+
+export const aiUserActionEnum = pgEnum("ai_user_action", [
+  "accepted",
+  "edited",
+  "rejected",
+  "regenerated",
+]);
+
+export const aiPatternTypeEnum = pgEnum("ai_pattern_type", [
+  "positive",
+  "negative",
+]);
+
+export const aiTeachingTypeEnum = pgEnum("ai_teaching_type", [
+  "good_example",
+  "bad_example",
+  "instruction",
+]);
+
+// Tracks every AI suggestion and user response for learning
+export const docAiFeedback = pgTable(
+  "doc_ai_feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    docId: uuid("doc_id").references(() => docs.id, { onDelete: "cascade" }),
+    fieldName: text("field_name").notNull(), // 'summary', 'keyPoints', 'applicableWhen'
+
+    // What AI produced
+    aiSuggestion: text("ai_suggestion").notNull(),
+    aiModel: text("ai_model"),
+    aiPromptHash: text("ai_prompt_hash"), // Track which prompt version was used
+
+    // What user did
+    userAction: aiUserActionEnum("user_action").notNull(),
+    userFinal: text("user_final"), // What user actually saved (null if rejected)
+    editDistance: integer("edit_distance"), // How much user changed it (0-100%)
+
+    // Context for learning
+    docType: text("doc_type"),
+    docDomain: text("doc_domain"),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+
+    // Timing
+    timeToDecide: integer("time_to_decide"), // Seconds user spent reviewing
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_doc_ai_feedback_doc_id").on(table.docId),
+    index("idx_doc_ai_feedback_context").on(table.docType, table.docDomain, table.fieldName),
+    index("idx_doc_ai_feedback_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertDocAiFeedbackSchema = createInsertSchema(docAiFeedback).omit({
+  id: true,
+  createdAt: true,
+});
+export type DocAiFeedback = typeof docAiFeedback.$inferSelect;
+export type InsertDocAiFeedback = z.infer<typeof insertDocAiFeedbackSchema>;
+
+// Gold standard examples for few-shot learning
+export const docAiExamples = pgTable(
+  "doc_ai_examples",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    docType: text("doc_type").notNull(),
+    docDomain: text("doc_domain"),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+
+    // The gold standard
+    contentExcerpt: text("content_excerpt").notNull(), // Source content (first 2000 chars)
+    fieldName: text("field_name").notNull(), // Which field this is an example for
+    goldOutput: text("gold_output").notNull(), // Human-approved output
+
+    // Quality signals
+    qualityScore: integer("quality_score"),
+    timesUsed: integer("times_used").default(0),
+    successRate: real("success_rate"), // When used as example, how often accepted
+
+    // Lifecycle
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    promotedAt: timestamp("promoted_at"),
+  },
+  (table) => [
+    index("idx_doc_ai_examples_lookup").on(table.docType, table.docDomain, table.fieldName, table.isActive),
+  ]
+);
+
+export const insertDocAiExampleSchema = createInsertSchema(docAiExamples).omit({
+  id: true,
+  createdAt: true,
+  promotedAt: true,
+});
+export type DocAiExample = typeof docAiExamples.$inferSelect;
+export type InsertDocAiExample = z.infer<typeof insertDocAiExampleSchema>;
+
+// Learned patterns from analyzing feedback
+export const docAiPatterns = pgTable(
+  "doc_ai_patterns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    docType: text("doc_type"),
+    docDomain: text("doc_domain"),
+    fieldName: text("field_name").notNull(),
+
+    patternType: aiPatternTypeEnum("pattern_type").notNull(), // positive or negative
+    pattern: text("pattern").notNull(), // The actual pattern description
+    confidence: real("confidence"), // How strong is this pattern (0-1)
+    sourceCount: integer("source_count"), // How many examples support it
+
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_doc_ai_patterns_lookup").on(table.docType, table.docDomain, table.fieldName, table.isActive),
+  ]
+);
+
+export const insertDocAiPatternSchema = createInsertSchema(docAiPatterns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type DocAiPattern = typeof docAiPatterns.$inferSelect;
+export type InsertDocAiPattern = z.infer<typeof insertDocAiPatternSchema>;
+
+// Direct user instructions to AI
+export const docAiTeachings = pgTable(
+  "doc_ai_teachings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    docType: text("doc_type"),
+    docDomain: text("doc_domain"),
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+    fieldName: text("field_name").notNull(),
+
+    teachingType: aiTeachingTypeEnum("teaching_type").notNull(),
+    content: text("content").notNull(), // The teaching content
+
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_doc_ai_teachings_lookup").on(table.docType, table.docDomain, table.fieldName, table.isActive),
+  ]
+);
+
+export const insertDocAiTeachingSchema = createInsertSchema(docAiTeachings).omit({
+  id: true,
+  createdAt: true,
+});
+export type DocAiTeaching = typeof docAiTeachings.$inferSelect;
+export type InsertDocAiTeaching = z.infer<typeof insertDocAiTeachingSchema>;
