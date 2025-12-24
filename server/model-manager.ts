@@ -30,22 +30,23 @@ export const MODEL_CASCADE = [
 
 // Available models for selection in UI (via OpenRouter)
 export const AVAILABLE_MODELS = [
-  // OpenAI models
-  { id: "openai/gpt-4.5-preview", name: "GPT-4.5 Preview", provider: "OpenAI", description: "Latest and most capable GPT model" },
-  { id: "openai/o1", name: "o1", provider: "OpenAI", description: "Advanced reasoning model for complex tasks" },
-  { id: "openai/o1-mini", name: "o1-mini", provider: "OpenAI", description: "Faster reasoning model" },
-  { id: "openai/o3-mini", name: "o3-mini", provider: "OpenAI", description: "Latest mini reasoning model" },
-  { id: "openai/gpt-4o", name: "GPT-4o", provider: "OpenAI", description: "Fast, multimodal flagship model" },
-  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", description: "Fast and efficient, good for most tasks" },
-  // Anthropic models
-  { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", description: "Latest Claude, excellent coding and reasoning" },
+  // Anthropic models (newest first)
+  { id: "anthropic/claude-opus-4", name: "Claude Opus 4", provider: "Anthropic", description: "Most powerful Claude, best for complex tasks" },
+  { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", description: "Excellent balance of speed and capability" },
   { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "Anthropic", description: "Previous gen, still excellent" },
   { id: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku", provider: "Anthropic", description: "Fast and affordable Claude" },
-  { id: "anthropic/claude-3-opus", name: "Claude 3 Opus", provider: "Anthropic", description: "Most powerful Claude 3" },
+  // OpenAI models
+  { id: "openai/gpt-4.5-preview", name: "GPT-4.5 Preview", provider: "OpenAI", description: "Latest and most capable GPT model" },
+  { id: "openai/o3-mini", name: "o3-mini", provider: "OpenAI", description: "Latest mini reasoning model" },
+  { id: "openai/o1", name: "o1", provider: "OpenAI", description: "Advanced reasoning model for complex tasks" },
+  { id: "openai/o1-mini", name: "o1-mini", provider: "OpenAI", description: "Faster reasoning model" },
+  { id: "openai/gpt-4o", name: "GPT-4o", provider: "OpenAI", description: "Fast, multimodal flagship model" },
+  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", description: "Fast and efficient, good for most tasks" },
   // Google models
-  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", provider: "Google", description: "Latest Gemini, fast and capable" },
+  { id: "google/gemini-2.5-pro-preview-06-05", name: "Gemini 2.5 Pro", provider: "Google", description: "Latest Gemini, most capable" },
+  { id: "google/gemini-2.5-flash-preview-05-20", name: "Gemini 2.5 Flash", provider: "Google", description: "Fast latest-gen Gemini" },
+  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", provider: "Google", description: "Fast and capable" },
   { id: "google/gemini-2.0-flash-thinking-exp", name: "Gemini 2.0 Flash Thinking", provider: "Google", description: "Reasoning-enhanced Gemini" },
-  { id: "google/gemini-pro-1.5", name: "Gemini Pro 1.5", provider: "Google", description: "Long context, multimodal" },
   // DeepSeek models
   { id: "deepseek/deepseek-r1", name: "DeepSeek R1", provider: "DeepSeek", description: "Advanced reasoning model" },
   { id: "deepseek/deepseek-chat", name: "DeepSeek V3", provider: "DeepSeek", description: "Latest DeepSeek chat model" },
