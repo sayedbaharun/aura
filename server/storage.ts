@@ -4238,52 +4238,67 @@ export class DBStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<VentureIdea[]> {
-    const conditions = [];
+    try {
+      const conditions = [];
 
-    if (filters?.status) {
-      conditions.push(eq(ventureIdeas.status, filters.status as any));
+      if (filters?.status) {
+        conditions.push(eq(ventureIdeas.status, filters.status as any));
+      }
+
+      if (filters?.verdict) {
+        conditions.push(eq(ventureIdeas.verdict, filters.verdict as any));
+      }
+
+      let query = this.db
+        .select()
+        .from(ventureIdeas)
+        .orderBy(desc(ventureIdeas.createdAt));
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+
+      if (filters?.limit) {
+        query = query.limit(filters.limit) as any;
+      }
+
+      if (filters?.offset) {
+        query = query.offset(filters.offset) as any;
+      }
+
+      return await query;
+    } catch (error) {
+      console.error("Error fetching venture ideas (table may not exist):", error);
+      return [];
     }
-
-    if (filters?.verdict) {
-      conditions.push(eq(ventureIdeas.verdict, filters.verdict as any));
-    }
-
-    let query = this.db
-      .select()
-      .from(ventureIdeas)
-      .orderBy(desc(ventureIdeas.createdAt));
-
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as any;
-    }
-
-    if (filters?.limit) {
-      query = query.limit(filters.limit) as any;
-    }
-
-    if (filters?.offset) {
-      query = query.offset(filters.offset) as any;
-    }
-
-    return await query;
   }
 
   async getVentureIdea(id: string): Promise<VentureIdea | undefined> {
-    const results = await this.db
-      .select()
-      .from(ventureIdeas)
-      .where(eq(ventureIdeas.id, id))
-      .limit(1);
-    return results[0];
+    try {
+      const results = await this.db
+        .select()
+        .from(ventureIdeas)
+        .where(eq(ventureIdeas.id, id))
+        .limit(1);
+      return results[0];
+    } catch (error) {
+      console.error("Error fetching venture idea (table may not exist):", error);
+      return undefined;
+    }
   }
 
   async getVentureIdeaByScoreHash(hash: string): Promise<VentureIdea | undefined> {
-    const results = await this.db
-      .select()
-      .from(ventureIdeas)
-      .where(eq(ventureIdeas.scoreInputHash, hash))
-      .limit(1);
-    return results[0];
+    try {
+      const results = await this.db
+        .select()
+        .from(ventureIdeas)
+        .where(eq(ventureIdeas.scoreInputHash, hash))
+        .limit(1);
+      return results[0];
+    } catch (error) {
+      console.error("Error fetching venture idea by hash (table may not exist):", error);
+      return undefined;
+    }
   }
 
   async createVentureIdea(data: InsertVentureIdea): Promise<VentureIdea> {
@@ -4295,16 +4310,25 @@ export class DBStorage implements IStorage {
   }
 
   async updateVentureIdea(id: string, updates: Partial<InsertVentureIdea>): Promise<VentureIdea | undefined> {
-    const [updated] = await this.db
-      .update(ventureIdeas)
-      .set({ ...updates, updatedAt: new Date() } as any)
-      .where(eq(ventureIdeas.id, id))
-      .returning();
-    return updated;
+    try {
+      const [updated] = await this.db
+        .update(ventureIdeas)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(ventureIdeas.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating venture idea (table may not exist):", error);
+      return undefined;
+    }
   }
 
   async deleteVentureIdea(id: string): Promise<void> {
-    await this.db.delete(ventureIdeas).where(eq(ventureIdeas.id, id));
+    try {
+      await this.db.delete(ventureIdeas).where(eq(ventureIdeas.id, id));
+    } catch (error) {
+      console.error("Error deleting venture idea (table may not exist):", error);
+    }
   }
 
 }
