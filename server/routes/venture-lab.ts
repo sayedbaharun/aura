@@ -78,65 +78,89 @@ router.post("/generate-prompt", aiRateLimiter, async (req: Request, res: Respons
     }
 
     // Build context for the AI to understand the idea
-    const domainLabel = domain ? DOMAIN_LABELS[domain] || domain : "Unknown";
+    const domainLabel = domain ? DOMAIN_LABELS[domain] || domain : "";
 
     const ideaContext = `
-BUSINESS IDEA TO RESEARCH:
+BUSINESS IDEA:
 - Name: ${name}
 - Description: ${description}
-${domain ? `- Domain/Industry: ${domainLabel}` : ""}
+${domain ? `- Domain: ${domainLabel}` : ""}
 ${targetCustomer ? `- Target Customer: ${targetCustomer}` : ""}
 ${initialThoughts ? `- Initial Hypotheses: ${initialThoughts}` : ""}
 `.trim();
 
-    // System prompt for the AI to generate a customized research prompt
-    const systemPrompt = `You are a strategic business analyst and venture researcher. Your task is to create a CUSTOMIZED research prompt for an external AI (${provider === "gemini" ? "Google Gemini" : "Perplexity"}) to thoroughly research a business idea.
+    // System prompt using the lean skeleton
+    const systemPrompt = `You are a venture analyst. Your task is to create a CUSTOMIZED research prompt for ${provider === "gemini" ? "Google Gemini" : "Perplexity"} to evaluate a business idea for commercial feasibility.
 
-The research prompt you generate must be SPECIFICALLY TAILORED to this particular idea - not a generic template. You should:
+The prompt you generate must be SPECIFICALLY TAILORED to this idea. You must:
 
-1. ANALYZE the idea to understand:
-   - What industry/domain it's in
-   - Who the likely competitors would be (name specific companies to research)
-   - What business models typically work in this space
-   - What regulatory or compliance issues might apply
-   - What technical requirements are likely needed
+1. ANALYZE the idea to identify:
+   - The specific industry and sub-segment
+   - Likely competitors (name actual companies)
+   - Relevant business models for this space
+   - Regulatory considerations specific to this domain
+   - Technical/operational requirements
 
-2. CUSTOMIZE the research questions to:
-   - Ask about SPECIFIC competitors relevant to this idea (don't just say "competitors" - name them)
-   - Request data relevant to THIS market (e.g., if it's SaaS, ask about SaaS metrics like MRR, churn, CAC)
-   - Probe the specific pain points this solution addresses
-   - Explore the specific customer segment mentioned
-   - Consider the unique risks and barriers for THIS type of business
+2. CUSTOMIZE each section to ask POINTED questions:
+   - Name specific competitors to research (not "find competitors")
+   - Ask for metrics relevant to THIS business type
+   - Probe THIS customer segment specifically
+   - Consider risks unique to THIS industry
 
-3. FORMAT the prompt so ${provider === "gemini" ? "Gemini" : "Perplexity"} will return structured, actionable insights${provider === "perplexity" ? " with sources and citations" : ""}.
+The prompt must follow this exact structure:
 
-The output should be a complete, ready-to-use research prompt that the user can copy and paste directly into ${provider === "gemini" ? "Gemini" : "Perplexity"}.
+---
+Act as a venture analyst.
+Evaluate [IDEA NAME] strictly for commercial feasibility.
+${provider === "perplexity" ? "Include sources and citations for all data points." : ""}
 
-IMPORTANT: Do NOT generate a generic prompt. The prompt must show that you UNDERSTAND what this specific business is about and ask POINTED questions that will validate or invalidate this specific opportunity.
+[Brief description of the idea]
 
-CRITICAL: Output ONLY the research prompt itself. Do NOT include any:
-- Introductory text like "Here's a customized prompt..."
-- Concluding statements like "This prompt is designed to..."
-- Meta-commentary about what the prompt will do
-- Explanations of why you structured it this way
+Produce:
 
-The output should start directly with the research request (e.g., "# Venture Research Request: [Name]") and end with the last research instruction. Nothing before, nothing after.`;
+1. **Problem Definition**
+   [Customized questions about who feels this pain and how badly]
+
+2. **Target Buyer with Budget**
+   [Customized questions about who pays, budget authority, willingness to pay]
+
+3. **Market Demand Signals**
+   [Customized questions about specific evidence: searches, forums, spending patterns relevant to THIS idea]
+
+4. **Competitive Landscape**
+   [Name 3-5 SPECIFIC competitors to research for THIS idea]
+
+5. **Differentiation Angle**
+   [Customized questions about what would make THIS idea defensible]
+
+6. **Revenue Model + Unit Economics**
+   [Customized questions about pricing, CAC, LTV relevant to THIS business type]
+
+7. **Distribution Path to First 100 Customers**
+   [Customized questions about specific channels for THIS customer segment]
+
+8. **Regulatory/Compliance Risks**
+   [Customized questions about specific regulations for THIS industry]
+
+9. **AI Leverage Opportunities**
+   [Customized questions about how AI could provide advantages for THIS specific business]
+
+10. **Top 3 Failure Modes**
+    [Customized questions about what could kill THIS specific business]
+
+**Verdict:** GO / NO-GO / NEEDS VALIDATION
+One-line reasoning.
+---
+
+CRITICAL RULES:
+- Output ONLY the research prompt. No intro, no conclusion, no meta-commentary.
+- Start directly with "Act as a venture analyst."
+- End with the verdict format. Nothing after.
+- Make every section SPECIFIC to this idea - no generic questions.`;
 
     const userPrompt = `${ideaContext}
 
-Generate a customized research prompt for ${provider === "gemini" ? "Gemini" : "Perplexity"} to thoroughly research this business idea. The prompt should be comprehensive and specifically tailored to this idea, not generic.
-
-The research prompt should help the user make a GO/NO-GO decision by covering:
-1. Market validation specific to this idea
-2. Named competitors to research
-3. Business model analysis for this type of business
-4. Go-to-market strategies relevant to this space
-5. Execution requirements for this specific idea
-6. Risks specific to this industry/approach
-7. An opportunity scoring framework
-8. Clear recommendation criteria
-
-Make the prompt detailed and specific. Include instructions for the AI to structure its response in a format that can be saved to a knowledge base.`;
+Generate the customized research prompt for ${provider === "gemini" ? "Gemini" : "Perplexity"}.`;
 
     // Call OpenRouter API
     const OpenAI = (await import("openai")).default;
@@ -146,13 +170,13 @@ Make the prompt detailed and specific. Include instructions for the AI to struct
     });
 
     const completion = await openai.chat.completions.create({
-      model: "openai/gpt-4o", // Using a strong model for prompt generation
+      model: "openai/gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 3000,
     });
 
     const generatedPrompt = completion.choices[0]?.message?.content;
@@ -204,88 +228,73 @@ function generateFallbackPrompt(idea: z.infer<typeof generatePromptSchema>): str
   const { name, description, domain, targetCustomer, initialThoughts, provider } = idea;
   const domainLabel = domain ? DOMAIN_LABELS[domain] || domain : "";
 
-  const providerNote = provider === "perplexity"
-    ? "Please include sources and links where possible. Use your web search capabilities to find current data."
-    : "Please provide thorough analysis based on your knowledge. Where you reference specific data or trends, note the source if known.";
+  const sourceNote = provider === "perplexity"
+    ? "Include sources and citations for all data points."
+    : "";
 
-  return `# Venture Research Request: ${name}
+  return `Act as a venture analyst.
+Evaluate "${name}" strictly for commercial feasibility.
+${sourceNote}
 
-## Context
-I'm evaluating a business idea and need comprehensive research to make a GO/NO-GO decision. ${providerNote}
-
-## The Idea
-**Name:** ${name}
-**Description:** ${description}
-${domain ? `**Domain:** ${domainLabel}` : ""}
+**The Idea:** ${description}
+${domainLabel ? `**Domain:** ${domainLabel}` : ""}
 ${targetCustomer ? `**Target Customer:** ${targetCustomer}` : ""}
-${initialThoughts ? `**Initial Thoughts:** ${initialThoughts}` : ""}
+${initialThoughts ? `**Hypothesis:** ${initialThoughts}` : ""}
 
----
+Produce:
 
-## Research Required
+1. **Problem Definition**
+   - Who feels this pain? How badly? (severity 1-10)
+   - What triggers them to seek a solution?
+   - How are they solving it today?
 
-Please provide detailed research on the following areas. Structure your response with clear markdown headers.
+2. **Target Buyer with Budget**
+   - Who specifically pays for this? (job title, company size)
+   - Do they have budget authority?
+   - What do they currently spend on alternatives?
 
-### 1. Problem & Market Validation
-- Is this a real problem that people/businesses actively pay to solve?
-- What is the market size? (Provide TAM/SAM/SOM estimates with sources)
-- Who is the ideal customer profile?
-- What are the primary pain points and how are they currently addressed?
+3. **Market Demand Signals**
+   - Search volume for related terms
+   - Active communities/forums discussing this problem
+   - Evidence of spending (existing products, services, workarounds)
 
-### 2. Competitive Landscape
-- Who are the direct competitors?
-- Who are indirect competitors?
-- What are the market gaps and opportunities?
-- What would differentiate a new entrant?
+4. **Competitive Landscape**
+   - Direct competitors (name specific companies)
+   - Indirect competitors and alternatives
+   - What's their pricing, positioning, and weaknesses?
 
-### 3. Business Model Analysis
-- What revenue models work in this space?
-- What are typical pricing benchmarks?
-- What are the unit economics like?
-- Is the revenue recurring or one-time?
+5. **Differentiation Angle**
+   - What would make this defensible?
+   - Is there a unique insight or unfair advantage?
+   - Why wouldn't an incumbent just copy this?
 
-### 4. Go-to-Market Intelligence
-- How do successful players acquire customers?
-- What distribution channels work best?
-- What marketing approaches work?
-- What is typical customer acquisition cost?
+6. **Revenue Model + Unit Economics**
+   - Best revenue model for this space (subscription, transaction, etc.)
+   - Realistic pricing based on alternatives
+   - Estimated CAC and LTV potential
 
-### 5. Execution Requirements
-- What's needed to build an MVP?
-- What key skills or team members are required?
-- What's a realistic timeline to first revenue?
-- What are the operational complexities?
+7. **Distribution Path to First 100 Customers**
+   - Specific channels to reach this customer
+   - What's the sales motion? (self-serve, sales-led, PLG)
+   - Where do these customers already congregate?
 
-### 6. Risk Assessment
-- What are the barriers to entry?
-- What are the key risks and mitigations?
-- Are there regulatory or legal considerations?
-- What market timing factors are relevant?
+8. **Regulatory/Compliance Risks**
+   - Industry-specific regulations
+   - Data privacy considerations
+   - Licensing or certification requirements
 
-### 7. Opportunity Scorecard
-Rate 1-10 for each:
-- Market Attractiveness
-- Competition Intensity
-- Execution Feasibility
-- Revenue Potential
-- Timing & Urgency
-- Overall Opportunity Score
+9. **AI Leverage Opportunities**
+   - Where could AI provide 10x improvement?
+   - What manual processes could be automated?
+   - Competitive moat from AI capabilities?
 
-### 8. Recommendation
-**Decision:** [GO / NO-GO / NEEDS MORE RESEARCH]
+10. **Top 3 Failure Modes**
+    - What kills this business?
+    - Key assumptions that must be true
+    - External risks (market, technology, regulation)
 
-**Key Reasons:**
-1. [Primary reason]
-2. [Secondary reason]
-3. [Third reason]
-
-**If GO - Suggested First Steps**
-
-**If NO-GO - What Would Change This?**
-
----
-
-Please structure your response in clean markdown with headers as shown above.`;
+**Verdict:** GO / NO-GO / NEEDS VALIDATION
+One-line reasoning.`;
 }
 
 export default router;

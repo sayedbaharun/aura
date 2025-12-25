@@ -63,103 +63,75 @@ const DOMAIN_OPTIONS = [
 ];
 
 function generateResearchPrompt(idea: IdeaInput, provider: AIProvider): string {
-  const providerNote = provider === "perplexity"
-    ? "Please include sources and links where possible. Use your web search capabilities to find current data."
-    : "Please provide thorough analysis based on your knowledge. Where you reference specific data or trends, note the source if known.";
+  const sourceNote = provider === "perplexity"
+    ? "Include sources and citations for all data points."
+    : "";
 
-  return `# Venture Research Request: ${idea.name}
+  const domainLabel = idea.domain ? DOMAIN_OPTIONS.find(d => d.value === idea.domain)?.label || idea.domain : "";
 
-## Context
-I'm evaluating a business idea and need comprehensive research to make a GO/NO-GO decision. ${providerNote}
+  return `Act as a venture analyst.
+Evaluate "${idea.name}" strictly for commercial feasibility.
+${sourceNote}
 
-## The Idea
-**Name:** ${idea.name}
-**Description:** ${idea.description}
-${idea.domain ? `**Domain:** ${DOMAIN_OPTIONS.find(d => d.value === idea.domain)?.label || idea.domain}` : ""}
+**The Idea:** ${idea.description}
+${domainLabel ? `**Domain:** ${domainLabel}` : ""}
 ${idea.targetCustomer ? `**Target Customer:** ${idea.targetCustomer}` : ""}
-${idea.initialThoughts ? `**Initial Thoughts:** ${idea.initialThoughts}` : ""}
+${idea.initialThoughts ? `**Hypothesis:** ${idea.initialThoughts}` : ""}
 
----
+Produce:
 
-## Research Required
+1. **Problem Definition**
+   - Who feels this pain? How badly? (severity 1-10)
+   - What triggers them to seek a solution?
+   - How are they solving it today?
 
-Please provide detailed research on the following areas. Structure your response with clear markdown headers matching each section.
+2. **Target Buyer with Budget**
+   - Who specifically pays for this? (job title, company size)
+   - Do they have budget authority?
+   - What do they currently spend on alternatives?
 
-### 1. Problem & Market Validation
-- Is this a real problem that people/businesses actively pay to solve?
-- What is the market size? (Provide TAM/SAM/SOM estimates with sources)
-- Who is the ideal customer profile? (Demographics, psychographics, behaviors)
-- What are the primary pain points and how are they currently addressed?
-- What triggers someone to seek a solution to this problem?
+3. **Market Demand Signals**
+   - Search volume for related terms
+   - Active communities/forums discussing this problem
+   - Evidence of spending (existing products, services, workarounds)
 
-### 2. Competitive Landscape
-- Who are the direct competitors? (Companies doing the exact same thing)
-- Who are indirect competitors? (Alternative solutions to the same problem)
-- What are the market gaps and underserved segments?
-- What would differentiate a new entrant? What moats exist?
-- Provide a brief competitive matrix if possible (features, pricing, positioning)
+4. **Competitive Landscape**
+   - Direct competitors (name specific companies)
+   - Indirect competitors and alternatives
+   - What's their pricing, positioning, and weaknesses?
 
-### 3. Business Model Analysis
-- What revenue models work in this space? (Subscription, transaction, licensing, etc.)
-- What are typical pricing benchmarks? What do customers pay?
-- What are the unit economics like? (CAC, LTV, margins in similar businesses)
-- Is the revenue recurring or one-time? What drives retention?
-- What's the typical sales cycle length?
+5. **Differentiation Angle**
+   - What would make this defensible?
+   - Is there a unique insight or unfair advantage?
+   - Why wouldn't an incumbent just copy this?
 
-### 4. Go-to-Market Intelligence
-- How do successful players acquire customers in this space?
-- What distribution channels work best? (Direct, partners, marketplaces, etc.)
-- What marketing approaches and content work? (Paid, organic, community, etc.)
-- What is typical customer acquisition cost in this space?
-- Are there platforms, partnerships, or ecosystems to leverage?
+6. **Revenue Model + Unit Economics**
+   - Best revenue model for this space (subscription, transaction, etc.)
+   - Realistic pricing based on alternatives
+   - Estimated CAC and LTV potential
 
-### 5. Execution Requirements
-- What's needed to build an MVP? (Tech stack, time, cost estimates)
-- What key skills or team members are required?
-- What's a realistic timeline to first revenue?
-- What are the operational complexities? (Support, fulfillment, compliance)
-- Are there regulatory or legal considerations?
+7. **Distribution Path to First 100 Customers**
+   - Specific channels to reach this customer
+   - What's the sales motion? (self-serve, sales-led, PLG)
+   - Where do these customers already congregate?
 
-### 6. Risk Assessment
-- What are the barriers to entry? (Capital, expertise, relationships, tech)
-- What are the key risks and how might they be mitigated?
-- Are there regulatory, legal, or compliance risks?
-- What market timing factors are relevant? (Is this the right time?)
-- What could cause this business to fail?
+8. **Regulatory/Compliance Risks**
+   - Industry-specific regulations
+   - Data privacy considerations
+   - Licensing or certification requirements
 
-### 7. Opportunity Scorecard
-Based on your research, provide scores from 1-10 for each factor:
+9. **AI Leverage Opportunities**
+   - Where could AI provide 10x improvement?
+   - What manual processes could be automated?
+   - Competitive moat from AI capabilities?
 
-| Factor | Score | Reasoning |
-|--------|-------|-----------|
-| Market Attractiveness | /10 | [Brief reasoning] |
-| Competition Intensity | /10 | [Lower is more competitive, higher means less crowded] |
-| Execution Feasibility | /10 | [Higher means easier to execute] |
-| Revenue Potential | /10 | [Higher means larger opportunity] |
-| Timing & Urgency | /10 | [Higher means better timing] |
-| **Overall Opportunity** | /10 | [Weighted average or holistic assessment] |
+10. **Top 3 Failure Modes**
+    - What kills this business?
+    - Key assumptions that must be true
+    - External risks (market, technology, regulation)
 
-### 8. Recommendation
-
-**Decision:** [GO / NO-GO / NEEDS MORE RESEARCH]
-
-**Key Reasons:**
-1. [Primary reason for recommendation]
-2. [Secondary reason]
-3. [Third reason]
-
-**If GO - Suggested First Steps:**
-1. [First action to take]
-2. [Second action]
-3. [Third action]
-
-**If NO-GO - What Would Change This?**
-[What conditions or changes would make this viable?]
-
----
-
-## Output Format
-Please structure your entire response in clean markdown with the headers exactly as shown above. This will be saved directly to a knowledge base, so consistent formatting is important.`;
+**Verdict:** GO / NO-GO / NEEDS VALIDATION
+One-line reasoning.`;
 }
 
 function generateResearchDocTemplate(idea: IdeaInput): string {
@@ -169,13 +141,10 @@ function generateResearchDocTemplate(idea: IdeaInput): string {
 
 **Status:** Researching
 **Research Date:** ${today}
-**Research Source:** [Gemini / Perplexity / Multiple]
+**Research Source:** [Gemini / Perplexity]
 **Decision:** Pending
 
 ---
-
-## Executive Summary
-[2-3 sentence summary of the opportunity - fill in after research]
 
 ## The Idea
 **Name:** ${idea.name}
@@ -187,49 +156,66 @@ ${idea.targetCustomer ? `**Target Customer:** ${idea.targetCustomer}` : ""}
 
 ## Research Findings
 
-### Problem & Market
-[Paste findings here]
+### 1. Problem Definition
+- **Who feels this pain:**
+- **Severity (1-10):**
+- **Current solutions:**
 
-### Competition
-[Paste findings here]
+### 2. Target Buyer with Budget
+- **Who pays:**
+- **Budget authority:**
+- **Current spend on alternatives:**
 
-### Business Model
-[Paste findings here]
+### 3. Market Demand Signals
+- **Search volume:**
+- **Active communities:**
+- **Spending evidence:**
 
-### Go-to-Market
-[Paste findings here]
+### 4. Competitive Landscape
+| Competitor | Positioning | Pricing | Weakness |
+|------------|-------------|---------|----------|
+| | | | |
+| | | | |
+| | | | |
 
-### Execution Requirements
-[Paste findings here]
+### 5. Differentiation Angle
+- **Defensibility:**
+- **Unique insight:**
+- **Why incumbents won't copy:**
 
-### Risks
-[Paste findings here]
+### 6. Revenue Model + Unit Economics
+- **Revenue model:**
+- **Pricing:**
+- **CAC estimate:**
+- **LTV potential:**
 
----
+### 7. Distribution Path to First 100 Customers
+- **Primary channel:**
+- **Sales motion:**
+- **Where customers congregate:**
 
-## Opportunity Scorecard
+### 8. Regulatory/Compliance Risks
+- **Industry regulations:**
+- **Data privacy:**
+- **Licensing requirements:**
 
-| Factor | Score (1-10) | Notes |
-|--------|--------------|-------|
-| Market Attractiveness | | |
-| Competition Level | | |
-| Execution Feasibility | | |
-| Revenue Potential | | |
-| Timing | | |
-| **Overall** | | |
+### 9. AI Leverage Opportunities
+- **10x improvement areas:**
+- **Automation potential:**
+- **AI moat:**
 
----
-
-## Recommendation
-[GO / NO-GO / NEEDS MORE]
-
-### Reasoning
-[Key points]
-
-### If GO - Next Steps
+### 10. Top 3 Failure Modes
 1.
 2.
 3.
+
+---
+
+## Verdict
+
+**Decision:** GO / NO-GO / NEEDS VALIDATION
+
+**One-line reasoning:**
 
 ---
 
@@ -241,7 +227,7 @@ ${idea.targetCustomer ? `**Target Customer:** ${idea.targetCustomer}` : ""}
 
 ---
 
-## Raw Research
+## Raw Research Output
 [Paste full AI research output below]
 
 `;
