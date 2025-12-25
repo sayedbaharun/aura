@@ -1,20 +1,28 @@
 import { useState, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   FlaskConical,
-  Copy,
-  Check,
-  Sparkles,
-  FileText,
-  ArrowRight,
+  Plus,
   Search,
   Target,
+  ArrowRight,
   ChevronDown,
   ChevronUp,
-  Save,
-  ExternalLink,
   Loader2,
   Brain,
+  CheckCircle2,
+  XCircle,
+  PauseCircle,
+  AlertTriangle,
+  TrendingUp,
+  Rocket,
+  FileText,
+  Edit3,
+  Trash2,
+  RefreshCw,
+  ExternalLink,
+  Clock,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,22 +39,82 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type AIProvider = "gemini" | "perplexity";
-type ResearchStage = "idea" | "prompt" | "research" | "review";
+// Types
+interface ScoreBreakdown {
+  score: number;
+  max: number;
+  reasoning: string;
+}
 
-interface IdeaInput {
+interface ScoreData {
+  rawScore: number;
+  confidence: number;
+  finalScore: number;
+  breakdown: {
+    buyerClarityBudget: ScoreBreakdown;
+    painIntensityUrgency: ScoreBreakdown;
+    distributionFeasibility: ScoreBreakdown;
+    revenueModelRealism: ScoreBreakdown;
+    competitiveEdge: ScoreBreakdown;
+    executionComplexity: ScoreBreakdown;
+    regulatoryFriction: ScoreBreakdown;
+    aiLeverage: ScoreBreakdown;
+  };
+  killReasons: string[];
+  nextValidationSteps: string[];
+}
+
+interface VentureIdea {
+  id: string;
   name: string;
   description: string;
-  domain: string;
-  targetCustomer: string;
-  initialThoughts: string;
+  domain: string | null;
+  targetCustomer: string | null;
+  initialThoughts: string | null;
+  status: string;
+  researchDocId: string | null;
+  researchCompletedAt: string | null;
+  researchModel: string | null;
+  researchTokensUsed: number | null;
+  scoreData: ScoreData | null;
+  verdict: "GREEN" | "YELLOW" | "RED" | null;
+  scoredAt: string | null;
+  approvalDecision: string | null;
+  approvalComment: string | null;
+  approvedAt: string | null;
+  ventureId: string | null;
+  compiledAt: string | null;
+  compilationData: {
+    projectsCreated: number;
+    phasesCreated: number;
+    tasksCreated: number;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ResearchDoc {
+  id: string;
+  title: string;
+  body: string;
 }
 
 const DOMAIN_OPTIONS = [
@@ -62,736 +130,906 @@ const DOMAIN_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-function generateResearchPrompt(idea: IdeaInput, provider: AIProvider): string {
-  const providerNote = provider === "perplexity"
-    ? "Please include sources and links where possible. Use your web search capabilities to find current data."
-    : "Please provide thorough analysis based on your knowledge. Where you reference specific data or trends, note the source if known.";
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+  idea: { label: "New Idea", color: "bg-slate-500", icon: Target },
+  researching: { label: "Researching", color: "bg-blue-500", icon: Search },
+  researched: { label: "Researched", color: "bg-indigo-500", icon: FileText },
+  scoring: { label: "Scoring", color: "bg-purple-500", icon: Brain },
+  scored: { label: "Scored", color: "bg-violet-500", icon: TrendingUp },
+  approved: { label: "Approved", color: "bg-green-500", icon: CheckCircle2 },
+  rejected: { label: "Killed", color: "bg-red-500", icon: XCircle },
+  parked: { label: "Parked", color: "bg-amber-500", icon: PauseCircle },
+  compiling: { label: "Compiling", color: "bg-cyan-500", icon: Zap },
+  compiled: { label: "Compiled", color: "bg-emerald-500", icon: Rocket },
+  failed: { label: "Failed", color: "bg-red-700", icon: AlertTriangle },
+};
 
-  return `# Venture Research Request: ${idea.name}
+const VERDICT_CONFIG = {
+  GREEN: { label: "GREEN", color: "bg-green-500 text-white", description: "Full venture pack" },
+  YELLOW: { label: "YELLOW", color: "bg-yellow-500 text-black", description: "Pilot pack only" },
+  RED: { label: "RED", color: "bg-red-500 text-white", description: "Kill / Archive" },
+};
 
-## Context
-I'm evaluating a business idea and need comprehensive research to make a GO/NO-GO decision. ${providerNote}
-
-## The Idea
-**Name:** ${idea.name}
-**Description:** ${idea.description}
-${idea.domain ? `**Domain:** ${DOMAIN_OPTIONS.find(d => d.value === idea.domain)?.label || idea.domain}` : ""}
-${idea.targetCustomer ? `**Target Customer:** ${idea.targetCustomer}` : ""}
-${idea.initialThoughts ? `**Initial Thoughts:** ${idea.initialThoughts}` : ""}
-
----
-
-## Research Required
-
-Please provide detailed research on the following areas. Structure your response with clear markdown headers matching each section.
-
-### 1. Problem & Market Validation
-- Is this a real problem that people/businesses actively pay to solve?
-- What is the market size? (Provide TAM/SAM/SOM estimates with sources)
-- Who is the ideal customer profile? (Demographics, psychographics, behaviors)
-- What are the primary pain points and how are they currently addressed?
-- What triggers someone to seek a solution to this problem?
-
-### 2. Competitive Landscape
-- Who are the direct competitors? (Companies doing the exact same thing)
-- Who are indirect competitors? (Alternative solutions to the same problem)
-- What are the market gaps and underserved segments?
-- What would differentiate a new entrant? What moats exist?
-- Provide a brief competitive matrix if possible (features, pricing, positioning)
-
-### 3. Business Model Analysis
-- What revenue models work in this space? (Subscription, transaction, licensing, etc.)
-- What are typical pricing benchmarks? What do customers pay?
-- What are the unit economics like? (CAC, LTV, margins in similar businesses)
-- Is the revenue recurring or one-time? What drives retention?
-- What's the typical sales cycle length?
-
-### 4. Go-to-Market Intelligence
-- How do successful players acquire customers in this space?
-- What distribution channels work best? (Direct, partners, marketplaces, etc.)
-- What marketing approaches and content work? (Paid, organic, community, etc.)
-- What is typical customer acquisition cost in this space?
-- Are there platforms, partnerships, or ecosystems to leverage?
-
-### 5. Execution Requirements
-- What's needed to build an MVP? (Tech stack, time, cost estimates)
-- What key skills or team members are required?
-- What's a realistic timeline to first revenue?
-- What are the operational complexities? (Support, fulfillment, compliance)
-- Are there regulatory or legal considerations?
-
-### 6. Risk Assessment
-- What are the barriers to entry? (Capital, expertise, relationships, tech)
-- What are the key risks and how might they be mitigated?
-- Are there regulatory, legal, or compliance risks?
-- What market timing factors are relevant? (Is this the right time?)
-- What could cause this business to fail?
-
-### 7. Opportunity Scorecard
-Based on your research, provide scores from 1-10 for each factor:
-
-| Factor | Score | Reasoning |
-|--------|-------|-----------|
-| Market Attractiveness | /10 | [Brief reasoning] |
-| Competition Intensity | /10 | [Lower is more competitive, higher means less crowded] |
-| Execution Feasibility | /10 | [Higher means easier to execute] |
-| Revenue Potential | /10 | [Higher means larger opportunity] |
-| Timing & Urgency | /10 | [Higher means better timing] |
-| **Overall Opportunity** | /10 | [Weighted average or holistic assessment] |
-
-### 8. Recommendation
-
-**Decision:** [GO / NO-GO / NEEDS MORE RESEARCH]
-
-**Key Reasons:**
-1. [Primary reason for recommendation]
-2. [Secondary reason]
-3. [Third reason]
-
-**If GO - Suggested First Steps:**
-1. [First action to take]
-2. [Second action]
-3. [Third action]
-
-**If NO-GO - What Would Change This?**
-[What conditions or changes would make this viable?]
-
----
-
-## Output Format
-Please structure your entire response in clean markdown with the headers exactly as shown above. This will be saved directly to a knowledge base, so consistent formatting is important.`;
+// Components
+function StatusBadge({ status }: { status: string }) {
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.idea;
+  const Icon = config.icon;
+  return (
+    <Badge className={`${config.color} text-white gap-1`}>
+      <Icon className="h-3 w-3" />
+      {config.label}
+    </Badge>
+  );
 }
 
-function generateResearchDocTemplate(idea: IdeaInput): string {
-  const today = new Date().toISOString().split('T')[0];
-
-  return `# Venture Research: ${idea.name}
-
-**Status:** Researching
-**Research Date:** ${today}
-**Research Source:** [Gemini / Perplexity / Multiple]
-**Decision:** Pending
-
----
-
-## Executive Summary
-[2-3 sentence summary of the opportunity - fill in after research]
-
-## The Idea
-**Name:** ${idea.name}
-**Description:** ${idea.description}
-${idea.domain ? `**Domain:** ${DOMAIN_OPTIONS.find(d => d.value === idea.domain)?.label || idea.domain}` : ""}
-${idea.targetCustomer ? `**Target Customer:** ${idea.targetCustomer}` : ""}
-
----
-
-## Research Findings
-
-### Problem & Market
-[Paste findings here]
-
-### Competition
-[Paste findings here]
-
-### Business Model
-[Paste findings here]
-
-### Go-to-Market
-[Paste findings here]
-
-### Execution Requirements
-[Paste findings here]
-
-### Risks
-[Paste findings here]
-
----
-
-## Opportunity Scorecard
-
-| Factor | Score (1-10) | Notes |
-|--------|--------------|-------|
-| Market Attractiveness | | |
-| Competition Level | | |
-| Execution Feasibility | | |
-| Revenue Potential | | |
-| Timing | | |
-| **Overall** | | |
-
----
-
-## Recommendation
-[GO / NO-GO / NEEDS MORE]
-
-### Reasoning
-[Key points]
-
-### If GO - Next Steps
-1.
-2.
-3.
-
----
-
-## Decision Log
-
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| ${today} | Research Started | Initial idea evaluation |
-
----
-
-## Raw Research
-[Paste full AI research output below]
-
-`;
+function VerdictBadge({ verdict }: { verdict: "GREEN" | "YELLOW" | "RED" }) {
+  const config = VERDICT_CONFIG[verdict];
+  return (
+    <Badge className={`${config.color} text-sm px-3 py-1`}>
+      {config.label} - {config.description}
+    </Badge>
+  );
 }
 
-export default function VentureLabPage() {
+function ScoreDisplay({ scoreData }: { scoreData: ScoreData }) {
+  const dimensions = [
+    { key: "buyerClarityBudget", label: "Buyer Clarity & Budget" },
+    { key: "painIntensityUrgency", label: "Pain Intensity" },
+    { key: "distributionFeasibility", label: "Distribution" },
+    { key: "revenueModelRealism", label: "Revenue Model" },
+    { key: "competitiveEdge", label: "Competitive Edge" },
+    { key: "executionComplexity", label: "Execution (inverse)" },
+    { key: "regulatoryFriction", label: "Regulatory (inverse)" },
+    { key: "aiLeverage", label: "AI Leverage" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-3xl font-bold">{scoreData.finalScore.toFixed(1)}</div>
+          <div className="text-sm text-muted-foreground">
+            Raw: {scoreData.rawScore} × Confidence: {(scoreData.confidence * 100).toFixed(0)}%
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {dimensions.map(({ key, label }) => {
+          const data = scoreData.breakdown[key as keyof typeof scoreData.breakdown];
+          const percentage = (data.score / data.max) * 100;
+          return (
+            <div key={key} className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>{label}</span>
+                <span className="text-muted-foreground">
+                  {data.score}/{data.max}
+                </span>
+              </div>
+              <Progress value={percentage} className="h-2" />
+              <p className="text-xs text-muted-foreground">{data.reasoning}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {scoreData.killReasons.length > 0 && (
+        <div className="mt-4">
+          <h4 className="font-medium text-red-600 mb-2">Kill Reasons</h4>
+          <ul className="list-disc list-inside text-sm text-muted-foreground">
+            {scoreData.killReasons.map((reason, i) => (
+              <li key={i}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {scoreData.nextValidationSteps.length > 0 && (
+        <div className="mt-4">
+          <h4 className="font-medium mb-2">Next Validation Steps</h4>
+          <ol className="list-decimal list-inside text-sm text-muted-foreground">
+            {scoreData.nextValidationSteps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CreateIdeaDialog({ onCreated }: { onCreated: () => void }) {
   const { toast } = useToast();
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
-  // Stage tracking
-  const [stage, setStage] = useState<ResearchStage>("idea");
-
-  // Idea input
-  const [idea, setIdea] = useState<IdeaInput>({
+  const [open, setOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [formData, setFormData] = useState({
     name: "",
     description: "",
     domain: "",
     targetCustomer: "",
     initialThoughts: "",
   });
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Prompt generation
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider>("gemini");
-  const [generatedPrompt, setGeneratedPrompt] = useState("");
-  const [copied, setCopied] = useState(false);
-
-  // Research results
-  const [researchResults, setResearchResults] = useState("");
-
-  // Track if AI was used for the prompt
-  const [promptMethod, setPromptMethod] = useState<"ai" | "template">("template");
-
-  // Auto-focus on mount
-  useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
-
-  // AI-powered prompt generation mutation
-  const generatePromptMutation = useMutation({
-    mutationFn: async (data: {
-      name: string;
-      description: string;
-      domain?: string;
-      targetCustomer?: string;
-      initialThoughts?: string;
-      provider: "gemini" | "perplexity";
-    }) => {
-      const res = await apiRequest("POST", "/api/venture-lab/generate-prompt", data);
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await apiRequest("POST", "/api/venture-lab/ideas", data);
       return await res.json();
     },
-    onSuccess: (data) => {
-      setGeneratedPrompt(data.prompt);
-      setPromptMethod(data.method || "ai");
-      setStage("prompt");
-
-      if (data.method === "ai") {
-        toast({
-          title: "Intelligent prompt generated",
-          description: `AI has analyzed your idea and created a customized research prompt for ${selectedProvider === "gemini" ? "Gemini" : "Perplexity"}.`,
-        });
-      } else {
-        toast({
-          title: "Prompt generated",
-          description: `Research prompt ready for ${selectedProvider === "gemini" ? "Gemini" : "Perplexity"}.`,
-        });
-      }
+    onSuccess: () => {
+      toast({ title: "Idea created", description: "Your idea has been captured." });
+      setOpen(false);
+      setFormData({ name: "", description: "", domain: "", targetCustomer: "", initialThoughts: "" });
+      onCreated();
     },
     onError: (error: any) => {
-      // Fall back to template-based prompt on error
-      const prompt = generateResearchPrompt(idea, selectedProvider);
-      setGeneratedPrompt(prompt);
-      setPromptMethod("template");
-      setStage("prompt");
-
-      toast({
-        title: "Using template prompt",
-        description: "AI unavailable - generated template-based prompt instead.",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleGeneratePrompt = () => {
-    if (!idea.name.trim() || !idea.description.trim()) {
-      toast({
-        title: "Missing information",
-        description: "Please provide at least an idea name and description.",
-        variant: "destructive",
-      });
-      return;
-    }
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="gap-2">
+          <Plus className="h-4 w-4" />
+          New Idea
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Capture New Idea</DialogTitle>
+          <DialogDescription>
+            Describe your business idea. We'll research, score, and help you decide if it's worth pursuing.
+          </DialogDescription>
+        </DialogHeader>
 
-    // Call AI-powered prompt generation
-    generatePromptMutation.mutate({
-      name: idea.name,
-      description: idea.description,
-      domain: idea.domain || undefined,
-      targetCustomer: idea.targetCustomer || undefined,
-      initialThoughts: idea.initialThoughts || undefined,
-      provider: selectedProvider,
-    });
-  };
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Idea Name *</Label>
+            <Input
+              id="name"
+              placeholder="e.g., AI-Powered Resume Builder"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
 
-  const handleCopyPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedPrompt);
-      setCopied(true);
-      toast({
-        title: "Copied!",
-        description: "Prompt copied to clipboard. Paste it in your AI tool.",
-      });
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast({
-        title: "Copy failed",
-        description: "Please select and copy the text manually.",
-        variant: "destructive",
-      });
-    }
-  };
+          <div className="space-y-2">
+            <Label htmlFor="description">Description *</Label>
+            <Textarea
+              id="description"
+              placeholder="What does it do? What problem does it solve?"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+            />
+          </div>
 
-  const handleProceedToResearch = () => {
-    setStage("research");
-  };
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground">
+                {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {showAdvanced ? "Less details" : "More details (optional)"}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Domain</Label>
+                  <Select
+                    value={formData.domain}
+                    onValueChange={(value) => setFormData({ ...formData, domain: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select domain" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DOMAIN_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="targetCustomer">Target Customer</Label>
+                  <Input
+                    id="targetCustomer"
+                    placeholder="e.g., Job seekers"
+                    value={formData.targetCustomer}
+                    onChange={(e) => setFormData({ ...formData, targetCustomer: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="initialThoughts">Initial Thoughts</Label>
+                <Textarea
+                  id="initialThoughts"
+                  placeholder="Any hypotheses to validate?"
+                  value={formData.initialThoughts}
+                  onChange={(e) => setFormData({ ...formData, initialThoughts: e.target.value })}
+                  rows={2}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
 
-  const saveResearchMutation = useMutation({
-    mutationFn: async (data: { title: string; body: string; type: string; domain: string }) => {
-      const res = await apiRequest("POST", "/api/docs", {
-        title: data.title,
-        body: data.body,
-        type: data.type,
-        domain: data.domain,
-        status: "draft",
-        tags: "venture-lab,research",
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => createMutation.mutate(formData)}
+            disabled={!formData.name || !formData.description || createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Idea"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function IdeaCard({
+  idea,
+  onSelect,
+  isSelected,
+}: {
+  idea: VentureIdea;
+  onSelect: () => void;
+  isSelected: boolean;
+}) {
+  return (
+    <Card
+      className={`cursor-pointer transition-all hover:shadow-md ${
+        isSelected ? "ring-2 ring-primary" : ""
+      }`}
+      onClick={onSelect}
+    >
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-lg">{idea.name}</CardTitle>
+            <div className="flex items-center gap-2">
+              <StatusBadge status={idea.status} />
+              {idea.verdict && <VerdictBadge verdict={idea.verdict} />}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground line-clamp-2">{idea.description}</p>
+        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+          {idea.domain && (
+            <span>{DOMAIN_OPTIONS.find((d) => d.value === idea.domain)?.label || idea.domain}</span>
+          )}
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {new Date(idea.createdAt).toLocaleDateString()}
+          </span>
+          {idea.scoreData && (
+            <span className="font-medium text-foreground">
+              Score: {idea.scoreData.finalScore.toFixed(1)}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function IdeaDetail({
+  idea,
+  researchDoc,
+  onRefresh,
+}: {
+  idea: VentureIdea;
+  researchDoc: ResearchDoc | null;
+  onRefresh: () => void;
+}) {
+  const { toast } = useToast();
+  const [editingResearch, setEditingResearch] = useState(false);
+  const [researchContent, setResearchContent] = useState(researchDoc?.body || "");
+  const [approvalComment, setApprovalComment] = useState("");
+
+  useEffect(() => {
+    setResearchContent(researchDoc?.body || "");
+  }, [researchDoc]);
+
+  // Research mutation
+  const researchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/venture-lab/ideas/${idea.id}/research`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Research complete", description: "AI research has been generated." });
+      onRefresh();
+    },
+    onError: (error: any) => {
+      toast({ title: "Research failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Update research mutation
+  const updateResearchMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await apiRequest("PATCH", `/api/venture-lab/ideas/${idea.id}/research`, {
+        researchContent: content,
       });
       return await res.json();
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
-      toast({
-        title: "Research saved!",
-        description: "Document saved to Knowledge Base.",
-      });
-      setStage("review");
+    onSuccess: () => {
+      toast({ title: "Research updated", description: "Your edits have been saved." });
+      setEditingResearch(false);
+      onRefresh();
     },
-    onError: () => {
-      toast({
-        title: "Save failed",
-        description: "Could not save research document.",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleSaveResearch = () => {
-    if (!researchResults.trim()) {
+  // Score mutation
+  const scoreMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/venture-lab/ideas/${idea.id}/score`);
+      return await res.json();
+    },
+    onSuccess: (data) => {
       toast({
-        title: "No research to save",
-        description: "Please paste your research results first.",
-        variant: "destructive",
+        title: "Scoring complete",
+        description: data.cached ? "Returned cached score (same inputs)." : "Idea has been scored.",
       });
-      return;
+      onRefresh();
+    },
+    onError: (error: any) => {
+      toast({ title: "Scoring failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Approval mutation
+  const approvalMutation = useMutation({
+    mutationFn: async (decision: "approved" | "parked" | "killed") => {
+      const res = await apiRequest("POST", `/api/venture-lab/ideas/${idea.id}/approve`, {
+        decision,
+        comment: approvalComment,
+      });
+      return await res.json();
+    },
+    onSuccess: (_, decision) => {
+      const messages = {
+        approved: "Idea approved! Ready for compilation.",
+        parked: "Idea parked for later review.",
+        killed: "Idea killed and archived.",
+      };
+      toast({ title: "Decision recorded", description: messages[decision] });
+      setApprovalComment("");
+      onRefresh();
+    },
+    onError: (error: any) => {
+      toast({ title: "Approval failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Compile mutation
+  const compileMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/venture-lab/ideas/${idea.id}/compile`);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Venture created!",
+        description: `Created ${data.stats.projectsCreated} projects, ${data.stats.phasesCreated} phases, ${data.stats.tasksCreated} tasks.`,
+      });
+      onRefresh();
+    },
+    onError: (error: any) => {
+      toast({ title: "Compilation failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/venture-lab/ideas/${idea.id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Idea deleted" });
+      onRefresh();
+    },
+    onError: (error: any) => {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const isLoading =
+    researchMutation.isPending ||
+    scoreMutation.isPending ||
+    approvalMutation.isPending ||
+    compileMutation.isPending;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">{idea.name}</h2>
+          <p className="text-muted-foreground mt-1">{idea.description}</p>
+          <div className="flex items-center gap-2 mt-3">
+            <StatusBadge status={idea.status} />
+            {idea.verdict && <VerdictBadge verdict={idea.verdict} />}
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate()}>
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+
+      {/* Workflow Steps */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Workflow</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Step 1: Research */}
+          <div className="flex items-center gap-4">
+            <div
+              className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                idea.status === "idea"
+                  ? "bg-primary text-primary-foreground"
+                  : idea.researchDocId
+                  ? "bg-green-500 text-white"
+                  : "bg-muted"
+              }`}
+            >
+              {idea.status === "researching" ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Search className="h-5 w-5" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="font-medium">1. Research</div>
+              <div className="text-sm text-muted-foreground">
+                {idea.researchDocId
+                  ? `Completed with ${idea.researchModel || "AI"}`
+                  : "Run AI-powered market research"}
+              </div>
+            </div>
+            {idea.status === "idea" && (
+              <Button onClick={() => researchMutation.mutate()} disabled={isLoading}>
+                {researchMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Researching...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="mr-2 h-4 w-4" />
+                    Run Research
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Step 2: Review & Edit */}
+          {idea.researchDocId && (
+            <div className="flex items-center gap-4">
+              <div
+                className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  idea.status === "researched" ? "bg-primary text-primary-foreground" : "bg-green-500 text-white"
+                }`}
+              >
+                <Edit3 className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">2. Review & Edit</div>
+                <div className="text-sm text-muted-foreground">Review research before scoring</div>
+              </div>
+              {idea.status === "researched" && !editingResearch && (
+                <Button variant="outline" onClick={() => setEditingResearch(true)}>
+                  Edit Research
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Score */}
+          {idea.researchDocId && (
+            <div className="flex items-center gap-4">
+              <div
+                className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  idea.status === "researched"
+                    ? "bg-primary text-primary-foreground"
+                    : idea.scoreData
+                    ? "bg-green-500 text-white"
+                    : "bg-muted"
+                }`}
+              >
+                {idea.status === "scoring" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <TrendingUp className="h-5 w-5" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">3. Score</div>
+                <div className="text-sm text-muted-foreground">
+                  {idea.scoreData
+                    ? `Score: ${idea.scoreData.finalScore.toFixed(1)} (${idea.verdict})`
+                    : "AI scores the opportunity"}
+                </div>
+              </div>
+              {idea.status === "researched" && (
+                <Button onClick={() => scoreMutation.mutate()} disabled={isLoading}>
+                  {scoreMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Scoring...
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="mr-2 h-4 w-4" />
+                      Score Idea
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Step 4: Approve */}
+          {idea.scoreData && (
+            <div className="flex items-center gap-4">
+              <div
+                className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  idea.status === "scored"
+                    ? "bg-primary text-primary-foreground"
+                    : idea.approvalDecision
+                    ? "bg-green-500 text-white"
+                    : "bg-muted"
+                }`}
+              >
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">4. Human Approval</div>
+                <div className="text-sm text-muted-foreground">
+                  {idea.approvalDecision
+                    ? `Decision: ${idea.approvalDecision}`
+                    : "Make GO/NO-GO decision"}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Compile */}
+          {idea.status === "approved" && (
+            <div className="flex items-center gap-4">
+              <div
+                className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  idea.status === "approved"
+                    ? "bg-primary text-primary-foreground"
+                    : idea.ventureId
+                    ? "bg-green-500 text-white"
+                    : "bg-muted"
+                }`}
+              >
+                {idea.status === "compiling" ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Rocket className="h-5 w-5" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">5. Compile to Venture</div>
+                <div className="text-sm text-muted-foreground">
+                  {idea.verdict === "GREEN"
+                    ? "Full venture pack with projects & tasks"
+                    : "Pilot validation sprint"}
+                </div>
+              </div>
+              <Button onClick={() => compileMutation.mutate()} disabled={isLoading}>
+                {compileMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Compiling...
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="mr-2 h-4 w-4" />
+                    Compile Venture
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Compiled State */}
+          {idea.status === "compiled" && idea.ventureId && (
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-500 text-white">
+                <Rocket className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">Venture Created!</div>
+                <div className="text-sm text-muted-foreground">
+                  {idea.compilationData &&
+                    `${idea.compilationData.projectsCreated} projects, ${idea.compilationData.phasesCreated} phases, ${idea.compilationData.tasksCreated} tasks`}
+                </div>
+              </div>
+              <Button variant="outline" asChild>
+                <a href={`/ventures/${idea.ventureId}`}>
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  View Venture
+                </a>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Research Content */}
+      {researchDoc && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center justify-between">
+              Research
+              {idea.status === "researched" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditingResearch(!editingResearch)}
+                >
+                  <Edit3 className="h-4 w-4 mr-1" />
+                  {editingResearch ? "Cancel" : "Edit"}
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {editingResearch ? (
+              <div className="space-y-4">
+                <Textarea
+                  value={researchContent}
+                  onChange={(e) => setResearchContent(e.target.value)}
+                  rows={20}
+                  className="font-mono text-sm"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => updateResearchMutation.mutate(researchContent)}
+                    disabled={updateResearchMutation.isPending}
+                  >
+                    {updateResearchMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditingResearch(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-auto max-h-[400px]">
+                  {researchDoc.body}
+                </pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Score Breakdown */}
+      {idea.scoreData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Score Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScoreDisplay scoreData={idea.scoreData} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Approval Panel */}
+      {idea.status === "scored" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Your Decision</CardTitle>
+            <CardDescription>
+              {idea.verdict === "RED"
+                ? "This idea scored RED. You can park it for later or kill it."
+                : "Review the score and make your GO/NO-GO decision."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Comment (optional)</Label>
+              <Textarea
+                value={approvalComment}
+                onChange={(e) => setApprovalComment(e.target.value)}
+                placeholder="Add any notes about your decision..."
+                rows={2}
+              />
+            </div>
+            <div className="flex gap-2">
+              {idea.verdict !== "RED" && (
+                <Button
+                  onClick={() => approvalMutation.mutate("approved")}
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Approve
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => approvalMutation.mutate("parked")}
+                disabled={isLoading}
+              >
+                <PauseCircle className="mr-2 h-4 w-4" />
+                Park
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => approvalMutation.mutate("killed")}
+                disabled={isLoading}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Kill
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// Main Page Component
+export default function VentureLabPage() {
+  const { toast } = useToast();
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Fetch ideas list
+  const ideasQuery = useQuery({
+    queryKey: ["/api/venture-lab/ideas"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/venture-lab/ideas");
+      return (await res.json()) as VentureIdea[];
+    },
+  });
+
+  // Fetch selected idea details
+  const ideaDetailQuery = useQuery({
+    queryKey: ["/api/venture-lab/ideas", selectedIdeaId],
+    queryFn: async () => {
+      if (!selectedIdeaId) return null;
+      const res = await apiRequest("GET", `/api/venture-lab/ideas/${selectedIdeaId}`);
+      return (await res.json()) as { idea: VentureIdea; researchDoc: ResearchDoc | null };
+    },
+    enabled: !!selectedIdeaId,
+  });
+
+  const filteredIdeas = (ideasQuery.data || []).filter((idea) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "active") return !["rejected", "compiled", "parked"].includes(idea.status);
+    return idea.status === statusFilter;
+  });
+
+  const handleRefresh = () => {
+    ideasQuery.refetch();
+    if (selectedIdeaId) {
+      ideaDetailQuery.refetch();
     }
-
-    // Combine the template with actual research
-    const docTemplate = generateResearchDocTemplate(idea);
-    const fullDoc = docTemplate.replace(
-      "[Paste full AI research output below]",
-      researchResults
-    );
-
-    saveResearchMutation.mutate({
-      title: `Venture Research: ${idea.name}`,
-      body: fullDoc,
-      type: "research",
-      domain: "venture_ops",
-    });
-  };
-
-  const handleStartOver = () => {
-    setIdea({
-      name: "",
-      description: "",
-      domain: "",
-      targetCustomer: "",
-      initialThoughts: "",
-    });
-    setGeneratedPrompt("");
-    setResearchResults("");
-    setStage("idea");
-    setCopied(false);
-    nameInputRef.current?.focus();
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 md:p-6 max-w-4xl space-y-6">
+      <div className="container mx-auto p-4 md:p-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 flex items-center justify-center">
-            <FlaskConical className="h-6 w-6 text-white" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 flex items-center justify-center">
+              <FlaskConical className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Venture Lab</h1>
+              <p className="text-sm text-muted-foreground">
+                Research, validate, and compile business ideas
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold">Venture Lab</h1>
-            <p className="text-sm text-muted-foreground">
-              Research and validate business ideas before committing
-            </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <CreateIdeaDialog onCreated={handleRefresh} />
           </div>
         </div>
 
-        {/* Progress indicator */}
-        <div className="flex items-center gap-2">
-          <Badge variant={stage === "idea" ? "default" : "secondary"} className="gap-1">
-            <Target className="h-3 w-3" />
-            1. Idea
-          </Badge>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          <Badge variant={stage === "prompt" ? "default" : "secondary"} className="gap-1">
-            <Sparkles className="h-3 w-3" />
-            2. Prompt
-          </Badge>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          <Badge variant={stage === "research" ? "default" : "secondary"} className="gap-1">
-            <Search className="h-3 w-3" />
-            3. Research
-          </Badge>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          <Badge variant={stage === "review" ? "default" : "secondary"} className="gap-1">
-            <FileText className="h-3 w-3" />
-            4. Review
-          </Badge>
-        </div>
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Ideas List */}
+          <div className="lg:col-span-1 space-y-4">
+            <div className="flex items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Ideas</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="idea">New</SelectItem>
+                  <SelectItem value="researched">Researched</SelectItem>
+                  <SelectItem value="scored">Scored</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="compiled">Compiled</SelectItem>
+                  <SelectItem value="parked">Parked</SelectItem>
+                  <SelectItem value="rejected">Killed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-        {/* Stage 1: Idea Input */}
-        {stage === "idea" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Describe Your Idea
-              </CardTitle>
-              <CardDescription>
-                Provide details about the business idea you want to research
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Idea Name *</Label>
-                <Input
-                  ref={nameInputRef}
-                  id="name"
-                  placeholder="e.g., AI-Powered Resume Builder"
-                  value={idea.name}
-                  onChange={(e) => setIdea({ ...idea, name: e.target.value })}
-                  className="text-lg"
-                />
+            {ideasQuery.isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Describe the core idea. What does it do? What problem does it solve?"
-                  value={idea.description}
-                  onChange={(e) => setIdea({ ...idea, description: e.target.value })}
-                  rows={4}
-                />
+            ) : filteredIdeas.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <FlaskConical className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No ideas yet.</p>
+                  <p className="text-sm">Create your first idea to get started.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {filteredIdeas.map((idea) => (
+                  <IdeaCard
+                    key={idea.id}
+                    idea={idea}
+                    onSelect={() => setSelectedIdeaId(idea.id)}
+                    isSelected={selectedIdeaId === idea.id}
+                  />
+                ))}
               </div>
+            )}
+          </div>
 
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground">
-                    {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    {showAdvanced ? "Less details" : "Add more details (optional)"}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Domain / Industry</Label>
-                      <Select
-                        value={idea.domain}
-                        onValueChange={(value) => setIdea({ ...idea, domain: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select domain" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DOMAIN_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="targetCustomer">Target Customer</Label>
-                      <Input
-                        id="targetCustomer"
-                        placeholder="e.g., Job seekers, HR managers"
-                        value={idea.targetCustomer}
-                        onChange={(e) => setIdea({ ...idea, targetCustomer: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="initialThoughts">Initial Thoughts / Hypotheses</Label>
-                    <Textarea
-                      id="initialThoughts"
-                      placeholder="Any initial thoughts, assumptions, or hypotheses you want to validate?"
-                      value={idea.initialThoughts}
-                      onChange={(e) => setIdea({ ...idea, initialThoughts: e.target.value })}
-                      rows={3}
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* AI Provider Selection */}
-              <div className="pt-4 border-t">
-                <Label className="mb-3 block">Which AI will you use for research?</Label>
-                <Tabs value={selectedProvider} onValueChange={(v) => setSelectedProvider(v as AIProvider)}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="gemini" className="gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Gemini
-                    </TabsTrigger>
-                    <TabsTrigger value="perplexity" className="gap-2">
-                      <Search className="h-4 w-4" />
-                      Perplexity
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="gemini" className="mt-3">
-                    <p className="text-sm text-muted-foreground">
-                      Best for: Deep analysis, strategic thinking, comprehensive reasoning.
-                      Gemini excels at synthesizing information and providing nuanced recommendations.
-                    </p>
-                  </TabsContent>
-                  <TabsContent value="perplexity" className="mt-3">
-                    <p className="text-sm text-muted-foreground">
-                      Best for: Current data, market research, finding sources.
-                      Perplexity has real-time web search and provides citations.
-                    </p>
-                  </TabsContent>
-                </Tabs>
-              </div>
-
-              <Button
-                onClick={handleGeneratePrompt}
-                className="w-full h-12 text-base bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500"
-                disabled={!idea.name.trim() || !idea.description.trim() || generatePromptMutation.isPending}
-              >
-                {generatePromptMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Analyzing Your Idea...
-                  </>
-                ) : (
-                  <>
-                    <Brain className="mr-2 h-5 w-5" />
-                    Generate Intelligent Research Prompt
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Stage 2: Prompt Display */}
-        {stage === "prompt" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {promptMethod === "ai" ? (
-                  <Brain className="h-5 w-5 text-purple-500" />
-                ) : (
-                  <Sparkles className="h-5 w-5" />
-                )}
-                Your Research Prompt
-                {promptMethod === "ai" && (
-                  <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-700">
-                    AI-Customized
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                {promptMethod === "ai" ? (
-                  <>
-                    AI has analyzed your idea and created a <strong>customized</strong> research prompt.
-                    Copy and paste it into {selectedProvider === "gemini" ? "Gemini" : "Perplexity"}.
-                  </>
-                ) : (
-                  <>Copy this prompt and paste it into {selectedProvider === "gemini" ? "Gemini" : "Perplexity"}</>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2 mb-4">
-                <Button
-                  onClick={handleCopyPrompt}
-                  className="gap-2"
-                  variant={copied ? "secondary" : "default"}
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copied!" : "Copy Prompt"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => {
-                    const url = selectedProvider === "gemini"
-                      ? "https://gemini.google.com"
-                      : "https://perplexity.ai";
-                    window.open(url, "_blank");
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open {selectedProvider === "gemini" ? "Gemini" : "Perplexity"}
-                </Button>
-              </div>
-
-              <div className="relative">
-                <Textarea
-                  value={generatedPrompt}
-                  readOnly
-                  className="font-mono text-sm min-h-[400px] bg-muted/50"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button variant="outline" onClick={() => setStage("idea")}>
-                  Back to Edit
-                </Button>
-                <Button
-                  onClick={handleProceedToResearch}
-                  className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500"
-                >
-                  I've Got My Research - Continue
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Stage 3: Paste Research */}
-        {stage === "research" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5" />
-                Paste Your Research
-              </CardTitle>
-              <CardDescription>
-                Paste the research output from {selectedProvider === "gemini" ? "Gemini" : "Perplexity"} below
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea
-                value={researchResults}
-                onChange={(e) => setResearchResults(e.target.value)}
-                placeholder="Paste the full research output here..."
-                className="font-mono text-sm min-h-[500px]"
+          {/* Idea Detail */}
+          <div className="lg:col-span-2">
+            {selectedIdeaId && ideaDetailQuery.data ? (
+              <IdeaDetail
+                idea={ideaDetailQuery.data.idea}
+                researchDoc={ideaDetailQuery.data.researchDoc}
+                onRefresh={handleRefresh}
               />
-
-              <div className="flex gap-2 pt-4">
-                <Button variant="outline" onClick={() => setStage("prompt")}>
-                  Back to Prompt
-                </Button>
-                <Button
-                  onClick={handleSaveResearch}
-                  disabled={!researchResults.trim() || saveResearchMutation.isPending}
-                  className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {saveResearchMutation.isPending ? "Saving..." : "Save to Knowledge Base"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Stage 4: Review / Complete */}
-        {stage === "review" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-600">
-                <Check className="h-5 w-5" />
-                Research Saved!
-              </CardTitle>
-              <CardDescription>
-                Your research for "{idea.name}" has been saved to the Knowledge Base
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                <p className="text-sm">
-                  <span className="font-medium">What's next?</span>
-                </p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>1. Review the research in your Knowledge Base</li>
-                  <li>2. Fill in the Opportunity Scorecard</li>
-                  <li>3. Make a GO/NO-GO decision</li>
-                  <li>4. If GO, create a new Venture with the research as foundation</li>
-                </ul>
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button variant="outline" onClick={handleStartOver}>
-                  Research Another Idea
-                </Button>
-                <Button
-                  onClick={() => window.location.href = "/knowledge"}
-                  className="flex-1"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Go to Knowledge Base
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Quick Tips Card */}
-        {stage === "idea" && (
-          <Card className="bg-muted/30 border-dashed">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <Brain className="h-5 w-5 text-purple-500 mt-0.5 shrink-0" />
-                <div>
-                  <h3 className="font-medium mb-2">AI-Powered Prompt Generation</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Our AI will analyze your idea and generate a <strong>customized research prompt</strong> that:
+            ) : (
+              <Card>
+                <CardContent className="py-16 text-center text-muted-foreground">
+                  <Target className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg">Select an idea to view details</p>
+                  <p className="text-sm mt-2">
+                    Or create a new idea to start the research process
                   </p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>- Names specific competitors to research (not just "find competitors")</li>
-                    <li>- Asks domain-relevant questions based on your industry</li>
-                    <li>- Probes the specific customer segment you mentioned</li>
-                    <li>- Considers risks unique to your type of business</li>
-                    <li>- Requests metrics relevant to your business model</li>
-                  </ul>
-                  <p className="text-sm text-muted-foreground mt-3">
-                    <strong>Tip:</strong> The more details you provide, the more tailored your research prompt will be.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
