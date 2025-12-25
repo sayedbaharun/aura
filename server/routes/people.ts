@@ -359,9 +359,9 @@ router.post("/contacts-api/sync", async (req: Request, res: Response) => {
     }
 
     res.json(results);
-  } catch (error) {
-    logger.error({ error }, "Error syncing from Contacts API");
-    res.status(500).json({ error: "Failed to sync from Contacts API" });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, "Error syncing from Contacts API");
+    res.status(500).json({ error: "Failed to sync from Contacts API", details: error.message });
   }
 });
 
