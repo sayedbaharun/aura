@@ -39,6 +39,7 @@ import decisionMemoriesRoutes from "./decision-memories";
 import arc2026Routes from "./arc-2026";
 import aiDocsRoutes from "./ai-docs";
 import aiLearningRoutes from "./ai-learning";
+import ventureLabRoutes from "./venture-lab";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -100,6 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/ventures', venturesRoutes);
+  app.use('/api/venture-lab', ventureLabRoutes);
   app.use('/api/projects', projectsRoutes);
   app.use('/api/phases', phasesRoutes);
   app.use('/api/tasks', tasksRoutes);
