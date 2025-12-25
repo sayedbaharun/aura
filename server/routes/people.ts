@@ -306,11 +306,12 @@ router.post("/contacts-api/sync", async (req: Request, res: Response) => {
     for (const contact of contacts) {
       try {
         const personData = contactsApi.externalContactToPerson(contact);
+        const externalIdStr = contact.id != null ? String(contact.id) : null;
 
         // Check if person already exists by external ID (if available)
         let existingPerson: any = null;
-        if (contact.id) {
-          existingPerson = await storage.getPersonByExternalId(contact.id);
+        if (externalIdStr) {
+          existingPerson = await storage.getPersonByExternalId(externalIdStr);
         }
 
         // If not found by external ID, try by email
@@ -336,7 +337,7 @@ router.post("/contacts-api/sync", async (req: Request, res: Response) => {
           });
           results.updated++;
           results.items.push({
-            externalId: contact.id,
+            externalId: externalIdStr,
             name: personData.name,
             personId: updated?.id,
             action: 'updated',
@@ -346,7 +347,7 @@ router.post("/contacts-api/sync", async (req: Request, res: Response) => {
           const newPerson = await storage.createPerson(personData);
           results.synced++;
           results.items.push({
-            externalId: contact.id,
+            externalId: externalIdStr,
             name: personData.name,
             personId: newPerson.id,
             action: 'created',
