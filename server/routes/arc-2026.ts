@@ -916,7 +916,8 @@ router.get("/2026-arc/audit", async (req, res) => {
   } catch (error) {
     logger.error({ error }, "Error auditing 2026 Arc");
     res.status(500).json({
-      error: "Failed to audit 2026 Arc"
+      error: "Failed to audit 2026 Arc",
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 });
