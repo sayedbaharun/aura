@@ -50,18 +50,18 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
     "December - Review & 2027 Planning"
   ],
   "Knowledge & Skills": [
-    "January - Foundation (set up Arabic/Trading/AI learning systems)",
-    "February - Arabic Focus (conversational basics, daily practice)",
-    "March - Trading Deep Dive (strategy backtesting, journaling)",
-    "April - AI Month (latest models, tools, research papers)",
-    "May - Arabic Immersion (conversation practice, media consumption)",
-    "June - Mid-Year Review (assess all 3 tracks, adjust curriculum)",
-    "July - Trading Psychology (mindset, discipline, risk management)",
-    "August - AI Applications (build projects, integrate AI into ventures)",
-    "September - Arabic Fluency Push (formal lessons, native speakers)",
-    "October - Trading Systems (automate, refine, document strategies)",
-    "November - AI Trends (conferences, papers, future prep)",
-    "December - Annual Learning Review (certify progress, plan 2027)"
+    "January - Learning Systems Setup (daily habits for all 3 tracks)",
+    "February - Q1 Consistency (establish Arabic/Trading/AI daily rhythm)",
+    "March - First Milestone Check (assess progress, adjust approach)",
+    "April - Q2 Acceleration (increase intensity on weakest track)",
+    "May - Immersion Month (consume content in Arabic, trade live, ship AI)",
+    "June - Mid-Year Assessment (measure all 3 tracks, recalibrate)",
+    "July - Skill Stacking (combine learnings - AI for trading, Arabic media)",
+    "August - Deep Practice (deliberate practice, push comfort zones)",
+    "September - Q3 Push (prepare for year-end milestones)",
+    "October - Application Focus (use skills in real ventures/life)",
+    "November - Consolidation (lock in gains, fill knowledge gaps)",
+    "December - Annual Review (certify progress, plan 2027 curriculum)"
   ],
   "Systems & Habits": [
     "January - Ritual Establishment (morning/evening)",
@@ -231,10 +231,10 @@ Who are you becoming by Dec 31, 2026?
 - [ ] Net worth target
 - [ ] Key venture milestones
 
-### Knowledge & Skills
-- [ ] Books to read
-- [ ] Courses to complete
-- [ ] Certifications to earn
+### Knowledge & Skills (3 Parallel Tracks - Daily)
+**Arabic**: [ ] fluency level target, [ ] conversation hours/week
+**Trading**: [ ] win rate target, [ ] strategies mastered
+**AI**: [ ] tools mastered, [ ] projects shipped
 
 ### Systems & Habits
 - [ ] Morning ritual streak target
@@ -250,6 +250,10 @@ These run every single day, 365 days:
 4. **Top 3 Outcomes**: Set every morning
 5. **Evening Review**: 10 min reflection
 6. **Nutrition**: Log meals, hit protein target
+7. **Learning Block**: 30-60 min across 3 tracks:
+   - Arabic: 15 min (vocab, app, or media)
+   - Trading: 15 min (journal, analysis, or study)
+   - AI: 15 min (newsletter, tool, or build)
 
 ## Weekly Rhythm
 - **Monday**: Planning + highest leverage tasks
@@ -486,41 +490,57 @@ Achieve conversational fluency in Arabic by December 2026
 ## Target Level by Dec 2026
 [Define your target: e.g., "Hold 15-minute conversations with native speakers"]
 
-## Weekly Commitments
-| Activity | Target | Time |
-|----------|--------|------|
-| Formal lessons | 2-3x/week | |
-| Vocabulary practice (Anki/app) | Daily | 15 min |
-| Arabic media (podcasts/shows) | 3x/week | 30 min |
+---
+
+## 🔄 DAILY HABITS (365 days, non-negotiable)
+
+| Activity | Time | When |
+|----------|------|------|
+| Vocabulary review (Anki/app) | 15 min | Morning |
+| Arabic audio (podcast/music) | During commute/gym | Anytime |
+| Read 1 thing in Arabic | 5 min | Evening |
+
+**Weekly minimum: 2 hours total**
+
+---
+
+## 📅 WEEKLY COMMITMENTS
+
+| Activity | Frequency | Duration |
+|----------|-----------|----------|
+| Formal lesson (tutor/class) | 2x/week | 30-60 min |
 | Conversation practice | 1x/week | 30 min |
+| Arabic TV/film (with subtitles) | 2x/week | 30 min |
+| New vocabulary batch | 1x/week | 20 words |
+
+---
 
 ## Resources
 ### Apps & Tools
-- [ ] Duolingo Arabic
-- [ ] Anki flashcards
-- [ ] Pimsleur
-- [ ] italki (tutors)
+- [ ] Duolingo Arabic - daily streak
+- [ ] Anki flashcards - spaced repetition
+- [ ] Pimsleur - audio lessons
+- [ ] italki - native tutors
+
+### Media (consume daily)
+- [ ] Arabic podcasts:
+- [ ] YouTube channels:
+- [ ] Netflix shows in Arabic:
+- [ ] Arabic music playlist:
 
 ### Courses
 - [ ] [Add course name]
 
-### Media
-- [ ] Arabic podcasts:
-- [ ] YouTube channels:
-- [ ] Netflix shows in Arabic:
+---
 
-## Milestones
-| Month | Milestone |
-|-------|-----------|
-| March | 500 vocabulary words, basic conversations |
-| June | Order food, navigate Dubai in Arabic |
-| September | 15-min conversations with tutors |
-| December | Watch Arabic content without subtitles |
+## Quarterly Milestones
 
-## Monthly Focus Areas
-- **Feb**: Basics - alphabet, greetings, numbers
-- **May**: Immersion - consume Arabic media daily
-- **Sep**: Fluency push - native speaker practice
+| Quarter | Milestone |
+|---------|-----------|
+| Q1 (Mar) | 500 words, alphabet mastered, basic greetings |
+| Q2 (Jun) | Order food, give directions, small talk |
+| Q3 (Sep) | 15-min conversations with tutors |
+| Q4 (Dec) | Watch content without subtitles, read news |
 
 ## Notes
 -
@@ -557,15 +577,33 @@ Become a consistently profitable, systematic trader with documented edge
 | Max Drawdown | % |
 | Strategies Mastered | |
 
-## Weekly Commitments
-| Activity | Target | Time |
-|----------|--------|------|
-| Market analysis | Daily | 30 min |
-| Trading journal review | 3x/week | 15 min |
-| Strategy backtesting | 2x/week | 1 hr |
-| Education (courses/books) | 2x/week | 1 hr |
+---
 
-## Learning Curriculum
+## 🔄 DAILY HABITS (365 days, non-negotiable)
+
+| Activity | Time | When |
+|----------|------|------|
+| Market structure review | 15 min | Pre-market |
+| Journal review (if traded) | 10 min | Post-session |
+| 1 trading insight (book/video/tweet) | 10 min | Anytime |
+
+**Weekly minimum: 3 hours learning + practice**
+
+---
+
+## 📅 WEEKLY COMMITMENTS
+
+| Activity | Frequency | Duration |
+|----------|-----------|----------|
+| Full market analysis | 1x/week (Sunday) | 1 hr |
+| Strategy backtesting | 2x/week | 1 hr |
+| Course/book study | 3x/week | 30 min |
+| Review all week's trades | 1x/week (Friday) | 30 min |
+| Paper trade or sim | As needed | - |
+
+---
+
+## Quarterly Focus (all run in parallel)
 
 ### Q1: Foundation & Strategy
 - [ ] Complete [course name]
@@ -578,7 +616,7 @@ Become a consistently profitable, systematic trader with documented edge
 - [ ] Implement position sizing rules
 
 ### Q3: Systems & Automation
-- [ ] Build trading checklist system
+- [ ] Build trading checklist system (use SB-OS trading module)
 - [ ] Automate trade journaling
 - [ ] Create strategy playbooks
 
@@ -587,14 +625,16 @@ Become a consistently profitable, systematic trader with documented edge
 - [ ] Identify edge leakages
 - [ ] Plan 2027 trading goals
 
-## Resources
-### Courses
-- [ ]
+---
 
-### Books
+## Resources
+### Books (read throughout year)
 - [ ] Trading in the Zone - Mark Douglas
 - [ ] The Disciplined Trader - Mark Douglas
 - [ ] Market Wizards series
+- [ ]
+
+### Courses
 - [ ]
 
 ### Mentors/Communities
@@ -627,15 +667,54 @@ Stay at the cutting edge of AI developments and apply them to ventures
 3. **AI for Business** - Automation, content, customer service
 4. **Technical Skills** - Prompt engineering, fine-tuning, RAG
 
-## Weekly Commitments
-| Activity | Target | Time |
-|----------|--------|------|
-| AI newsletters | 3x/week | 15 min |
-| Research papers | 1/week | 1 hr |
-| Tool experimentation | 2x/week | 30 min |
-| Build/ship AI features | 1x/week | 2 hrs |
+---
 
-## Learning Curriculum
+## 🔄 DAILY HABITS (365 days, non-negotiable)
+
+| Activity | Time | When |
+|----------|------|------|
+| AI newsletter/feed scan | 15 min | Morning |
+| Try 1 new prompt/technique | 10 min | During work |
+| Note 1 AI insight | 5 min | Evening |
+
+**Weekly minimum: 3 hours learning + building**
+
+---
+
+## 📅 WEEKLY COMMITMENTS
+
+| Activity | Frequency | Duration |
+|----------|-----------|----------|
+| Deep-read 1 research paper/post | 1x/week | 1 hr |
+| Experiment with new tool/model | 2x/week | 30 min |
+| Build/ship AI feature | 1x/week | 2 hrs |
+| AI podcast/video | 2x/week | 30 min |
+
+---
+
+## Daily/Weekly Sources (consume consistently)
+
+### Newsletters (subscribe to all)
+- [ ] The Rundown AI
+- [ ] TLDR AI
+- [ ] Import AI (by Jack Clark)
+- [ ] Anthropic newsletter
+
+### Twitter/X (check daily)
+- [ ] @AnthropicAI
+- [ ] @OpenAI
+- [ ] @GoogleDeepMind
+- [ ] Key researchers in your feed
+
+### YouTube/Podcasts (2-3x/week)
+- [ ] AI Explained
+- [ ] Two Minute Papers
+- [ ] Latent Space podcast
+- [ ] Lex Fridman (AI episodes)
+
+---
+
+## Quarterly Focus (all run in parallel)
 
 ### Q1: Foundation
 - [ ] Master prompt engineering patterns
@@ -657,36 +736,20 @@ Stay at the cutting edge of AI developments and apply them to ventures
 - [ ] Identify 2027 trends
 - [ ] Plan AI roadmap for ventures
 
-## Resources
+---
 
-### Daily/Weekly Sources
-- [ ] AI newsletters: The Rundown, TLDR AI, Import AI
-- [ ] Twitter/X accounts: @AnthropicAI, @OpenAI, @kaborando
-- [ ] YouTube: AI Explained, Two Minute Papers
-- [ ] Podcasts: Latent Space, Lex Fridman
+## Tools to Master (ongoing)
+- [ ] Claude (advanced features, artifacts, projects)
+- [ ] ChatGPT + custom GPTs
+- [ ] Cursor/Copilot for coding
+- [ ] ComfyUI/Midjourney for images
+- [ ] Voice AI (ElevenLabs, OpenAI TTS)
 
-### Courses
-- [ ] DeepLearning.AI courses
-- [ ] Fast.ai
-- [ ]
-
-### Research Sources
-- [ ] Arxiv (AI papers)
-- [ ] Anthropic research blog
-- [ ] OpenAI research
-- [ ] Google DeepMind
-
-### Tools to Master
-- [ ] Claude (advanced features)
-- [ ] ChatGPT + GPTs
-- [ ] Cursor/Copilot
-- [ ] ComfyUI/Midjourney
-- [ ] Voice AI (ElevenLabs)
-
-## Projects to Build
+## Projects to Build (at least 1/quarter)
 1. [ ]
 2. [ ]
 3. [ ]
+4. [ ]
 
 ## Notes
 -

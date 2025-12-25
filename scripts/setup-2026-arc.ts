@@ -50,18 +50,18 @@ const MONTHLY_SPRINTS = {
     "December - Review & 2027 Planning"
   ],
   "Knowledge & Skills": [
-    "January - Foundation (set up Arabic/Trading/AI learning systems)",
-    "February - Arabic Focus (conversational basics, daily practice)",
-    "March - Trading Deep Dive (strategy backtesting, journaling)",
-    "April - AI Month (latest models, tools, research papers)",
-    "May - Arabic Immersion (conversation practice, media consumption)",
-    "June - Mid-Year Review (assess all 3 tracks, adjust curriculum)",
-    "July - Trading Psychology (mindset, discipline, risk management)",
-    "August - AI Applications (build projects, integrate AI into ventures)",
-    "September - Arabic Fluency Push (formal lessons, native speakers)",
-    "October - Trading Systems (automate, refine, document strategies)",
-    "November - AI Trends (conferences, papers, future prep)",
-    "December - Annual Learning Review (certify progress, plan 2027)"
+    "January - Learning Systems Setup (daily habits for all 3 tracks)",
+    "February - Q1 Consistency (establish Arabic/Trading/AI daily rhythm)",
+    "March - First Milestone Check (assess progress, adjust approach)",
+    "April - Q2 Acceleration (increase intensity on weakest track)",
+    "May - Immersion Month (consume content in Arabic, trade live, ship AI)",
+    "June - Mid-Year Assessment (measure all 3 tracks, recalibrate)",
+    "July - Skill Stacking (combine learnings - AI for trading, Arabic media)",
+    "August - Deep Practice (deliberate practice, push comfort zones)",
+    "September - Q3 Push (prepare for year-end milestones)",
+    "October - Application Focus (use skills in real ventures/life)",
+    "November - Consolidation (lock in gains, fill knowledge gaps)",
+    "December - Annual Review (certify progress, plan 2027 curriculum)"
   ],
   "Systems & Habits": [
     "January - Ritual Establishment (morning/evening)",
