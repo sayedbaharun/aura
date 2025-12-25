@@ -319,6 +319,7 @@ export interface IStorage {
   }): Promise<Person[]>;
   getPerson(id: string): Promise<Person | undefined>;
   getPersonByGoogleId(googleContactId: string): Promise<Person | undefined>;
+  getPersonByExternalId(externalContactId: string): Promise<Person | undefined>;
   getPersonByEmail(email: string): Promise<Person | undefined>;
   createPerson(data: InsertPerson): Promise<Person>;
   updatePerson(id: string, data: Partial<InsertPerson>): Promise<Person | undefined>;
@@ -3104,6 +3105,20 @@ export class DBStorage implements IStorage {
       return person;
     } catch (error) {
       console.error("Error fetching person by Google ID (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async getPersonByExternalId(externalContactId: string): Promise<Person | undefined> {
+    try {
+      const [person] = await this.db
+        .select()
+        .from(people)
+        .where(eq(people.externalContactId, externalContactId))
+        .limit(1);
+      return person;
+    } catch (error) {
+      console.error("Error fetching person by external ID (table may not exist):", error);
       return undefined;
     }
   }
