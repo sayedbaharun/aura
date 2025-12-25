@@ -50,18 +50,18 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
     "December - Review & 2027 Planning"
   ],
   "Knowledge & Skills": [
-    "January - Learning Plan (set curriculum)",
-    "February - Course Sprint (complete one course)",
-    "March - Reading Month (4 books)",
-    "April - Skill Practice (apply learning)",
-    "May - Certification Prep",
-    "June - Mid-Year Assessment",
-    "July - Deep Dive (one topic mastery)",
-    "August - Technical Skills (coding/tools)",
-    "September - Business Skills (negotiation, sales)",
-    "October - Teaching/Writing (share knowledge)",
-    "November - Review & Consolidate",
-    "December - Plan 2027 Learning"
+    "January - Foundation (set up Arabic/Trading/AI learning systems)",
+    "February - Arabic Focus (conversational basics, daily practice)",
+    "March - Trading Deep Dive (strategy backtesting, journaling)",
+    "April - AI Month (latest models, tools, research papers)",
+    "May - Arabic Immersion (conversation practice, media consumption)",
+    "June - Mid-Year Review (assess all 3 tracks, adjust curriculum)",
+    "July - Trading Psychology (mindset, discipline, risk management)",
+    "August - AI Applications (build projects, integrate AI into ventures)",
+    "September - Arabic Fluency Push (formal lessons, native speakers)",
+    "October - Trading Systems (automate, refine, document strategies)",
+    "November - AI Trends (conferences, papers, future prep)",
+    "December - Annual Learning Review (certify progress, plan 2027)"
   ],
   "Systems & Habits": [
     "January - Ritual Establishment (morning/evening)",
@@ -93,8 +93,8 @@ const PROJECT_CONFIGS = [
   },
   {
     name: "Knowledge & Skills",
-    outcome: "Continuous learning and skill development for competitive advantage",
-    notes: "Track: books read, courses completed, certifications earned, skills practiced"
+    outcome: "Master Arabic, elevate trading skills, and stay ahead on AI developments",
+    notes: "Track 3 pillars:\n• ARABIC: lessons/week, vocabulary learned, conversation hours, media consumed\n• TRADING: courses completed, strategies backtested, journal entries, win rate improvement\n• AI: papers read, tools mastered, projects built, newsletters/podcasts consumed"
   },
   {
     name: "Systems & Habits",
@@ -447,6 +447,252 @@ ${config.notes}
       });
     }
 
+    // Create Education Track Playbooks folder
+    const educationFolder = await storage.createDoc({
+      title: "Education Tracks",
+      type: "page",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: mainFolder.id,
+      status: "active",
+      icon: "🎓",
+      isFolder: true,
+      order: 6,
+      body: "Dedicated playbooks for 2026 education pillars: Arabic, Trading, AI"
+    });
+
+    // Arabic Learning Playbook
+    await storage.createDoc({
+      title: "Arabic Learning Track",
+      type: "playbook",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: educationFolder.id,
+      status: "draft",
+      icon: "🇦🇪",
+      isFolder: false,
+      order: 1,
+      body: `# Arabic Learning Track 2026
+
+## Goal
+Achieve conversational fluency in Arabic by December 2026
+
+## Current Level
+- [ ] Complete beginner
+- [ ] Know basics (greetings, numbers)
+- [ ] Can hold simple conversations
+- [ ] Intermediate (can discuss topics)
+
+## Target Level by Dec 2026
+[Define your target: e.g., "Hold 15-minute conversations with native speakers"]
+
+## Weekly Commitments
+| Activity | Target | Time |
+|----------|--------|------|
+| Formal lessons | 2-3x/week | |
+| Vocabulary practice (Anki/app) | Daily | 15 min |
+| Arabic media (podcasts/shows) | 3x/week | 30 min |
+| Conversation practice | 1x/week | 30 min |
+
+## Resources
+### Apps & Tools
+- [ ] Duolingo Arabic
+- [ ] Anki flashcards
+- [ ] Pimsleur
+- [ ] italki (tutors)
+
+### Courses
+- [ ] [Add course name]
+
+### Media
+- [ ] Arabic podcasts:
+- [ ] YouTube channels:
+- [ ] Netflix shows in Arabic:
+
+## Milestones
+| Month | Milestone |
+|-------|-----------|
+| March | 500 vocabulary words, basic conversations |
+| June | Order food, navigate Dubai in Arabic |
+| September | 15-min conversations with tutors |
+| December | Watch Arabic content without subtitles |
+
+## Monthly Focus Areas
+- **Feb**: Basics - alphabet, greetings, numbers
+- **May**: Immersion - consume Arabic media daily
+- **Sep**: Fluency push - native speaker practice
+
+## Notes
+-
+`
+    });
+
+    // Trading Education Playbook
+    await storage.createDoc({
+      title: "Trading Education Track",
+      type: "playbook",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: educationFolder.id,
+      status: "draft",
+      icon: "📈",
+      isFolder: false,
+      order: 2,
+      body: `# Trading Education Track 2026
+
+## Goal
+Become a consistently profitable, systematic trader with documented edge
+
+## Current Level
+- [ ] Beginner (learning basics)
+- [ ] Intermediate (have strategies, inconsistent)
+- [ ] Advanced (profitable but refining)
+
+## 2026 Targets
+| Metric | Target |
+|--------|--------|
+| Win Rate | % |
+| Risk:Reward | : |
+| Monthly Return | % |
+| Max Drawdown | % |
+| Strategies Mastered | |
+
+## Weekly Commitments
+| Activity | Target | Time |
+|----------|--------|------|
+| Market analysis | Daily | 30 min |
+| Trading journal review | 3x/week | 15 min |
+| Strategy backtesting | 2x/week | 1 hr |
+| Education (courses/books) | 2x/week | 1 hr |
+
+## Learning Curriculum
+
+### Q1: Foundation & Strategy
+- [ ] Complete [course name]
+- [ ] Backtest 3 strategies (100+ trades each)
+- [ ] Document trading rules
+
+### Q2: Psychology & Risk
+- [ ] Read "Trading in the Zone"
+- [ ] Read "The Disciplined Trader"
+- [ ] Implement position sizing rules
+
+### Q3: Systems & Automation
+- [ ] Build trading checklist system
+- [ ] Automate trade journaling
+- [ ] Create strategy playbooks
+
+### Q4: Mastery & Review
+- [ ] Review full year of trades
+- [ ] Identify edge leakages
+- [ ] Plan 2027 trading goals
+
+## Resources
+### Courses
+- [ ]
+
+### Books
+- [ ] Trading in the Zone - Mark Douglas
+- [ ] The Disciplined Trader - Mark Douglas
+- [ ] Market Wizards series
+- [ ]
+
+### Mentors/Communities
+- [ ]
+
+## Notes
+-
+`
+    });
+
+    // AI Education Playbook
+    await storage.createDoc({
+      title: "AI & Technology Track",
+      type: "playbook",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: educationFolder.id,
+      status: "draft",
+      icon: "🤖",
+      isFolder: false,
+      order: 3,
+      body: `# AI & Technology Track 2026
+
+## Goal
+Stay at the cutting edge of AI developments and apply them to ventures
+
+## Focus Areas
+1. **LLM/Foundation Models** - GPT, Claude, Gemini, open source
+2. **AI Agents** - Autonomous systems, tool use, workflows
+3. **AI for Business** - Automation, content, customer service
+4. **Technical Skills** - Prompt engineering, fine-tuning, RAG
+
+## Weekly Commitments
+| Activity | Target | Time |
+|----------|--------|------|
+| AI newsletters | 3x/week | 15 min |
+| Research papers | 1/week | 1 hr |
+| Tool experimentation | 2x/week | 30 min |
+| Build/ship AI features | 1x/week | 2 hrs |
+
+## Learning Curriculum
+
+### Q1: Foundation
+- [ ] Master prompt engineering patterns
+- [ ] Understand RAG architecture
+- [ ] Build 1 AI-powered feature for ventures
+
+### Q2: Agents & Automation
+- [ ] Learn AI agent frameworks (LangChain, Claude tools)
+- [ ] Build automated workflows
+- [ ] Implement AI in SB-OS
+
+### Q3: Advanced Applications
+- [ ] Explore fine-tuning
+- [ ] Build custom AI tools for ventures
+- [ ] Implement AI customer service
+
+### Q4: Future Prep
+- [ ] Review 2026 AI developments
+- [ ] Identify 2027 trends
+- [ ] Plan AI roadmap for ventures
+
+## Resources
+
+### Daily/Weekly Sources
+- [ ] AI newsletters: The Rundown, TLDR AI, Import AI
+- [ ] Twitter/X accounts: @AnthropicAI, @OpenAI, @kaborando
+- [ ] YouTube: AI Explained, Two Minute Papers
+- [ ] Podcasts: Latent Space, Lex Fridman
+
+### Courses
+- [ ] DeepLearning.AI courses
+- [ ] Fast.ai
+- [ ]
+
+### Research Sources
+- [ ] Arxiv (AI papers)
+- [ ] Anthropic research blog
+- [ ] OpenAI research
+- [ ] Google DeepMind
+
+### Tools to Master
+- [ ] Claude (advanced features)
+- [ ] ChatGPT + GPTs
+- [ ] Cursor/Copilot
+- [ ] ComfyUI/Midjourney
+- [ ] Voice AI (ElevenLabs)
+
+## Projects to Build
+1. [ ]
+2. [ ]
+3. [ ]
+
+## Notes
+-
+`
+    });
+
     logger.info("2026 Arc setup complete!");
 
     res.json({
@@ -460,7 +706,8 @@ ${config.notes}
         projects: createdProjects,
         docs: {
           mainFolder: mainFolder.id,
-          totalDocs: 8 // Main folder + playbook + goals + 2 folders + 4 domain playbooks
+          educationFolder: educationFolder.id,
+          totalDocs: 12 // Main folder + playbook + goals + 3 folders + 4 domain playbooks + 3 education tracks
         }
       }
     });

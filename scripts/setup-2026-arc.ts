@@ -50,18 +50,18 @@ const MONTHLY_SPRINTS = {
     "December - Review & 2027 Planning"
   ],
   "Knowledge & Skills": [
-    "January - Learning Plan (set curriculum)",
-    "February - Course Sprint (complete one course)",
-    "March - Reading Month (4 books)",
-    "April - Skill Practice (apply learning)",
-    "May - Certification Prep",
-    "June - Mid-Year Assessment",
-    "July - Deep Dive (one topic mastery)",
-    "August - Technical Skills (coding/tools)",
-    "September - Business Skills (negotiation, sales)",
-    "October - Teaching/Writing (share knowledge)",
-    "November - Review & Consolidate",
-    "December - Plan 2027 Learning"
+    "January - Foundation (set up Arabic/Trading/AI learning systems)",
+    "February - Arabic Focus (conversational basics, daily practice)",
+    "March - Trading Deep Dive (strategy backtesting, journaling)",
+    "April - AI Month (latest models, tools, research papers)",
+    "May - Arabic Immersion (conversation practice, media consumption)",
+    "June - Mid-Year Review (assess all 3 tracks, adjust curriculum)",
+    "July - Trading Psychology (mindset, discipline, risk management)",
+    "August - AI Applications (build projects, integrate AI into ventures)",
+    "September - Arabic Fluency Push (formal lessons, native speakers)",
+    "October - Trading Systems (automate, refine, document strategies)",
+    "November - AI Trends (conferences, papers, future prep)",
+    "December - Annual Learning Review (certify progress, plan 2027)"
   ],
   "Systems & Habits": [
     "January - Ritual Establishment (morning/evening)",
@@ -96,8 +96,8 @@ const PROJECT_CONFIGS = [
   {
     name: "Knowledge & Skills",
     category: "research_dev" as const,
-    outcome: "Continuous learning and skill development for competitive advantage",
-    notes: "Track: books read, courses completed, certifications earned, skills practiced"
+    outcome: "Master Arabic, elevate trading skills, and stay ahead on AI developments",
+    notes: "Track 3 pillars:\n• ARABIC: lessons/week, vocabulary learned, conversation hours, media consumed\n• TRADING: courses completed, strategies backtested, journal entries, win rate improvement\n• AI: papers read, tools mastered, projects built, newsletters/podcasts consumed"
   },
   {
     name: "Systems & Habits",
