@@ -1625,6 +1625,10 @@ export const people = pgTable(
     // Sync metadata (for Google Contacts integration)
     googleContactId: text("google_contact_id").unique(),
     googleEtag: text("google_etag"),
+
+    // Sync metadata (for external Contacts API integration)
+    externalContactId: text("external_contact_id").unique(),
+
     needsEnrichment: boolean("needs_enrichment").default(true),
 
     // Timestamps
@@ -1638,6 +1642,7 @@ export const people = pgTable(
     index("idx_people_importance").on(table.importance),
     index("idx_people_venture_id").on(table.ventureId),
     index("idx_people_google_contact_id").on(table.googleContactId),
+    index("idx_people_external_contact_id").on(table.externalContactId),
     index("idx_people_next_follow_up").on(table.nextFollowUp),
     index("idx_people_last_contact_date").on(table.lastContactDate),
   ]

@@ -92,6 +92,13 @@ interface GoogleContactsStatus {
   error?: string;
 }
 
+interface ContactsApiStatus {
+  configured: boolean;
+  connected: boolean;
+  contactCount?: number;
+  error?: string;
+}
+
 const relationshipConfig: Record<string, { label: string; color: string }> = {
   family: { label: "Family", color: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200" },
   friend: { label: "Friend", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
@@ -138,7 +145,8 @@ export default function PeoplePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
+  const [isSyncingApi, setIsSyncingApi] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -168,7 +176,11 @@ export default function PeoplePage() {
   });
 
   const { data: googleStatus } = useQuery<GoogleContactsStatus>({
-    queryKey: ["/api/google-contacts/status"],
+    queryKey: ["/api/people/google-contacts/status"],
+  });
+
+  const { data: contactsApiStatus } = useQuery<ContactsApiStatus>({
+    queryKey: ["/api/people/contacts-api/status"],
   });
 
   // Mutations
@@ -231,18 +243,36 @@ export default function PeoplePage() {
   });
 
   const syncGoogleContacts = async () => {
-    setIsSyncing(true);
+    setIsSyncingGoogle(true);
     try {
-      const result = await apiRequest("POST", "/api/google-contacts/sync", {});
+      const response = await apiRequest("POST", "/api/people/google-contacts/sync", {});
+      const result = await response.json();
       queryClient.invalidateQueries({ queryKey: ["/api/people"] });
       toast({
-        title: "Sync complete",
+        title: "Google sync complete",
         description: `Synced ${result.synced} new, updated ${result.updated}, skipped ${result.skipped}`,
       });
     } catch (error: any) {
       toast({ title: "Sync failed", description: error.message, variant: "destructive" });
     } finally {
-      setIsSyncing(false);
+      setIsSyncingGoogle(false);
+    }
+  };
+
+  const syncContactsApi = async () => {
+    setIsSyncingApi(true);
+    try {
+      const response = await apiRequest("POST", "/api/people/contacts-api/sync", {});
+      const result = await response.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/people"] });
+      toast({
+        title: "Contacts sync complete",
+        description: `Synced ${result.synced} new, updated ${result.updated}, skipped ${result.skipped}`,
+      });
+    } catch (error: any) {
+      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSyncingApi(false);
     }
   };
 
@@ -378,13 +408,23 @@ export default function PeoplePage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {contactsApiStatus?.configured && (
+            <Button
+              variant="outline"
+              onClick={syncContactsApi}
+              disabled={isSyncingApi}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncingApi ? "animate-spin" : ""}`} />
+              Sync Contacts
+            </Button>
+          )}
           {googleStatus?.configured && (
             <Button
               variant="outline"
               onClick={syncGoogleContacts}
-              disabled={isSyncing}
+              disabled={isSyncingGoogle}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 mr-2 ${isSyncingGoogle ? "animate-spin" : ""}`} />
               Sync Google
             </Button>
           )}
