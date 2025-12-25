@@ -92,6 +92,8 @@ import {
   type InsertDocAiTeaching,
   type VentureIdea,
   type InsertVentureIdea,
+  type DocChunk,
+  type InsertDocChunk,
   ventures,
   projects,
   phases,
@@ -102,6 +104,7 @@ import {
   healthEntries,
   nutritionEntries,
   docs,
+  docChunks,
   attachments,
   users,
   userPreferences,
@@ -261,6 +264,15 @@ export interface IStorage {
     averageScore: number;
     needsReview: number;
   }>;
+
+  // Doc Chunks (for RAG embeddings)
+  createDocChunk(data: InsertDocChunk): Promise<DocChunk>;
+  getDocChunks(docId: string): Promise<DocChunk[]>;
+  getDocChunksWithEmbeddings(ventureId?: string): Promise<(DocChunk & { docTitle?: string })[]>;
+  updateDocChunkEmbedding(id: string, embedding: string): Promise<void>;
+  deleteDocChunks(docId: string): Promise<void>;
+  getDocsNeedingEmbedding(limit?: number): Promise<Doc[]>;
+  updateDocEmbedding(docId: string, embedding: string, model: string): Promise<void>;
 
   // Attachments
   getAttachments(docId: string): Promise<Attachment[]>;
@@ -1678,6 +1690,102 @@ export class DBStorage implements IStorage {
       averageScore,
       needsReview,
     };
+  }
+
+  // ============================================================================
+  // DOC CHUNKS (for RAG embeddings)
+  // ============================================================================
+
+  async createDocChunk(data: InsertDocChunk): Promise<DocChunk> {
+    const [chunk] = await this.db.insert(docChunks).values(data).returning();
+    return chunk;
+  }
+
+  async getDocChunks(docId: string): Promise<DocChunk[]> {
+    return await this.db
+      .select()
+      .from(docChunks)
+      .where(eq(docChunks.docId, docId))
+      .orderBy(docChunks.chunkIndex);
+  }
+
+  async getDocChunksWithEmbeddings(ventureId?: string): Promise<(DocChunk & { docTitle?: string })[]> {
+    // Join with docs to get title and filter by venture
+    const query = this.db
+      .select({
+        id: docChunks.id,
+        docId: docChunks.docId,
+        chunkIndex: docChunks.chunkIndex,
+        content: docChunks.content,
+        embedding: docChunks.embedding,
+        startOffset: docChunks.startOffset,
+        endOffset: docChunks.endOffset,
+        metadata: docChunks.metadata,
+        createdAt: docChunks.createdAt,
+        docTitle: docs.title,
+      })
+      .from(docChunks)
+      .innerJoin(docs, eq(docChunks.docId, docs.id))
+      .where(
+        and(
+          not(sql`${docChunks.embedding} IS NULL`),
+          ventureId ? eq(docs.ventureId, ventureId) : undefined
+        )
+      );
+
+    const results = await query;
+    return results.map(r => ({
+      id: r.id,
+      docId: r.docId,
+      chunkIndex: r.chunkIndex,
+      content: r.content,
+      embedding: r.embedding,
+      startOffset: r.startOffset,
+      endOffset: r.endOffset,
+      metadata: r.metadata,
+      createdAt: r.createdAt,
+      docTitle: r.docTitle,
+    }));
+  }
+
+  async updateDocChunkEmbedding(id: string, embedding: string): Promise<void> {
+    await this.db
+      .update(docChunks)
+      .set({ embedding })
+      .where(eq(docChunks.id, id));
+  }
+
+  async deleteDocChunks(docId: string): Promise<void> {
+    await this.db.delete(docChunks).where(eq(docChunks.docId, docId));
+  }
+
+  async getDocsNeedingEmbedding(limit: number = 50): Promise<Doc[]> {
+    // Get docs that are active and don't have embeddings yet
+    return await this.db
+      .select()
+      .from(docs)
+      .where(
+        and(
+          eq(docs.status, 'active'),
+          or(
+            sql`${docs.embedding} IS NULL`,
+            sql`${docs.embeddingUpdatedAt} < ${docs.updatedAt}`
+          )
+        )
+      )
+      .orderBy(desc(docs.updatedAt))
+      .limit(limit);
+  }
+
+  async updateDocEmbedding(docId: string, embedding: string, model: string): Promise<void> {
+    await this.db
+      .update(docs)
+      .set({
+        embedding,
+        embeddingModel: model,
+        embeddingUpdatedAt: new Date(),
+      })
+      .where(eq(docs.id, docId));
   }
 
   // ============================================================================

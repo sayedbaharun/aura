@@ -349,7 +349,11 @@ app.use((req, res, next) => {
       scheduleWeeklyPlanningReminder();
       scheduleDailyReflectionReminder();
 
-      log('✓ SB-OS automations initialized (day creation, reminders)');
+      // Initialize RAG embedding jobs
+      const { scheduleEmbeddingJobs } = await import('./embedding-jobs');
+      scheduleEmbeddingJobs();
+
+      log('✓ SB-OS automations initialized (day creation, reminders, RAG embeddings)');
     } catch (error) {
       log('SB-OS automations setup skipped:', String(error));
     }

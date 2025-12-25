@@ -40,6 +40,7 @@ import arc2026Routes from "./arc-2026";
 import aiDocsRoutes from "./ai-docs";
 import aiLearningRoutes from "./ai-learning";
 import ventureLabRoutes from "./venture-lab";
+import ragRoutes from "./rag";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -122,6 +123,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/docs/ai', aiDocsRoutes);
   app.use('/api/ai/learning', aiLearningRoutes);
   app.use('/api/attachments', attachmentsRoutes);
+
+  // ============================================================================
+  // RAG (Retrieval Augmented Generation)
+  // Vector search, embeddings, and context injection for AI
+  // ============================================================================
+  app.use('/api/rag', ragRoutes);
 
   // ============================================================================
   // SETTINGS & USER PREFERENCES

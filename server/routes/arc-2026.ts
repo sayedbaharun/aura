@@ -50,18 +50,18 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
     "December - Review & 2027 Planning"
   ],
   "Knowledge & Skills": [
-    "January - Learning Plan (set curriculum)",
-    "February - Course Sprint (complete one course)",
-    "March - Reading Month (4 books)",
-    "April - Skill Practice (apply learning)",
-    "May - Certification Prep",
-    "June - Mid-Year Assessment",
-    "July - Deep Dive (one topic mastery)",
-    "August - Technical Skills (coding/tools)",
-    "September - Business Skills (negotiation, sales)",
-    "October - Teaching/Writing (share knowledge)",
-    "November - Review & Consolidate",
-    "December - Plan 2027 Learning"
+    "January - Learning Systems Setup (daily habits for all 3 tracks)",
+    "February - Q1 Consistency (establish Arabic/Trading/AI daily rhythm)",
+    "March - First Milestone Check (assess progress, adjust approach)",
+    "April - Q2 Acceleration (increase intensity on weakest track)",
+    "May - Immersion Month (consume content in Arabic, trade live, ship AI)",
+    "June - Mid-Year Assessment (measure all 3 tracks, recalibrate)",
+    "July - Skill Stacking (combine learnings - AI for trading, Arabic media)",
+    "August - Deep Practice (deliberate practice, push comfort zones)",
+    "September - Q3 Push (prepare for year-end milestones)",
+    "October - Application Focus (use skills in real ventures/life)",
+    "November - Consolidation (lock in gains, fill knowledge gaps)",
+    "December - Annual Review (certify progress, plan 2027 curriculum)"
   ],
   "Systems & Habits": [
     "January - Ritual Establishment (morning/evening)",
@@ -93,8 +93,8 @@ const PROJECT_CONFIGS = [
   },
   {
     name: "Knowledge & Skills",
-    outcome: "Continuous learning and skill development for competitive advantage",
-    notes: "Track: books read, courses completed, certifications earned, skills practiced"
+    outcome: "Master Arabic, elevate trading skills, and stay ahead on AI developments",
+    notes: "Track 3 pillars:\n• ARABIC: lessons/week, vocabulary learned, conversation hours, media consumed\n• TRADING: courses completed, strategies backtested, journal entries, win rate improvement\n• AI: papers read, tools mastered, projects built, newsletters/podcasts consumed"
   },
   {
     name: "Systems & Habits",
@@ -231,10 +231,10 @@ Who are you becoming by Dec 31, 2026?
 - [ ] Net worth target
 - [ ] Key venture milestones
 
-### Knowledge & Skills
-- [ ] Books to read
-- [ ] Courses to complete
-- [ ] Certifications to earn
+### Knowledge & Skills (3 Parallel Tracks - Daily)
+**Arabic**: [ ] fluency level target, [ ] conversation hours/week
+**Trading**: [ ] win rate target, [ ] strategies mastered
+**AI**: [ ] tools mastered, [ ] projects shipped
 
 ### Systems & Habits
 - [ ] Morning ritual streak target
@@ -250,6 +250,10 @@ These run every single day, 365 days:
 4. **Top 3 Outcomes**: Set every morning
 5. **Evening Review**: 10 min reflection
 6. **Nutrition**: Log meals, hit protein target
+7. **Learning Block**: 30-60 min across 3 tracks:
+   - Arabic: 15 min (vocab, app, or media)
+   - Trading: 15 min (journal, analysis, or study)
+   - AI: 15 min (newsletter, tool, or build)
 
 ## Weekly Rhythm
 - **Monday**: Planning + highest leverage tasks
@@ -447,6 +451,311 @@ ${config.notes}
       });
     }
 
+    // Create Education Track Playbooks folder
+    const educationFolder = await storage.createDoc({
+      title: "Education Tracks",
+      type: "page",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: mainFolder.id,
+      status: "active",
+      icon: "🎓",
+      isFolder: true,
+      order: 6,
+      body: "Dedicated playbooks for 2026 education pillars: Arabic, Trading, AI"
+    });
+
+    // Arabic Learning Playbook
+    await storage.createDoc({
+      title: "Arabic Learning Track",
+      type: "playbook",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: educationFolder.id,
+      status: "draft",
+      icon: "🇦🇪",
+      isFolder: false,
+      order: 1,
+      body: `# Arabic Learning Track 2026
+
+## Goal
+Achieve conversational fluency in Arabic by December 2026
+
+## Current Level
+- [ ] Complete beginner
+- [ ] Know basics (greetings, numbers)
+- [ ] Can hold simple conversations
+- [ ] Intermediate (can discuss topics)
+
+## Target Level by Dec 2026
+[Define your target: e.g., "Hold 15-minute conversations with native speakers"]
+
+---
+
+## 🔄 DAILY HABITS (365 days, non-negotiable)
+
+| Activity | Time | When |
+|----------|------|------|
+| Vocabulary review (Anki/app) | 15 min | Morning |
+| Arabic audio (podcast/music) | During commute/gym | Anytime |
+| Read 1 thing in Arabic | 5 min | Evening |
+
+**Weekly minimum: 2 hours total**
+
+---
+
+## 📅 WEEKLY COMMITMENTS
+
+| Activity | Frequency | Duration |
+|----------|-----------|----------|
+| Formal lesson (tutor/class) | 2x/week | 30-60 min |
+| Conversation practice | 1x/week | 30 min |
+| Arabic TV/film (with subtitles) | 2x/week | 30 min |
+| New vocabulary batch | 1x/week | 20 words |
+
+---
+
+## Resources
+### Apps & Tools
+- [ ] Duolingo Arabic - daily streak
+- [ ] Anki flashcards - spaced repetition
+- [ ] Pimsleur - audio lessons
+- [ ] italki - native tutors
+
+### Media (consume daily)
+- [ ] Arabic podcasts:
+- [ ] YouTube channels:
+- [ ] Netflix shows in Arabic:
+- [ ] Arabic music playlist:
+
+### Courses
+- [ ] [Add course name]
+
+---
+
+## Quarterly Milestones
+
+| Quarter | Milestone |
+|---------|-----------|
+| Q1 (Mar) | 500 words, alphabet mastered, basic greetings |
+| Q2 (Jun) | Order food, give directions, small talk |
+| Q3 (Sep) | 15-min conversations with tutors |
+| Q4 (Dec) | Watch content without subtitles, read news |
+
+## Notes
+-
+`
+    });
+
+    // Trading Education Playbook
+    await storage.createDoc({
+      title: "Trading Education Track",
+      type: "playbook",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: educationFolder.id,
+      status: "draft",
+      icon: "📈",
+      isFolder: false,
+      order: 2,
+      body: `# Trading Education Track 2026
+
+## Goal
+Become a consistently profitable, systematic trader with documented edge
+
+## Current Level
+- [ ] Beginner (learning basics)
+- [ ] Intermediate (have strategies, inconsistent)
+- [ ] Advanced (profitable but refining)
+
+## 2026 Targets
+| Metric | Target |
+|--------|--------|
+| Win Rate | % |
+| Risk:Reward | : |
+| Monthly Return | % |
+| Max Drawdown | % |
+| Strategies Mastered | |
+
+---
+
+## 🔄 DAILY HABITS (365 days, non-negotiable)
+
+| Activity | Time | When |
+|----------|------|------|
+| Market structure review | 15 min | Pre-market |
+| Journal review (if traded) | 10 min | Post-session |
+| 1 trading insight (book/video/tweet) | 10 min | Anytime |
+
+**Weekly minimum: 3 hours learning + practice**
+
+---
+
+## 📅 WEEKLY COMMITMENTS
+
+| Activity | Frequency | Duration |
+|----------|-----------|----------|
+| Full market analysis | 1x/week (Sunday) | 1 hr |
+| Strategy backtesting | 2x/week | 1 hr |
+| Course/book study | 3x/week | 30 min |
+| Review all week's trades | 1x/week (Friday) | 30 min |
+| Paper trade or sim | As needed | - |
+
+---
+
+## Quarterly Focus (all run in parallel)
+
+### Q1: Foundation & Strategy
+- [ ] Complete [course name]
+- [ ] Backtest 3 strategies (100+ trades each)
+- [ ] Document trading rules
+
+### Q2: Psychology & Risk
+- [ ] Read "Trading in the Zone"
+- [ ] Read "The Disciplined Trader"
+- [ ] Implement position sizing rules
+
+### Q3: Systems & Automation
+- [ ] Build trading checklist system (use SB-OS trading module)
+- [ ] Automate trade journaling
+- [ ] Create strategy playbooks
+
+### Q4: Mastery & Review
+- [ ] Review full year of trades
+- [ ] Identify edge leakages
+- [ ] Plan 2027 trading goals
+
+---
+
+## Resources
+### Books (read throughout year)
+- [ ] Trading in the Zone - Mark Douglas
+- [ ] The Disciplined Trader - Mark Douglas
+- [ ] Market Wizards series
+- [ ]
+
+### Courses
+- [ ]
+
+### Mentors/Communities
+- [ ]
+
+## Notes
+-
+`
+    });
+
+    // AI Education Playbook
+    await storage.createDoc({
+      title: "AI & Technology Track",
+      type: "playbook",
+      domain: "personal",
+      ventureId: venture.id,
+      parentId: educationFolder.id,
+      status: "draft",
+      icon: "🤖",
+      isFolder: false,
+      order: 3,
+      body: `# AI & Technology Track 2026
+
+## Goal
+Stay at the cutting edge of AI developments and apply them to ventures
+
+## Focus Areas
+1. **LLM/Foundation Models** - GPT, Claude, Gemini, open source
+2. **AI Agents** - Autonomous systems, tool use, workflows
+3. **AI for Business** - Automation, content, customer service
+4. **Technical Skills** - Prompt engineering, fine-tuning, RAG
+
+---
+
+## 🔄 DAILY HABITS (365 days, non-negotiable)
+
+| Activity | Time | When |
+|----------|------|------|
+| AI newsletter/feed scan | 15 min | Morning |
+| Try 1 new prompt/technique | 10 min | During work |
+| Note 1 AI insight | 5 min | Evening |
+
+**Weekly minimum: 3 hours learning + building**
+
+---
+
+## 📅 WEEKLY COMMITMENTS
+
+| Activity | Frequency | Duration |
+|----------|-----------|----------|
+| Deep-read 1 research paper/post | 1x/week | 1 hr |
+| Experiment with new tool/model | 2x/week | 30 min |
+| Build/ship AI feature | 1x/week | 2 hrs |
+| AI podcast/video | 2x/week | 30 min |
+
+---
+
+## Daily/Weekly Sources (consume consistently)
+
+### Newsletters (subscribe to all)
+- [ ] The Rundown AI
+- [ ] TLDR AI
+- [ ] Import AI (by Jack Clark)
+- [ ] Anthropic newsletter
+
+### Twitter/X (check daily)
+- [ ] @AnthropicAI
+- [ ] @OpenAI
+- [ ] @GoogleDeepMind
+- [ ] Key researchers in your feed
+
+### YouTube/Podcasts (2-3x/week)
+- [ ] AI Explained
+- [ ] Two Minute Papers
+- [ ] Latent Space podcast
+- [ ] Lex Fridman (AI episodes)
+
+---
+
+## Quarterly Focus (all run in parallel)
+
+### Q1: Foundation
+- [ ] Master prompt engineering patterns
+- [ ] Understand RAG architecture
+- [ ] Build 1 AI-powered feature for ventures
+
+### Q2: Agents & Automation
+- [ ] Learn AI agent frameworks (LangChain, Claude tools)
+- [ ] Build automated workflows
+- [ ] Implement AI in SB-OS
+
+### Q3: Advanced Applications
+- [ ] Explore fine-tuning
+- [ ] Build custom AI tools for ventures
+- [ ] Implement AI customer service
+
+### Q4: Future Prep
+- [ ] Review 2026 AI developments
+- [ ] Identify 2027 trends
+- [ ] Plan AI roadmap for ventures
+
+---
+
+## Tools to Master (ongoing)
+- [ ] Claude (advanced features, artifacts, projects)
+- [ ] ChatGPT + custom GPTs
+- [ ] Cursor/Copilot for coding
+- [ ] ComfyUI/Midjourney for images
+- [ ] Voice AI (ElevenLabs, OpenAI TTS)
+
+## Projects to Build (at least 1/quarter)
+1. [ ]
+2. [ ]
+3. [ ]
+4. [ ]
+
+## Notes
+-
+`
+    });
+
     logger.info("2026 Arc setup complete!");
 
     res.json({
@@ -460,7 +769,8 @@ ${config.notes}
         projects: createdProjects,
         docs: {
           mainFolder: mainFolder.id,
-          totalDocs: 8 // Main folder + playbook + goals + 2 folders + 4 domain playbooks
+          educationFolder: educationFolder.id,
+          totalDocs: 12 // Main folder + playbook + goals + 3 folders + 4 domain playbooks + 3 education tracks
         }
       }
     });
@@ -505,6 +815,108 @@ router.get("/2026-arc/status", async (req, res) => {
     logger.error({ error }, "Error checking 2026 Arc status");
     res.status(500).json({
       error: "Failed to check 2026 Arc status"
+    });
+  }
+});
+
+/**
+ * GET /api/setup/2026-arc/audit
+ * Detailed audit of what exists vs what's expected
+ */
+router.get("/2026-arc/audit", async (req, res) => {
+  try {
+    const ventures = await storage.getVentures();
+    const arc2026 = ventures.find(v => v.name === "2026 Arc");
+
+    if (!arc2026) {
+      return res.json({
+        exists: false,
+        message: "2026 Arc venture not found. Run POST /api/setup/2026-arc to create it."
+      });
+    }
+
+    // Get projects
+    const projects = await storage.getProjects({ ventureId: arc2026.id });
+    const expectedProjects = ["Health & Energy", "Wealth & Ventures", "Knowledge & Skills", "Systems & Habits"];
+
+    const projectStatus = expectedProjects.map(name => ({
+      name,
+      exists: projects.some(p => p.name === name),
+      id: projects.find(p => p.name === name)?.id
+    }));
+
+    // Get phases for each project
+    const projectsWithPhases = await Promise.all(
+      projects.map(async (p) => {
+        const phases = await storage.getPhases(p.id);
+        return {
+          name: p.name,
+          id: p.id,
+          phaseCount: phases.length,
+          expectedPhases: 12
+        };
+      })
+    );
+
+    // Get docs
+    const allDocs = await storage.getDocs({ ventureId: arc2026.id });
+
+    const expectedDocs = [
+      "2026 Arc",
+      "2026 Arc Playbook",
+      "Annual Goals & Metrics",
+      "Monthly Reviews",
+      "January 2026 Review",
+      "Quarterly Reviews",
+      "Domain Playbooks",
+      "Health & Energy Playbook",
+      "Wealth & Ventures Playbook",
+      "Knowledge & Skills Playbook",
+      "Systems & Habits Playbook",
+      "Education Tracks",
+      "Arabic Learning Track",
+      "Trading Education Track",
+      "AI & Technology Track"
+    ];
+
+    const docStatus = expectedDocs.map(title => ({
+      title,
+      exists: allDocs.some(d => d.title === title),
+      id: allDocs.find(d => d.title === title)?.id
+    }));
+
+    const missingDocs = docStatus.filter(d => !d.exists).map(d => d.title);
+    const existingDocs = docStatus.filter(d => d.exists).map(d => d.title);
+
+    res.json({
+      exists: true,
+      venture: {
+        id: arc2026.id,
+        name: arc2026.name
+      },
+      projects: {
+        expected: 4,
+        found: projects.length,
+        details: projectStatus,
+        withPhases: projectsWithPhases
+      },
+      docs: {
+        expected: expectedDocs.length,
+        found: allDocs.length,
+        existing: existingDocs,
+        missing: missingDocs
+      },
+      summary: {
+        projectsComplete: projectStatus.every(p => p.exists),
+        docsComplete: missingDocs.length === 0,
+        missingItems: missingDocs
+      }
+    });
+
+  } catch (error) {
+    logger.error({ error }, "Error auditing 2026 Arc");
+    res.status(500).json({
+      error: "Failed to audit 2026 Arc"
     });
   }
 });
