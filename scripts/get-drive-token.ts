@@ -1,7 +1,10 @@
 /**
- * Google Drive OAuth Token Helper
+ * Google OAuth Token Helper
  *
- * This script helps you get a refresh token for Google Drive access.
+ * This script helps you get a refresh token for ALL Google integrations:
+ * - Google Drive (file storage, knowledge base sync)
+ * - Google Contacts (people sync)
+ * - Google Calendar (scheduling)
  *
  * Usage:
  * 1. Set your client ID and secret below (or via environment variables)
@@ -10,6 +13,8 @@
  * 4. Authorize and copy the code from the redirect URL
  * 5. Paste the code when prompted
  * 6. Copy the refresh token to your .env file
+ *
+ * The same refresh token works for Drive, Contacts, and Calendar!
  */
 
 import { google } from 'googleapis';
@@ -20,11 +25,12 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '934929533291-rf09qoinm2q2vaep
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'YOUR_CLIENT_SECRET_HERE';
 const REDIRECT_URI = 'http://localhost:3000/oauth2callback';
 
-// Scopes needed for Drive access
+// Scopes for all Google integrations (Drive, Contacts, Calendar)
 const SCOPES = [
-  'https://www.googleapis.com/auth/drive',           // Full Drive access
-  'https://www.googleapis.com/auth/drive.file',      // Access to files created by app
-  'https://www.googleapis.com/auth/calendar',        // Calendar (if you want combined token)
+  'https://www.googleapis.com/auth/drive',              // Full Drive access
+  'https://www.googleapis.com/auth/drive.file',         // Access to files created by app
+  'https://www.googleapis.com/auth/calendar',           // Calendar access
+  'https://www.googleapis.com/auth/contacts.readonly',  // Read contacts
 ];
 
 async function getRefreshToken() {
@@ -78,14 +84,16 @@ async function getRefreshToken() {
 
     if (tokens.refresh_token) {
       console.log('\n📋 Add this to your .env file:\n');
-      console.log(`GOOGLE_DRIVE_CLIENT_ID=${CLIENT_ID}`);
-      console.log(`GOOGLE_DRIVE_CLIENT_SECRET=${CLIENT_SECRET}`);
-      console.log(`GOOGLE_DRIVE_REFRESH_TOKEN=${tokens.refresh_token}`);
-      console.log('\n' + '='.repeat(80));
-      console.log('\n💡 Or if you want to use the same credentials for Calendar:');
+      console.log('# Google OAuth (works for Drive, Contacts, and Calendar)');
       console.log(`GOOGLE_CALENDAR_CLIENT_ID=${CLIENT_ID}`);
       console.log(`GOOGLE_CALENDAR_CLIENT_SECRET=${CLIENT_SECRET}`);
       console.log(`GOOGLE_CALENDAR_REFRESH_TOKEN=${tokens.refresh_token}`);
+      console.log('\n' + '='.repeat(80));
+      console.log('\n✅ This single refresh token includes scopes for:');
+      console.log('   - Google Drive (full access)');
+      console.log('   - Google Contacts (read-only)');
+      console.log('   - Google Calendar (full access)');
+      console.log('\n💡 Drive and Contacts will automatically fall back to these credentials.');
     } else {
       console.log('\n⚠️  No refresh token received!');
       console.log('This usually happens if you\'ve already authorized this app.');
