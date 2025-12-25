@@ -863,6 +863,11 @@ export const docs = pgTable(
     qualityScore: integer("quality_score").default(0), // 0-100 score
     lastReviewedAt: timestamp("last_reviewed_at"), // When last validated
 
+    // Embedding fields for RAG (Level 2)
+    embedding: text("embedding"), // Vector embedding stored as JSON string (1536 dimensions)
+    embeddingModel: text("embedding_model"), // Model used to generate embedding
+    embeddingUpdatedAt: timestamp("embedding_updated_at"), // When embedding was last updated
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -879,6 +884,8 @@ export const docs = pgTable(
     // AI Knowledge Base: filter by quality and readiness
     index("idx_docs_ai_ready").on(table.aiReady),
     index("idx_docs_quality_score").on(table.qualityScore),
+    // RAG: filter by embedding existence
+    index("idx_docs_embedding_updated").on(table.embeddingUpdatedAt),
   ]
 );
 
@@ -912,6 +919,38 @@ export const insertAttachmentSchema = createInsertSchema(attachments).omit({
 
 export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Attachment = typeof attachments.$inferSelect;
+
+// DOC_CHUNKS: Chunked document content for RAG vector search (Level 2)
+export const docChunks = pgTable(
+  "doc_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    docId: uuid("doc_id").references(() => docs.id, { onDelete: "cascade" }).notNull(),
+    chunkIndex: integer("chunk_index").notNull(), // Order of chunk within doc
+    content: text("content").notNull(), // Chunk text content
+    embedding: text("embedding"), // Vector embedding as JSON string
+    startOffset: integer("start_offset"), // Start position in original doc
+    endOffset: integer("end_offset"), // End position in original doc
+    metadata: jsonb("metadata").$type<{
+      section?: string;
+      headings?: string[];
+      isCodeBlock?: boolean;
+    }>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_doc_chunks_doc_id").on(table.docId),
+    index("idx_doc_chunks_index").on(table.docId, table.chunkIndex),
+  ]
+);
+
+export const insertDocChunkSchema = createInsertSchema(docChunks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDocChunk = z.infer<typeof insertDocChunkSchema>;
+export type DocChunk = typeof docChunks.$inferSelect;
 
 export const insertDocSchema = createInsertSchema(docs).omit({
   id: true,
