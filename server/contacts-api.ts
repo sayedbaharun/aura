@@ -20,7 +20,7 @@ const CONTACTS_API_URL = process.env.CONTACTS_API_URL;
  * Matches the SB-OS Person schema
  */
 export interface ExternalContact {
-  id?: string;  // External unique ID (for deduplication if available)
+  id?: number | string;  // External unique ID (integer from API, stored as string)
   name: string;
   email?: string | null;
   phone?: string | null;
@@ -43,7 +43,7 @@ export interface ContactsApiSyncResult {
   skipped: number;
   errors: string[];
   items: Array<{
-    externalId?: string;
+    externalId?: string | null;
     name: string;
     personId?: string;
     action: 'created' | 'updated' | 'skipped';
@@ -164,7 +164,7 @@ export function externalContactToPerson(contact: ExternalContact): {
     relationship: contact.relationship || null,
     importance: contact.importance || 'standard',
     howWeMet: contact.howWeMet || null,
-    externalContactId: contact.id || null,
+    externalContactId: contact.id != null ? String(contact.id) : null,
     needsEnrichment: true, // New imports need enrichment
   };
 }
