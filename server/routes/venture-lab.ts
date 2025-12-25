@@ -112,7 +112,15 @@ The research prompt you generate must be SPECIFICALLY TAILORED to this particula
 
 The output should be a complete, ready-to-use research prompt that the user can copy and paste directly into ${provider === "gemini" ? "Gemini" : "Perplexity"}.
 
-IMPORTANT: Do NOT generate a generic prompt. The prompt must show that you UNDERSTAND what this specific business is about and ask POINTED questions that will validate or invalidate this specific opportunity.`;
+IMPORTANT: Do NOT generate a generic prompt. The prompt must show that you UNDERSTAND what this specific business is about and ask POINTED questions that will validate or invalidate this specific opportunity.
+
+CRITICAL: Output ONLY the research prompt itself. Do NOT include any:
+- Introductory text like "Here's a customized prompt..."
+- Concluding statements like "This prompt is designed to..."
+- Meta-commentary about what the prompt will do
+- Explanations of why you structured it this way
+
+The output should start directly with the research request (e.g., "# Venture Research Request: [Name]") and end with the last research instruction. Nothing before, nothing after.`;
 
     const userPrompt = `${ideaContext}
 
