@@ -848,7 +848,7 @@ router.get("/2026-arc/audit", async (req, res) => {
     // Get phases for each project
     const projectsWithPhases = await Promise.all(
       projects.map(async (p) => {
-        const phases = await storage.getPhases(p.id);
+        const phases = await storage.getPhases({ projectId: p.id });
         return {
           name: p.name,
           id: p.id,
