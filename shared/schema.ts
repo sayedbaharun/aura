@@ -2624,3 +2624,112 @@ export const insertDocAiTeachingSchema = createInsertSchema(docAiTeachings).omit
 });
 export type DocAiTeaching = typeof docAiTeachings.$inferSelect;
 export type InsertDocAiTeaching = z.infer<typeof insertDocAiTeachingSchema>;
+
+// ----------------------------------------------------------------------------
+// VENTURE LAB: Idea Research & Validation System
+// ----------------------------------------------------------------------------
+
+// Idea status lifecycle: idea → researching → scored → approved/rejected/parked → compiled
+export const ventureIdeaStatusEnum = pgEnum('venture_idea_status', [
+  'idea',        // Initial capture
+  'researching', // AI research in progress
+  'researched',  // Research complete, awaiting scoring
+  'scoring',     // AI scoring in progress
+  'scored',      // Scored, awaiting human decision
+  'approved',    // Human approved, ready for compilation
+  'rejected',    // Human rejected (killed)
+  'parked',      // Human parked for later
+  'compiling',   // Compilation in progress
+  'compiled',    // Venture created successfully
+  'failed'       // Compilation failed
+]);
+
+// Verdict based on score thresholds
+export const ventureIdeaVerdictEnum = pgEnum('venture_idea_verdict', [
+  'GREEN',   // 80-100: Full venture pack
+  'YELLOW',  // 70-79: Pilot pack only
+  'RED'      // 0-69: Kill/archive
+]);
+
+// Venture Ideas: Track business ideas through research → scoring → approval → compilation
+export const ventureIdeas = pgTable(
+  "venture_ideas",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Idea basics
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    domain: text("domain"), // saas, media, ecommerce, etc.
+    targetCustomer: text("target_customer"),
+    initialThoughts: text("initial_thoughts"),
+
+    // Status tracking
+    status: ventureIdeaStatusEnum("status").default("idea").notNull(),
+
+    // Research results
+    researchDocId: uuid("research_doc_id").references(() => docs.id, { onDelete: "set null" }),
+    researchCompletedAt: timestamp("research_completed_at"),
+    researchModel: text("research_model"), // Which AI model was used
+    researchTokensUsed: integer("research_tokens_used"),
+
+    // Scoring results (JSON for flexibility)
+    scoreData: jsonb("score_data").$type<{
+      rawScore: number;        // 0-100
+      confidence: number;      // 0-1
+      finalScore: number;      // rawScore × confidence
+      breakdown: {
+        buyerClarityBudget: { score: number; max: number; reasoning: string };
+        painIntensityUrgency: { score: number; max: number; reasoning: string };
+        distributionFeasibility: { score: number; max: number; reasoning: string };
+        revenueModelRealism: { score: number; max: number; reasoning: string };
+        competitiveEdge: { score: number; max: number; reasoning: string };
+        executionComplexity: { score: number; max: number; reasoning: string };
+        regulatoryFriction: { score: number; max: number; reasoning: string };
+        aiLeverage: { score: number; max: number; reasoning: string };
+      };
+      killReasons: string[];
+      nextValidationSteps: string[];
+    }>(),
+    verdict: ventureIdeaVerdictEnum("verdict"),
+    scoredAt: timestamp("scored_at"),
+    scoreInputHash: text("score_input_hash"), // Hash of inputs for determinism check
+
+    // Human approval
+    approvalDecision: text("approval_decision"), // approved, parked, killed
+    approvalComment: text("approval_comment"),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at"),
+
+    // Compilation results
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "set null" }),
+    compiledAt: timestamp("compiled_at"),
+    compilationData: jsonb("compilation_data").$type<{
+      projectsCreated: number;
+      phasesCreated: number;
+      tasksCreated: number;
+      model: string;
+      tokensUsed: number;
+    }>(),
+
+    // Metadata
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_venture_ideas_status").on(table.status),
+    index("idx_venture_ideas_verdict").on(table.verdict),
+    index("idx_venture_ideas_venture_id").on(table.ventureId),
+    index("idx_venture_ideas_research_doc_id").on(table.researchDocId),
+    index("idx_venture_ideas_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertVentureIdeaSchema = createInsertSchema(ventureIdeas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type VentureIdea = typeof ventureIdeas.$inferSelect;
+export type InsertVentureIdea = z.infer<typeof insertVentureIdeaSchema>;

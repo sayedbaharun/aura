@@ -90,6 +90,8 @@ import {
   type InsertDocAiPattern,
   type DocAiTeaching,
   type InsertDocAiTeaching,
+  type VentureIdea,
+  type InsertVentureIdea,
   ventures,
   projects,
   phases,
@@ -134,6 +136,7 @@ import {
   docAiExamples,
   docAiPatterns,
   docAiTeachings,
+  ventureIdeas,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc } from "drizzle-orm";
@@ -4223,6 +4226,85 @@ export class DBStorage implements IStorage {
       examplesCount,
       teachingsCount,
     };
+  }
+
+  // ============================================================================
+  // VENTURE IDEAS (Venture Lab)
+  // ============================================================================
+
+  async getVentureIdeas(filters?: {
+    status?: string;
+    verdict?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<VentureIdea[]> {
+    const conditions = [];
+
+    if (filters?.status) {
+      conditions.push(eq(ventureIdeas.status, filters.status as any));
+    }
+
+    if (filters?.verdict) {
+      conditions.push(eq(ventureIdeas.verdict, filters.verdict as any));
+    }
+
+    let query = this.db
+      .select()
+      .from(ventureIdeas)
+      .orderBy(desc(ventureIdeas.createdAt));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return await query;
+  }
+
+  async getVentureIdea(id: string): Promise<VentureIdea | undefined> {
+    const results = await this.db
+      .select()
+      .from(ventureIdeas)
+      .where(eq(ventureIdeas.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async getVentureIdeaByScoreHash(hash: string): Promise<VentureIdea | undefined> {
+    const results = await this.db
+      .select()
+      .from(ventureIdeas)
+      .where(eq(ventureIdeas.scoreInputHash, hash))
+      .limit(1);
+    return results[0];
+  }
+
+  async createVentureIdea(data: InsertVentureIdea): Promise<VentureIdea> {
+    const [idea] = await this.db
+      .insert(ventureIdeas)
+      .values(data as any)
+      .returning();
+    return idea;
+  }
+
+  async updateVentureIdea(id: string, updates: Partial<InsertVentureIdea>): Promise<VentureIdea | undefined> {
+    const [updated] = await this.db
+      .update(ventureIdeas)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(ventureIdeas.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteVentureIdea(id: string): Promise<void> {
+    await this.db.delete(ventureIdeas).where(eq(ventureIdeas.id, id));
   }
 
 }
