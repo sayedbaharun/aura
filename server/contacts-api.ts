@@ -110,7 +110,10 @@ export async function fetchContacts(): Promise<ExternalContact[]> {
     throw new Error('Contacts API not configured');
   }
 
-  const response = await fetch(`${CONTACTS_API_URL}/api/directory`, {
+  const url = `${CONTACTS_API_URL}/api/directory`;
+  logger.info({ url, hasKey: !!CONTACTS_API_KEY, keyLength: CONTACTS_API_KEY?.length }, 'Fetching contacts from external API');
+
+  const response = await fetch(url, {
     headers: {
       'X-API-Key': CONTACTS_API_KEY!,
     },
@@ -118,6 +121,7 @@ export async function fetchContacts(): Promise<ExternalContact[]> {
 
   if (!response.ok) {
     const errorText = await response.text();
+    logger.error({ status: response.status, url, errorText }, 'Contacts API fetch failed');
     throw new Error(`Failed to fetch contacts: ${response.status} ${errorText}`);
   }
 
