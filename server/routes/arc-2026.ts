@@ -819,4 +819,106 @@ router.get("/2026-arc/status", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/setup/2026-arc/audit
+ * Detailed audit of what exists vs what's expected
+ */
+router.get("/2026-arc/audit", async (req, res) => {
+  try {
+    const ventures = await storage.getVentures();
+    const arc2026 = ventures.find(v => v.name === "2026 Arc");
+
+    if (!arc2026) {
+      return res.json({
+        exists: false,
+        message: "2026 Arc venture not found. Run POST /api/setup/2026-arc to create it."
+      });
+    }
+
+    // Get projects
+    const projects = await storage.getProjects({ ventureId: arc2026.id });
+    const expectedProjects = ["Health & Energy", "Wealth & Ventures", "Knowledge & Skills", "Systems & Habits"];
+
+    const projectStatus = expectedProjects.map(name => ({
+      name,
+      exists: projects.some(p => p.name === name),
+      id: projects.find(p => p.name === name)?.id
+    }));
+
+    // Get phases for each project
+    const projectsWithPhases = await Promise.all(
+      projects.map(async (p) => {
+        const phases = await storage.getPhases(p.id);
+        return {
+          name: p.name,
+          id: p.id,
+          phaseCount: phases.length,
+          expectedPhases: 12
+        };
+      })
+    );
+
+    // Get docs
+    const allDocs = await storage.getDocs({ ventureId: arc2026.id });
+
+    const expectedDocs = [
+      "2026 Arc",
+      "2026 Arc Playbook",
+      "Annual Goals & Metrics",
+      "Monthly Reviews",
+      "January 2026 Review",
+      "Quarterly Reviews",
+      "Domain Playbooks",
+      "Health & Energy Playbook",
+      "Wealth & Ventures Playbook",
+      "Knowledge & Skills Playbook",
+      "Systems & Habits Playbook",
+      "Education Tracks",
+      "Arabic Learning Track",
+      "Trading Education Track",
+      "AI & Technology Track"
+    ];
+
+    const docStatus = expectedDocs.map(title => ({
+      title,
+      exists: allDocs.some(d => d.title === title),
+      id: allDocs.find(d => d.title === title)?.id
+    }));
+
+    const missingDocs = docStatus.filter(d => !d.exists).map(d => d.title);
+    const existingDocs = docStatus.filter(d => d.exists).map(d => d.title);
+
+    res.json({
+      exists: true,
+      venture: {
+        id: arc2026.id,
+        name: arc2026.name
+      },
+      projects: {
+        expected: 4,
+        found: projects.length,
+        details: projectStatus,
+        withPhases: projectsWithPhases
+      },
+      docs: {
+        expected: expectedDocs.length,
+        found: allDocs.length,
+        existing: existingDocs,
+        missing: missingDocs
+      },
+      summary: {
+        projectsComplete: projectStatus.every(p => p.exists),
+        docsComplete: missingDocs.length === 0,
+        missingItems: missingDocs
+      }
+    });
+
+  } catch (error) {
+    logger.error({ error }, "Error auditing 2026 Arc");
+    res.status(500).json({
+      error: "Failed to audit 2026 Arc"
+    });
+  }
+});
+
 export default router;
