@@ -581,6 +581,35 @@ Current date: ${today}`;
       {
         type: "function",
         function: {
+          name: "get_knowledge_files",
+          description: "Get uploaded knowledge files (PDFs, images, documents) with their extracted text and AI summaries. Use when user asks about uploaded files, attached documents, or needs content from PDFs/images.",
+          parameters: {
+            type: "object",
+            properties: {
+              ventureId: { type: "string", description: "Filter by venture" },
+              category: { type: "string", description: "Filter by category: document, strategy, playbook, notes, research, reference, template, image" },
+              includeContent: { type: "boolean", description: "Include extracted text content (can be large)" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "read_knowledge_file",
+          description: "Read the full content of a specific knowledge file. Use when you need the complete extracted text from a PDF, image, or document.",
+          parameters: {
+            type: "object",
+            properties: {
+              fileId: { type: "string", description: "The knowledge file ID" }
+            },
+            required: ["fileId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
           name: "get_summary",
           description: "Get a summary of the user's system - venture count, active projects, pending tasks, etc.",
           parameters: { type: "object", properties: {}, required: [] }
@@ -1087,6 +1116,54 @@ Current date: ${today}`;
             return JSON.stringify(docs.map((d: any) => ({
               id: d.id, title: d.title, type: d.type, status: d.status
             })));
+          }
+          case "get_knowledge_files": {
+            const files = await storage.getKnowledgeFiles({
+              ventureId: args.ventureId,
+              category: args.category,
+              processingStatus: "completed", // Only return processed files
+            });
+            return JSON.stringify(files.map((f: any) => {
+              const result: any = {
+                id: f.id,
+                name: f.name,
+                category: f.category,
+                mimeType: f.mimeType,
+                summary: f.aiSummary,
+                tags: f.aiTags,
+                processingStatus: f.processingStatus,
+                ventureId: f.ventureId,
+              };
+              // Include content if requested (for detailed analysis)
+              if (args.includeContent && f.extractedText) {
+                // Truncate very long content
+                result.extractedText = f.extractedText.length > 5000
+                  ? f.extractedText.substring(0, 5000) + "\n[... truncated ...]"
+                  : f.extractedText;
+              }
+              return result;
+            }));
+          }
+          case "read_knowledge_file": {
+            const file = await storage.getKnowledgeFile(args.fileId);
+            if (!file) {
+              return JSON.stringify({ error: "Knowledge file not found" });
+            }
+            if (file.processingStatus !== "completed") {
+              return JSON.stringify({
+                error: "File not yet processed",
+                status: file.processingStatus
+              });
+            }
+            return JSON.stringify({
+              id: file.id,
+              name: file.name,
+              category: file.category,
+              extractedText: file.extractedText,
+              summary: file.aiSummary,
+              tags: file.aiTags,
+              metadata: file.aiMetadata,
+            });
           }
           case "get_summary": {
             const [ventures, projects, tasks, captures] = await Promise.all([

@@ -9,12 +9,13 @@ import { DriveFilesBrowser } from "@/components/knowledge-hub/drive-files-browse
 import { QualityDashboard } from "@/components/knowledge-hub/quality-dashboard";
 import { ReviewQueue } from "@/components/knowledge-hub/review-queue";
 import { AiPerformance } from "@/components/knowledge-hub/ai-performance";
+import { KnowledgeFilesBrowser } from "@/components/knowledge-hub/knowledge-files-browser";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { BookOpen, Cloud, Sparkles } from "lucide-react";
+import { BookOpen, Cloud, Sparkles, FileUp } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -195,6 +196,10 @@ export default function KnowledgeHub() {
             <BookOpen className="h-4 w-4" />
             Local Docs
           </TabsTrigger>
+          <TabsTrigger value="files" className="gap-2">
+            <FileUp className="h-4 w-4" />
+            Files
+          </TabsTrigger>
           <TabsTrigger value="quality" className="gap-2">
             <Sparkles className="h-4 w-4" />
             Quality Metrics
@@ -229,6 +234,10 @@ export default function KnowledgeHub() {
               <FiltersSidebar filters={filters} onFiltersChange={setFilters} />
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="files">
+          <KnowledgeFilesBrowser ventures={ventures} />
         </TabsContent>
 
         <TabsContent value="quality">

@@ -94,6 +94,8 @@ import {
   type InsertVentureIdea,
   type DocChunk,
   type InsertDocChunk,
+  type KnowledgeFile,
+  type InsertKnowledgeFile,
   ventures,
   projects,
   phases,
@@ -140,6 +142,7 @@ import {
   docAiPatterns,
   docAiTeachings,
   ventureIdeas,
+  knowledgeFiles,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc } from "drizzle-orm";
@@ -4451,6 +4454,161 @@ export class DBStorage implements IStorage {
       await this.db.delete(ventureIdeas).where(eq(ventureIdeas.id, id));
     } catch (error) {
       console.error("Error deleting venture idea (table may not exist):", error);
+    }
+  }
+
+  // ============================================================================
+  // KNOWLEDGE FILES (File uploads with AI reading)
+  // ============================================================================
+
+  async getKnowledgeFiles(
+    filters?: {
+      ventureId?: string;
+      projectId?: string;
+      taskId?: string;
+      docId?: string;
+      category?: string;
+      processingStatus?: string;
+      includeInAiContext?: boolean;
+      limit?: number;
+    }
+  ): Promise<KnowledgeFile[]> {
+    try {
+      const conditions: any[] = [];
+
+      if (filters?.ventureId) {
+        conditions.push(eq(knowledgeFiles.ventureId, filters.ventureId));
+      }
+      if (filters?.projectId) {
+        conditions.push(eq(knowledgeFiles.projectId, filters.projectId));
+      }
+      if (filters?.taskId) {
+        conditions.push(eq(knowledgeFiles.taskId, filters.taskId));
+      }
+      if (filters?.docId) {
+        conditions.push(eq(knowledgeFiles.docId, filters.docId));
+      }
+      if (filters?.category) {
+        conditions.push(eq(knowledgeFiles.category, filters.category as any));
+      }
+      if (filters?.processingStatus) {
+        conditions.push(eq(knowledgeFiles.processingStatus, filters.processingStatus as any));
+      }
+      if (filters?.includeInAiContext !== undefined) {
+        conditions.push(eq(knowledgeFiles.includeInAiContext, filters.includeInAiContext));
+      }
+
+      const query = this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(knowledgeFiles.aiContextPriority), desc(knowledgeFiles.createdAt));
+
+      if (filters?.limit) {
+        return await query.limit(filters.limit);
+      }
+
+      return await query;
+    } catch (error) {
+      console.error("Error fetching knowledge files (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getKnowledgeFile(id: string): Promise<KnowledgeFile | undefined> {
+    try {
+      const [file] = await this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(eq(knowledgeFiles.id, id))
+        .limit(1);
+      return file;
+    } catch (error) {
+      console.error("Error fetching knowledge file (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async getKnowledgeFileByDriveId(driveFileId: string): Promise<KnowledgeFile | undefined> {
+    try {
+      const [file] = await this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(eq(knowledgeFiles.googleDriveFileId, driveFileId))
+        .limit(1);
+      return file;
+    } catch (error) {
+      console.error("Error fetching knowledge file by drive ID (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async createKnowledgeFile(data: InsertKnowledgeFile): Promise<KnowledgeFile> {
+    try {
+      const [file] = await this.db
+        .insert(knowledgeFiles)
+        .values(data as any)
+        .returning();
+      return file;
+    } catch (error) {
+      console.error("Error creating knowledge file:", error);
+      throw error;
+    }
+  }
+
+  async updateKnowledgeFile(
+    id: string,
+    updates: Partial<InsertKnowledgeFile>
+  ): Promise<KnowledgeFile | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(knowledgeFiles)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(knowledgeFiles.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating knowledge file:", error);
+      throw error;
+    }
+  }
+
+  async deleteKnowledgeFile(id: string): Promise<void> {
+    try {
+      await this.db
+        .delete(knowledgeFiles)
+        .where(eq(knowledgeFiles.id, id));
+    } catch (error) {
+      console.error("Error deleting knowledge file:", error);
+      throw error;
+    }
+  }
+
+  async getKnowledgeFilesForAiContext(
+    ventureId: string,
+    options?: { limit?: number }
+  ): Promise<KnowledgeFile[]> {
+    try {
+      const query = this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(
+          and(
+            eq(knowledgeFiles.ventureId, ventureId),
+            eq(knowledgeFiles.includeInAiContext, true),
+            eq(knowledgeFiles.processingStatus, 'completed' as any)
+          )
+        )
+        .orderBy(desc(knowledgeFiles.aiContextPriority), desc(knowledgeFiles.createdAt));
+
+      if (options?.limit) {
+        return await query.limit(options.limit);
+      }
+
+      return await query;
+    } catch (error) {
+      console.error("Error fetching knowledge files for AI context:", error);
+      return [];
     }
   }
 

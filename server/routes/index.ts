@@ -41,6 +41,7 @@ import aiDocsRoutes from "./ai-docs";
 import aiLearningRoutes from "./ai-learning";
 import ventureLabRoutes from "./venture-lab";
 import ragRoutes from "./rag";
+import knowledgeFilesRoutes from "./knowledge-files";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
@@ -123,6 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/docs/ai', aiDocsRoutes);
   app.use('/api/ai/learning', aiLearningRoutes);
   app.use('/api/attachments', attachmentsRoutes);
+  app.use('/api/knowledge-files', knowledgeFilesRoutes);
 
   // ============================================================================
   // RAG (Retrieval Augmented Generation)

@@ -1,0 +1,497 @@
+/**
+ * Knowledge Files Routes
+ * File uploads with AI reading capability, linked to ventures
+ */
+import { Router, Request, Response } from "express";
+import multer from "multer";
+import { storage } from "../storage";
+import { logger } from "../logger";
+import { insertKnowledgeFileSchema } from "@shared/schema";
+import { z } from "zod";
+import {
+  extractFromFile,
+  reanalyzeFile,
+  isSupportedMimeType,
+  getMaxFileSize,
+  SUPPORTED_MIME_TYPES,
+} from "../file-extraction";
+
+const router = Router();
+
+// Configure multer for memory storage (we'll upload to Drive)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max
+  },
+  fileFilter: (req, file, cb) => {
+    if (isSupportedMimeType(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${file.mimetype}. Supported types: ${SUPPORTED_MIME_TYPES.join(", ")}`));
+    }
+  },
+});
+
+// Check if Google Drive is configured
+function isDriveConfigured(): boolean {
+  const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN || process.env.GOOGLE_CALENDAR_REFRESH_TOKEN;
+  return !!(clientId && clientSecret && refreshToken);
+}
+
+// GET /supported-types - List supported file types
+router.get("/supported-types", (req: Request, res: Response) => {
+  res.json({
+    mimeTypes: SUPPORTED_MIME_TYPES,
+    categories: [
+      { value: "document", label: "Document" },
+      { value: "strategy", label: "Strategy" },
+      { value: "playbook", label: "Playbook" },
+      { value: "notes", label: "Notes" },
+      { value: "research", label: "Research" },
+      { value: "reference", label: "Reference" },
+      { value: "template", label: "Template" },
+      { value: "image", label: "Image" },
+      { value: "spreadsheet", label: "Spreadsheet" },
+      { value: "presentation", label: "Presentation" },
+      { value: "other", label: "Other" },
+    ],
+  });
+});
+
+// GET / - List knowledge files
+router.get("/", async (req: Request, res: Response) => {
+  try {
+    const { ventureId, projectId, taskId, docId, category, processingStatus, includeInAiContext, limit } = req.query;
+
+    const files = await storage.getKnowledgeFiles({
+      ventureId: ventureId as string | undefined,
+      projectId: projectId as string | undefined,
+      taskId: taskId as string | undefined,
+      docId: docId as string | undefined,
+      category: category as string | undefined,
+      processingStatus: processingStatus as string | undefined,
+      includeInAiContext: includeInAiContext === "true" ? true : includeInAiContext === "false" ? false : undefined,
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
+
+    res.json(files);
+  } catch (error) {
+    logger.error({ error }, "Error listing knowledge files");
+    res.status(500).json({ error: "Failed to list knowledge files" });
+  }
+});
+
+// GET /:id - Get single knowledge file
+router.get("/:id", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+    res.json(file);
+  } catch (error) {
+    logger.error({ error }, "Error fetching knowledge file");
+    res.status(500).json({ error: "Failed to fetch knowledge file" });
+  }
+});
+
+// POST / - Upload a new knowledge file
+router.post("/", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const {
+      name,
+      description,
+      category,
+      ventureId,
+      projectId,
+      taskId,
+      docId,
+      tags,
+      notes,
+      includeInAiContext,
+      aiContextPriority,
+    } = req.body;
+
+    // Validate ventureId is provided
+    if (!ventureId) {
+      return res.status(400).json({ error: "ventureId is required" });
+    }
+
+    const file = req.file;
+    const fileName = name || file.originalname;
+
+    logger.info({
+      fileName,
+      mimeType: file.mimetype,
+      size: file.size,
+      ventureId,
+    }, "Processing knowledge file upload");
+
+    let driveFileId: string | undefined;
+    let driveUrl: string | undefined;
+    let storageType: "google_drive" | "base64" = "base64";
+    let base64Data: string | undefined;
+
+    // Try to upload to Google Drive if configured
+    if (isDriveConfigured()) {
+      try {
+        const {
+          uploadFile,
+          createVentureFolder,
+          getOrCreateKnowledgeBaseFolder,
+        } = await import("../google-drive");
+
+        // Get or create venture folder under Knowledge Base
+        const venture = await storage.getVenture(ventureId);
+        let parentFolderId: string;
+
+        if (venture) {
+          parentFolderId = await createVentureFolder(venture.name);
+        } else {
+          parentFolderId = await getOrCreateKnowledgeBaseFolder();
+        }
+
+        // Upload to Google Drive
+        const driveFile = await uploadFile(
+          file.originalname,
+          file.buffer,
+          file.mimetype,
+          parentFolderId,
+          description
+        );
+
+        driveFileId = driveFile.id || undefined;
+        driveUrl = driveFile.webViewLink || undefined;
+        storageType = "google_drive";
+
+        logger.info({ driveFileId, driveUrl }, "File uploaded to Google Drive");
+      } catch (driveError) {
+        logger.warn({ error: driveError }, "Google Drive upload failed, falling back to base64 storage");
+        // Fall back to base64 storage
+        base64Data = file.buffer.toString("base64");
+        storageType = "base64";
+      }
+    } else {
+      // No Drive configured, use base64
+      base64Data = file.buffer.toString("base64");
+      storageType = "base64";
+    }
+
+    // Create the knowledge file record (processing pending)
+    const knowledgeFile = await storage.createKnowledgeFile({
+      name: fileName,
+      description,
+      category: category || "document",
+      ventureId,
+      projectId: projectId || null,
+      taskId: taskId || null,
+      docId: docId || null,
+      originalFileName: file.originalname,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      storageType,
+      googleDriveFileId: driveFileId,
+      googleDriveUrl: driveUrl,
+      base64Data,
+      processingStatus: "pending",
+      includeInAiContext: includeInAiContext !== "false",
+      aiContextPriority: aiContextPriority ? parseInt(aiContextPriority) : 0,
+      tags,
+      notes,
+    });
+
+    // Start processing in background (don't await)
+    processFileAsync(knowledgeFile.id, file.buffer, file.mimetype);
+
+    res.status(201).json(knowledgeFile);
+  } catch (error) {
+    logger.error({ error }, "Error uploading knowledge file");
+    if (error instanceof Error && error.message.includes("Unsupported file type")) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Failed to upload knowledge file" });
+    }
+  }
+});
+
+// Background file processing
+async function processFileAsync(fileId: string, buffer: Buffer, mimeType: string) {
+  try {
+    // Mark as processing
+    await storage.updateKnowledgeFile(fileId, {
+      processingStatus: "processing",
+    });
+
+    logger.info({ fileId, mimeType }, "Starting file extraction");
+
+    // Extract text and metadata
+    const result = await extractFromFile(buffer, mimeType, { generateSummary: true });
+
+    // Update with extracted data
+    await storage.updateKnowledgeFile(fileId, {
+      processingStatus: "completed",
+      extractedText: result.extractedText,
+      aiSummary: result.summary,
+      aiTags: result.tags || [],
+      aiMetadata: result.metadata as any,
+      processedAt: new Date(),
+    });
+
+    logger.info({ fileId, textLength: result.extractedText.length }, "File extraction completed");
+  } catch (error) {
+    logger.error({ error, fileId }, "File extraction failed");
+
+    // Mark as failed
+    await storage.updateKnowledgeFile(fileId, {
+      processingStatus: "failed",
+      aiMetadata: {
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      } as any,
+    });
+  }
+}
+
+// POST /:id/reprocess - Reprocess a file (re-extract text and metadata)
+router.post("/:id/reprocess", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    // Get the file content
+    let buffer: Buffer;
+
+    if (file.storageType === "base64" && file.base64Data) {
+      buffer = Buffer.from(file.base64Data, "base64");
+    } else if (file.storageType === "google_drive" && file.googleDriveFileId) {
+      if (!isDriveConfigured()) {
+        return res.status(503).json({ error: "Google Drive not configured" });
+      }
+      const { downloadFile } = await import("../google-drive");
+      buffer = await downloadFile(file.googleDriveFileId);
+    } else {
+      return res.status(400).json({ error: "No file content available for reprocessing" });
+    }
+
+    // Reset status
+    await storage.updateKnowledgeFile(file.id, {
+      processingStatus: "pending",
+    });
+
+    // Process in background
+    processFileAsync(file.id, buffer, file.mimeType);
+
+    res.json({ message: "Reprocessing started", fileId: file.id });
+  } catch (error) {
+    logger.error({ error }, "Error reprocessing knowledge file");
+    res.status(500).json({ error: "Failed to reprocess knowledge file" });
+  }
+});
+
+// POST /:id/analyze - On-demand AI analysis
+router.post("/:id/analyze", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    if (!file.extractedText) {
+      return res.status(400).json({ error: "File has not been processed yet. No extracted text available." });
+    }
+
+    const { prompt, detailed } = req.body;
+
+    logger.info({ fileId: file.id, prompt, detailed }, "Starting on-demand file analysis");
+
+    // Run AI analysis
+    const analysis = await reanalyzeFile(file.extractedText, {
+      prompt,
+      detailed: detailed === true,
+    });
+
+    // Update the file with new analysis
+    await storage.updateKnowledgeFile(file.id, {
+      aiSummary: analysis.summary,
+      aiTags: analysis.tags,
+      aiMetadata: {
+        ...file.aiMetadata,
+        ...analysis.metadata,
+        lastAnalyzedAt: new Date().toISOString(),
+        analysisPrompt: prompt,
+      } as any,
+    });
+
+    res.json({
+      fileId: file.id,
+      summary: analysis.summary,
+      tags: analysis.tags,
+      analysis: analysis.analysis,
+      metadata: analysis.metadata,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error analyzing knowledge file");
+    res.status(500).json({ error: "Failed to analyze knowledge file" });
+  }
+});
+
+// PATCH /:id - Update knowledge file metadata
+router.patch("/:id", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    const {
+      name,
+      description,
+      category,
+      tags,
+      notes,
+      includeInAiContext,
+      aiContextPriority,
+    } = req.body;
+
+    const updates: Record<string, any> = {};
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (category !== undefined) updates.category = category;
+    if (tags !== undefined) updates.tags = tags;
+    if (notes !== undefined) updates.notes = notes;
+    if (includeInAiContext !== undefined) updates.includeInAiContext = includeInAiContext;
+    if (aiContextPriority !== undefined) updates.aiContextPriority = aiContextPriority;
+
+    const updated = await storage.updateKnowledgeFile(req.params.id, updates);
+    res.json(updated);
+  } catch (error) {
+    logger.error({ error }, "Error updating knowledge file");
+    res.status(500).json({ error: "Failed to update knowledge file" });
+  }
+});
+
+// DELETE /:id - Delete knowledge file
+router.delete("/:id", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    // Delete from Google Drive if applicable
+    if (file.storageType === "google_drive" && file.googleDriveFileId && isDriveConfigured()) {
+      try {
+        const { deleteFile } = await import("../google-drive");
+        await deleteFile(file.googleDriveFileId);
+        logger.info({ driveFileId: file.googleDriveFileId }, "Deleted file from Google Drive");
+      } catch (driveError) {
+        logger.warn({ error: driveError }, "Failed to delete file from Google Drive");
+        // Continue with database deletion
+      }
+    }
+
+    await storage.deleteKnowledgeFile(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Error deleting knowledge file");
+    res.status(500).json({ error: "Failed to delete knowledge file" });
+  }
+});
+
+// GET /:id/content - Get file content (extracted text)
+router.get("/:id/content", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    if (file.processingStatus !== "completed") {
+      return res.status(400).json({
+        error: "File not yet processed",
+        status: file.processingStatus,
+      });
+    }
+
+    res.json({
+      id: file.id,
+      name: file.name,
+      extractedText: file.extractedText,
+      summary: file.aiSummary,
+      tags: file.aiTags,
+      metadata: file.aiMetadata,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error getting knowledge file content");
+    res.status(500).json({ error: "Failed to get knowledge file content" });
+  }
+});
+
+// GET /:id/download - Download original file
+router.get("/:id/download", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    let buffer: Buffer;
+
+    if (file.storageType === "base64" && file.base64Data) {
+      buffer = Buffer.from(file.base64Data, "base64");
+    } else if (file.storageType === "google_drive" && file.googleDriveFileId) {
+      if (!isDriveConfigured()) {
+        return res.status(503).json({ error: "Google Drive not configured" });
+      }
+      const { downloadFile } = await import("../google-drive");
+      buffer = await downloadFile(file.googleDriveFileId);
+    } else {
+      return res.status(404).json({ error: "File content not available" });
+    }
+
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${file.originalFileName}"`);
+    res.send(buffer);
+  } catch (error) {
+    logger.error({ error }, "Error downloading knowledge file");
+    res.status(500).json({ error: "Failed to download knowledge file" });
+  }
+});
+
+// GET /venture/:ventureId/context - Get files for AI context
+router.get("/venture/:ventureId/context", async (req: Request, res: Response) => {
+  try {
+    const { ventureId } = req.params;
+    const { limit } = req.query;
+
+    const files = await storage.getKnowledgeFilesForAiContext(ventureId, {
+      limit: limit ? parseInt(limit as string) : undefined,
+    });
+
+    // Return condensed data suitable for AI context
+    const context = files.map(file => ({
+      id: file.id,
+      name: file.name,
+      category: file.category,
+      summary: file.aiSummary,
+      extractedText: file.extractedText,
+      tags: file.aiTags,
+      keyTopics: file.aiMetadata?.keyTopics,
+    }));
+
+    res.json(context);
+  } catch (error) {
+    logger.error({ error }, "Error getting knowledge files for AI context");
+    res.status(500).json({ error: "Failed to get knowledge files for AI context" });
+  }
+});
+
+export default router;

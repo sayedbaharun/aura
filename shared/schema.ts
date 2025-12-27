@@ -1866,6 +1866,121 @@ export type TradingKnowledgeDoc = typeof tradingKnowledgeDocs.$inferSelect;
 export type InsertTradingKnowledgeDoc = z.infer<typeof insertTradingKnowledgeDocSchema>;
 
 // ----------------------------------------------------------------------------
+// KNOWLEDGE FILES (Venture-linked file uploads with AI reading)
+// ----------------------------------------------------------------------------
+
+// Category enum for knowledge files
+export const knowledgeFileCategoryEnum = pgEnum('knowledge_file_category', [
+  'document',     // General documents
+  'strategy',     // Strategy documents
+  'playbook',     // Step-by-step playbooks
+  'notes',        // Personal notes
+  'research',     // Research and analysis
+  'reference',    // Reference materials
+  'template',     // Templates
+  'image',        // Images and diagrams
+  'spreadsheet',  // Spreadsheets and data
+  'presentation', // Presentations
+  'other'         // Other files
+]);
+
+// Storage type enum
+export const knowledgeFileStorageEnum = pgEnum('knowledge_file_storage', [
+  'google_drive', // Stored in Google Drive
+  'base64',       // Base64 encoded in DB
+  'url'           // External URL
+]);
+
+// Processing status enum
+export const knowledgeFileProcessingStatusEnum = pgEnum('knowledge_file_processing_status', [
+  'pending',      // Waiting to be processed
+  'processing',   // Currently being processed
+  'completed',    // Processing complete
+  'failed'        // Processing failed
+]);
+
+// Knowledge Files: Venture-linked file uploads with AI reading capability
+export const knowledgeFiles = pgTable(
+  "knowledge_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Ownership & linking
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    docId: uuid("doc_id").references(() => docs.id, { onDelete: "set null" }),
+
+    // File info
+    name: text("name").notNull(),
+    description: text("description"),
+    category: knowledgeFileCategoryEnum("category").default("document"),
+
+    // Original file details
+    originalFileName: text("original_file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileSize: integer("file_size"), // Size in bytes
+
+    // Storage
+    storageType: knowledgeFileStorageEnum("storage_type").default("google_drive"),
+    googleDriveFileId: text("google_drive_file_id"), // Google Drive file ID
+    googleDriveUrl: text("google_drive_url"), // Web view link
+    storageUrl: text("storage_url"), // For external URLs
+    base64Data: text("base64_data"), // For small files stored in DB
+
+    // AI Processing
+    processingStatus: knowledgeFileProcessingStatusEnum("processing_status").default("pending"),
+    extractedText: text("extracted_text"), // Text extracted from file (PDF, images via OCR)
+    aiSummary: text("ai_summary"), // AI-generated summary
+    aiTags: jsonb("ai_tags").$type<string[]>().default([]), // AI-suggested tags
+    aiMetadata: jsonb("ai_metadata").$type<{
+      confidence?: number;
+      noteType?: string;
+      hasActionItems?: boolean;
+      keyTopics?: string[];
+      entities?: string[];
+      processingModel?: string;
+      processingTime?: number;
+      errorMessage?: string;
+      [key: string]: any;
+    }>(),
+
+    // Context inclusion for AI
+    includeInAiContext: boolean("include_in_ai_context").default(true),
+    aiContextPriority: integer("ai_context_priority").default(0), // Higher = included first
+
+    // User-provided metadata
+    tags: text("tags"), // Comma-separated user tags
+    notes: text("notes"),
+
+    // Timestamps
+    processedAt: timestamp("processed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_knowledge_files_venture_id").on(table.ventureId),
+    index("idx_knowledge_files_project_id").on(table.projectId),
+    index("idx_knowledge_files_task_id").on(table.taskId),
+    index("idx_knowledge_files_doc_id").on(table.docId),
+    index("idx_knowledge_files_category").on(table.category),
+    index("idx_knowledge_files_processing_status").on(table.processingStatus),
+    index("idx_knowledge_files_include_in_ai_context").on(table.includeInAiContext),
+    index("idx_knowledge_files_google_drive_file_id").on(table.googleDriveFileId),
+    index("idx_knowledge_files_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertKnowledgeFileSchema = createInsertSchema(knowledgeFiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type KnowledgeFile = typeof knowledgeFiles.$inferSelect;
+export type InsertKnowledgeFile = z.infer<typeof insertKnowledgeFileSchema>;
+
+// ----------------------------------------------------------------------------
 // STRATEGIC FORESIGHT MODULE
 // ----------------------------------------------------------------------------
 
