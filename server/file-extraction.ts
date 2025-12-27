@@ -8,9 +8,12 @@
  */
 
 import OpenAI from "openai";
-// @ts-ignore - pdf-parse doesn't have proper ESM exports
-import pdfParse from "pdf-parse";
+import { createRequire } from "module";
 import { logger } from "./logger";
+
+// pdf-parse doesn't support ESM, so we need to use require
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 // Initialize OpenRouter with OpenAI-compatible API
 const openai = new OpenAI({
