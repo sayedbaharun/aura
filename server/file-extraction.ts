@@ -11,10 +11,6 @@ import OpenAI from "openai";
 import { createRequire } from "module";
 import { logger } from "./logger";
 
-// pdf-parse doesn't support ESM, so we need to use require
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
-
 // Initialize OpenRouter with OpenAI-compatible API
 const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -24,6 +20,17 @@ const openai = new OpenAI({
     "X-Title": "SB-OS",
   },
 });
+
+// Lazy-load pdf-parse to avoid ESM/CJS issues with esbuild
+let pdfParseModule: any = null;
+async function getPdfParse() {
+  if (!pdfParseModule) {
+    // Use dynamic require at runtime to avoid esbuild transformation
+    const require = createRequire(import.meta.url);
+    pdfParseModule = require("pdf-parse");
+  }
+  return pdfParseModule;
+}
 
 export interface FileExtractionResult {
   extractedText: string;
@@ -68,6 +75,7 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<FileExtraction
   const startTime = Date.now();
 
   try {
+    const pdfParse = await getPdfParse();
     const data = await pdfParse(buffer);
     const extractedText = data.text.trim();
 
