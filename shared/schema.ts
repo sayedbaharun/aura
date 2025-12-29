@@ -279,6 +279,7 @@ export const users = pgTable("users", {
   totpSecret: varchar("totp_secret"), // Encrypted TOTP secret
   totpEnabled: boolean("totp_enabled").default(false),
   totpBackupCodes: jsonb("totp_backup_codes").$type<string[]>(), // Hashed backup codes
+  totpRecoveryKeyHash: varchar("totp_recovery_key_hash"), // Emergency recovery key (hashed)
   // Device/session tracking
   lastKnownIp: varchar("last_known_ip", { length: 45 }),
   lastKnownUserAgent: text("last_known_user_agent"),
