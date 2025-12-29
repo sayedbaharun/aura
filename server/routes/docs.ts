@@ -98,6 +98,34 @@ router.get("/children/:parentId", async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// QUALITY SCORING ENDPOINTS
+// NOTE: These must be defined BEFORE /:id to avoid route matching conflicts
+// ============================================================================
+
+// Get docs needing review
+router.get("/quality/review-queue", async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const docs = await storage.getDocsNeedingReview(limit);
+    res.json({ docs });
+  } catch (error) {
+    logger.error({ error }, "Error getting review queue");
+    res.status(500).json({ error: "Failed to get review queue" });
+  }
+});
+
+// Get quality metrics
+router.get("/quality/metrics", async (req: Request, res: Response) => {
+  try {
+    const metrics = await storage.getDocQualityMetrics();
+    res.json(metrics);
+  } catch (error) {
+    logger.error({ error }, "Error getting metrics");
+    res.status(500).json({ error: "Failed to get metrics" });
+  }
+});
+
 // Get single doc
 router.get("/:id", async (req: Request, res: Response) => {
   try {
@@ -237,29 +265,6 @@ router.post("/:id/mark-reviewed", async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, "Error marking reviewed");
     res.status(500).json({ error: "Failed to mark reviewed" });
-  }
-});
-
-// Get docs needing review
-router.get("/quality/review-queue", async (req: Request, res: Response) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 20;
-    const docs = await storage.getDocsNeedingReview(limit);
-    res.json({ docs });
-  } catch (error) {
-    logger.error({ error }, "Error getting review queue");
-    res.status(500).json({ error: "Failed to get review queue" });
-  }
-});
-
-// Get quality metrics
-router.get("/quality/metrics", async (req: Request, res: Response) => {
-  try {
-    const metrics = await storage.getDocQualityMetrics();
-    res.json(metrics);
-  } catch (error) {
-    logger.error({ error }, "Error getting metrics");
-    res.status(500).json({ error: "Failed to get metrics" });
   }
 });
 

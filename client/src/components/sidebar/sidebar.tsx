@@ -89,6 +89,11 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[]; default
     label: "Daily",
     items: [
       {
+        href: "/morning",
+        icon: Sun,
+        label: "Morning Ritual",
+      },
+      {
         href: "/dashboard",
         icon: LayoutDashboard,
         label: "Command Center",
@@ -102,11 +107,6 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[]; default
         href: "/calendar",
         icon: Calendar,
         label: "Calendar",
-      },
-      {
-        href: "/morning",
-        icon: Sun,
-        label: "Morning Ritual",
       },
       {
         href: "/evening",
