@@ -98,6 +98,98 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
+// GET /:id/content - Get raw file content for viewing/embedding
+router.get("/:id/content", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    // If we have base64 data, serve it directly
+    if (file.base64Data) {
+      const buffer = Buffer.from(file.base64Data, "base64");
+      res.set({
+        "Content-Type": file.mimeType,
+        "Content-Length": buffer.length,
+        "Content-Disposition": `inline; filename="${file.originalFileName}"`,
+        "Cache-Control": "private, max-age=3600",
+      });
+      return res.send(buffer);
+    }
+
+    // If stored in Google Drive, fetch and serve
+    if (file.storageType === "google_drive" && file.googleDriveFileId) {
+      try {
+        const { downloadFile } = await import("../google-drive");
+        const buffer = await downloadFile(file.googleDriveFileId);
+
+        res.set({
+          "Content-Type": file.mimeType,
+          "Content-Length": buffer.length,
+          "Content-Disposition": `inline; filename="${file.originalFileName}"`,
+          "Cache-Control": "private, max-age=3600",
+        });
+        return res.send(buffer);
+      } catch (driveError) {
+        logger.error({ driveError, fileId: file.id }, "Failed to fetch from Drive");
+        return res.status(500).json({ error: "Failed to fetch file from Google Drive" });
+      }
+    }
+
+    return res.status(404).json({ error: "File content not available" });
+  } catch (error) {
+    logger.error({ error }, "Error fetching knowledge file content");
+    res.status(500).json({ error: "Failed to fetch knowledge file content" });
+  }
+});
+
+// GET /:id/preview - Get preview URL or embedded content
+router.get("/:id/preview", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    const isImage = file.mimeType.startsWith("image/");
+    const isPdf = file.mimeType === "application/pdf";
+    const isText = file.mimeType.startsWith("text/") ||
+                   file.mimeType === "application/json";
+
+    // For images, return base64 data URL
+    if (isImage && file.base64Data) {
+      return res.json({
+        type: "image",
+        dataUrl: `data:${file.mimeType};base64,${file.base64Data}`,
+        mimeType: file.mimeType,
+      });
+    }
+
+    // For text files, return the content
+    if (isText && file.base64Data) {
+      const content = Buffer.from(file.base64Data, "base64").toString("utf-8");
+      return res.json({
+        type: "text",
+        content,
+        mimeType: file.mimeType,
+      });
+    }
+
+    // For PDFs and other files, return URLs for embedding
+    return res.json({
+      type: isPdf ? "pdf" : "other",
+      contentUrl: `/api/knowledge-files/${file.id}/content`,
+      googleDriveUrl: file.googleDriveUrl,
+      mimeType: file.mimeType,
+      canEmbed: isImage || isPdf,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error generating preview");
+    res.status(500).json({ error: "Failed to generate preview" });
+  }
+});
+
 // POST / - Upload a new knowledge file
 router.post("/", upload.single("file"), async (req: Request, res: Response) => {
   try {
