@@ -54,8 +54,9 @@ router.get("/", async (req: Request, res: Response) => {
       res.json(docs);
     }
   } catch (error) {
-    logger.error({ error }, "Error fetching docs");
-    res.status(500).json({ error: "Failed to fetch docs" });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error, errorMessage, filters: req.query }, "Error fetching docs");
+    res.status(500).json({ error: "Failed to fetch docs", details: errorMessage });
   }
 });
 
