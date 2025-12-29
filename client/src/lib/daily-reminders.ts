@@ -6,7 +6,11 @@
 import { apiRequest } from './queryClient';
 import { showToast } from './toast-helper';
 import { browserNotifications } from './browser-notifications';
-import { addNotification, isNotificationEnabled, isDoNotDisturb } from './notification-store';
+import { addNotification, isNotificationEnabled, isDoNotDisturb, getNotificationSettings } from './notification-store';
+
+// Store interval IDs for cleanup
+let taskCheckIntervalId: ReturnType<typeof setInterval> | null = null;
+let reminderCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
 interface Task {
   id: string;
@@ -187,30 +191,27 @@ function showDailyReflectionReminder(): void {
  * Check if it's time for a scheduled reminder
  */
 function checkScheduledReminders(): void {
-  const settings = isNotificationEnabled as any; // Use the store directly
   const now = new Date();
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:00`;
   const currentDay = now.getDay();
 
-  // Import settings from store
-  import('./notification-store').then(({ getNotificationSettings }) => {
-    const settings = getNotificationSettings();
+  // Use directly imported getNotificationSettings (no dynamic import needed)
+  const settings = getNotificationSettings();
 
-    // Check health reminder
-    if (currentTime === settings.healthReminderTime) {
-      showHealthReminder();
-    }
+  // Check health reminder
+  if (currentTime === settings.healthReminderTime) {
+    showHealthReminder();
+  }
 
-    // Check weekly planning reminder
-    if (currentDay === settings.weeklyPlanningDay && currentTime === settings.weeklyPlanningTime) {
-      showWeeklyPlanningReminder();
-    }
+  // Check weekly planning reminder
+  if (currentDay === settings.weeklyPlanningDay && currentTime === settings.weeklyPlanningTime) {
+    showWeeklyPlanningReminder();
+  }
 
-    // Check daily reflection reminder
-    if (currentTime === settings.dailyReflectionTime) {
-      showDailyReflectionReminder();
-    }
-  });
+  // Check daily reflection reminder
+  if (currentTime === settings.dailyReflectionTime) {
+    showDailyReflectionReminder();
+  }
 }
 
 /**
@@ -228,20 +229,37 @@ export const dailyRemindersService = {
    * Initialize the service (call on app load)
    */
   init(): void {
+    // Clean up any existing intervals first
+    this.cleanup();
+
     // Check immediately on load
     this.checkDueTasks();
     this.checkOverdueTasks();
     this.checkScheduledReminders();
 
     // Check every hour for due/overdue tasks
-    setInterval(() => {
+    taskCheckIntervalId = setInterval(() => {
       this.checkDueTasks();
       this.checkOverdueTasks();
     }, 60 * 60 * 1000); // 1 hour
 
     // Check every minute for scheduled reminders
-    setInterval(() => {
+    reminderCheckIntervalId = setInterval(() => {
       this.checkScheduledReminders();
     }, 60 * 1000); // 1 minute
+  },
+
+  /**
+   * Cleanup intervals (call on app unmount or reinitialize)
+   */
+  cleanup(): void {
+    if (taskCheckIntervalId) {
+      clearInterval(taskCheckIntervalId);
+      taskCheckIntervalId = null;
+    }
+    if (reminderCheckIntervalId) {
+      clearInterval(reminderCheckIntervalId);
+      reminderCheckIntervalId = null;
+    }
   },
 };
