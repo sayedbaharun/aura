@@ -3,17 +3,22 @@
  *
  * This module provides:
  * - Password hashing with bcrypt
- * - Session-based authentication
+ * - Session-based authentication with single-session enforcement
  * - Route protection middleware
  * - Audit logging for security events
  * - Account lockout after failed attempts
+ * - 2FA/TOTP authentication
+ * - Device/IP tracking and new device alerts
  */
 
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { authenticator } from "otplib";
+import * as QRCode from "qrcode";
 import { db } from "../db";
-import { users, auditLogs, sessions } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { users, auditLogs, sessions, TrustedDevice } from "@shared/schema";
+import { eq, sql, ne } from "drizzle-orm";
 import { logger } from "./logger";
 
 // Constants
@@ -21,6 +26,9 @@ const BCRYPT_ROUNDS = 12;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 const DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001";
+const PASSWORD_MAX_AGE_DAYS = 90; // Warn after 90 days
+const TOTP_ISSUER = "SB-OS";
+const BACKUP_CODE_COUNT = 10;
 
 // Extend Express Request to include user
 declare global {
@@ -125,13 +133,127 @@ async function updateFailedAttempts(userId: string, increment: boolean): Promise
 }
 
 /**
+ * Invalidate all other sessions for a user (single active session enforcement)
+ */
+export async function invalidateOtherSessions(userId: string, currentSessionId?: string): Promise<number> {
+  try {
+    // Delete all sessions for this user except the current one
+    // Sessions table stores userId in the sess JSONB column
+    const result = await db.execute(sql`
+      DELETE FROM sessions
+      WHERE (sess->>'userId')::text = ${userId}
+      ${currentSessionId ? sql`AND sid != ${currentSessionId}` : sql``}
+    `);
+
+    const deletedCount = (result as any).rowCount || 0;
+    if (deletedCount > 0) {
+      logger.info({ userId, deletedCount }, "Invalidated other sessions for single-session enforcement");
+    }
+    return deletedCount;
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to invalidate other sessions");
+    return 0;
+  }
+}
+
+/**
+ * Check if this is a new device/IP and log accordingly
+ */
+export async function checkNewDevice(
+  userId: string,
+  req: Request
+): Promise<{ isNewDevice: boolean; isNewIp: boolean; deviceFingerprint: string }> {
+  const currentIp = getClientIp(req);
+  const currentUserAgent = req.headers["user-agent"] || "unknown";
+  const deviceFingerprint = crypto
+    .createHash("sha256")
+    .update(`${currentIp}:${currentUserAgent}`)
+    .digest("hex")
+    .substring(0, 16);
+
+  try {
+    const [user] = await db
+      .select({
+        lastKnownIp: users.lastKnownIp,
+        lastKnownUserAgent: users.lastKnownUserAgent,
+        trustedDevices: users.trustedDevices,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    const isNewIp = user?.lastKnownIp !== currentIp;
+    const isNewUserAgent = user?.lastKnownUserAgent !== currentUserAgent;
+    const trustedDevices = user?.trustedDevices || [];
+
+    // Check if this device fingerprint is in trusted devices
+    const isTrustedDevice = trustedDevices.some(d =>
+      d.id === deviceFingerprint || (d.ipAddress === currentIp && d.userAgent === currentUserAgent)
+    );
+
+    const isNewDevice = !isTrustedDevice && (isNewIp || isNewUserAgent);
+
+    // Update last known IP/UA
+    await db
+      .update(users)
+      .set({
+        lastKnownIp: currentIp,
+        lastKnownUserAgent: currentUserAgent,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    return { isNewDevice, isNewIp, deviceFingerprint };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to check device");
+    return { isNewDevice: true, isNewIp: true, deviceFingerprint };
+  }
+}
+
+/**
+ * Check if password is aging and should be changed
+ */
+export async function checkPasswordAge(userId: string): Promise<{ shouldWarn: boolean; daysSinceChange: number }> {
+  try {
+    const [user] = await db
+      .select({ passwordChangedAt: users.passwordChangedAt })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user?.passwordChangedAt) {
+      return { shouldWarn: true, daysSinceChange: PASSWORD_MAX_AGE_DAYS + 1 };
+    }
+
+    const daysSinceChange = Math.floor(
+      (Date.now() - new Date(user.passwordChangedAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    return {
+      shouldWarn: daysSinceChange >= PASSWORD_MAX_AGE_DAYS,
+      daysSinceChange,
+    };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to check password age");
+    return { shouldWarn: false, daysSinceChange: 0 };
+  }
+}
+
+/**
  * Authenticate user with email and password
  */
 export async function authenticateUser(
   email: string,
   password: string,
   req: Request
-): Promise<{ success: boolean; userId?: string; error?: string }> {
+): Promise<{
+  success: boolean;
+  userId?: string;
+  error?: string;
+  requiresTwoFactor?: boolean;
+  isNewDevice?: boolean;
+  isNewIp?: boolean;
+  passwordAgeWarning?: boolean;
+  daysSincePasswordChange?: number;
+}> {
   try {
     const [user] = await db
       .select()
@@ -165,6 +287,30 @@ export async function authenticateUser(
       return { success: false, error: "Invalid credentials" };
     }
 
+    // Check device/IP for new device detection
+    const { isNewDevice, isNewIp, deviceFingerprint } = await checkNewDevice(user.id, req);
+
+    // Check password age
+    const { shouldWarn: passwordAgeWarning, daysSinceChange } = await checkPasswordAge(user.id);
+
+    // Check if 2FA is enabled
+    if (user.totpEnabled) {
+      // Don't complete login yet - require 2FA
+      await createAuditLog(user.id, "login_2fa_required", req, {
+        isNewDevice,
+        isNewIp,
+        deviceFingerprint
+      }, "auth");
+
+      return {
+        success: false,
+        userId: user.id,
+        requiresTwoFactor: true,
+        isNewDevice,
+        isNewIp,
+      };
+    }
+
     // Success - reset failed attempts and update last login
     await updateFailedAttempts(user.id, false);
     await db
@@ -172,9 +318,30 @@ export async function authenticateUser(
       .set({ lastLoginAt: new Date() })
       .where(eq(users.id, user.id));
 
-    await createAuditLog(user.id, "login_success", req, {}, "auth");
+    // Log with enhanced details
+    await createAuditLog(user.id, "login_success", req, {
+      isNewDevice,
+      isNewIp,
+      deviceFingerprint,
+      twoFactorUsed: false,
+    }, "auth");
 
-    return { success: true, userId: user.id };
+    // If new device, also create a specific alert
+    if (isNewDevice) {
+      await createAuditLog(user.id, "new_device_login", req, {
+        deviceFingerprint,
+        userAgent: req.headers["user-agent"],
+      }, "auth", undefined, "success");
+    }
+
+    return {
+      success: true,
+      userId: user.id,
+      isNewDevice,
+      isNewIp,
+      passwordAgeWarning,
+      daysSincePasswordChange: daysSinceChange,
+    };
   } catch (error) {
     logger.error({ error }, "Authentication error");
     return { success: false, error: "Authentication failed" };
@@ -214,7 +381,11 @@ export async function setUserPassword(
     const hash = await hashPassword(newPassword);
     await db
       .update(users)
-      .set({ passwordHash: hash, updatedAt: new Date() })
+      .set({
+        passwordHash: hash,
+        passwordChangedAt: new Date(),
+        updatedAt: new Date()
+      })
       .where(eq(users.id, userId));
 
     await createAuditLog(userId, "password_change", req, {}, "auth");
@@ -326,4 +497,364 @@ export async function logoutUser(req: Request): Promise<void> {
       }
     });
   });
+}
+
+// ============================================================================
+// 2FA/TOTP FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate TOTP secret and QR code for setup
+ */
+export async function setupTwoFactor(
+  userId: string,
+  req: Request
+): Promise<{ success: boolean; secret?: string; qrCode?: string; backupCodes?: string[]; error?: string }> {
+  try {
+    const [user] = await db
+      .select({ email: users.email, totpEnabled: users.totpEnabled })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    if (user.totpEnabled) {
+      return { success: false, error: "2FA is already enabled. Disable it first to reconfigure." };
+    }
+
+    // Generate secret
+    const secret = authenticator.generateSecret();
+
+    // Generate QR code
+    const otpauth = authenticator.keyuri(user.email || "user", TOTP_ISSUER, secret);
+    const qrCode = await QRCode.toDataURL(otpauth);
+
+    // Generate backup codes
+    const backupCodes: string[] = [];
+    const hashedBackupCodes: string[] = [];
+
+    for (let i = 0; i < BACKUP_CODE_COUNT; i++) {
+      const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+      backupCodes.push(code);
+      hashedBackupCodes.push(await bcrypt.hash(code, 10));
+    }
+
+    // Store secret temporarily (not enabled until verified)
+    await db
+      .update(users)
+      .set({
+        totpSecret: secret, // In production, encrypt this
+        totpBackupCodes: hashedBackupCodes,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    await createAuditLog(userId, "2fa_setup_initiated", req, {}, "auth");
+
+    return {
+      success: true,
+      secret,
+      qrCode,
+      backupCodes, // Show these once, user must save them
+    };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to setup 2FA");
+    return { success: false, error: "Failed to setup two-factor authentication" };
+  }
+}
+
+/**
+ * Verify TOTP code and enable 2FA
+ */
+export async function verifyAndEnableTwoFactor(
+  userId: string,
+  token: string,
+  req: Request
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const [user] = await db
+      .select({ totpSecret: users.totpSecret, totpEnabled: users.totpEnabled })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user?.totpSecret) {
+      return { success: false, error: "2FA setup not initiated. Please start setup first." };
+    }
+
+    if (user.totpEnabled) {
+      return { success: false, error: "2FA is already enabled." };
+    }
+
+    // Verify the token
+    const isValid = authenticator.verify({ token, secret: user.totpSecret });
+
+    if (!isValid) {
+      await createAuditLog(userId, "2fa_verification_failed", req, { reason: "invalid_token" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid verification code. Please try again." };
+    }
+
+    // Enable 2FA
+    await db
+      .update(users)
+      .set({
+        totpEnabled: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    await createAuditLog(userId, "2fa_enabled", req, {}, "auth");
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to verify 2FA");
+    return { success: false, error: "Failed to verify two-factor authentication" };
+  }
+}
+
+/**
+ * Verify TOTP code during login
+ */
+export async function verifyTwoFactorLogin(
+  userId: string,
+  token: string,
+  req: Request
+): Promise<{ success: boolean; error?: string; usedBackupCode?: boolean }> {
+  try {
+    const [user] = await db
+      .select({
+        totpSecret: users.totpSecret,
+        totpEnabled: users.totpEnabled,
+        totpBackupCodes: users.totpBackupCodes,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user?.totpEnabled || !user.totpSecret) {
+      return { success: false, error: "2FA is not enabled for this account." };
+    }
+
+    // First try TOTP code
+    const isValidTotp = authenticator.verify({ token, secret: user.totpSecret });
+
+    if (isValidTotp) {
+      await createAuditLog(userId, "2fa_login_success", req, { method: "totp" }, "auth");
+      return { success: true, usedBackupCode: false };
+    }
+
+    // Try backup codes
+    const backupCodes = user.totpBackupCodes || [];
+    for (let i = 0; i < backupCodes.length; i++) {
+      const isValidBackup = await bcrypt.compare(token.toUpperCase(), backupCodes[i]);
+      if (isValidBackup) {
+        // Remove used backup code
+        const updatedCodes = [...backupCodes];
+        updatedCodes.splice(i, 1);
+
+        await db
+          .update(users)
+          .set({
+            totpBackupCodes: updatedCodes,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        await createAuditLog(userId, "2fa_login_success", req, {
+          method: "backup_code",
+          remainingBackupCodes: updatedCodes.length,
+        }, "auth");
+
+        return { success: true, usedBackupCode: true };
+      }
+    }
+
+    await createAuditLog(userId, "2fa_login_failed", req, { reason: "invalid_code" }, "auth", undefined, "failure");
+    return { success: false, error: "Invalid verification code." };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to verify 2FA login");
+    return { success: false, error: "Failed to verify two-factor authentication" };
+  }
+}
+
+/**
+ * Disable 2FA (requires current password)
+ */
+export async function disableTwoFactor(
+  userId: string,
+  password: string,
+  req: Request
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const [user] = await db
+      .select({ passwordHash: users.passwordHash, totpEnabled: users.totpEnabled })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    if (!user.totpEnabled) {
+      return { success: false, error: "2FA is not enabled." };
+    }
+
+    // Verify password before disabling
+    if (!user.passwordHash) {
+      return { success: false, error: "Password not configured." };
+    }
+
+    const isValid = await verifyPassword(password, user.passwordHash);
+    if (!isValid) {
+      await createAuditLog(userId, "2fa_disable_failed", req, { reason: "invalid_password" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid password." };
+    }
+
+    // Disable 2FA
+    await db
+      .update(users)
+      .set({
+        totpSecret: null,
+        totpEnabled: false,
+        totpBackupCodes: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    await createAuditLog(userId, "2fa_disabled", req, {}, "auth");
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to disable 2FA");
+    return { success: false, error: "Failed to disable two-factor authentication" };
+  }
+}
+
+/**
+ * Regenerate backup codes
+ */
+export async function regenerateBackupCodes(
+  userId: string,
+  password: string,
+  req: Request
+): Promise<{ success: boolean; backupCodes?: string[]; error?: string }> {
+  try {
+    const [user] = await db
+      .select({ passwordHash: users.passwordHash, totpEnabled: users.totpEnabled })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user?.totpEnabled) {
+      return { success: false, error: "2FA is not enabled." };
+    }
+
+    // Verify password
+    if (!user.passwordHash) {
+      return { success: false, error: "Password not configured." };
+    }
+
+    const isValid = await verifyPassword(password, user.passwordHash);
+    if (!isValid) {
+      await createAuditLog(userId, "backup_codes_regenerate_failed", req, { reason: "invalid_password" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid password." };
+    }
+
+    // Generate new backup codes
+    const backupCodes: string[] = [];
+    const hashedBackupCodes: string[] = [];
+
+    for (let i = 0; i < BACKUP_CODE_COUNT; i++) {
+      const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+      backupCodes.push(code);
+      hashedBackupCodes.push(await bcrypt.hash(code, 10));
+    }
+
+    await db
+      .update(users)
+      .set({
+        totpBackupCodes: hashedBackupCodes,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    await createAuditLog(userId, "backup_codes_regenerated", req, {}, "auth");
+
+    return { success: true, backupCodes };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to regenerate backup codes");
+    return { success: false, error: "Failed to regenerate backup codes" };
+  }
+}
+
+/**
+ * Get 2FA status for user
+ */
+export async function getTwoFactorStatus(
+  userId: string
+): Promise<{ enabled: boolean; backupCodesRemaining: number }> {
+  try {
+    const [user] = await db
+      .select({
+        totpEnabled: users.totpEnabled,
+        totpBackupCodes: users.totpBackupCodes,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    return {
+      enabled: user?.totpEnabled || false,
+      backupCodesRemaining: user?.totpBackupCodes?.length || 0,
+    };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to get 2FA status");
+    return { enabled: false, backupCodesRemaining: 0 };
+  }
+}
+
+/**
+ * Complete login after 2FA verification (used after verifyTwoFactorLogin)
+ */
+export async function completeTwoFactorLogin(
+  userId: string,
+  req: Request
+): Promise<{ success: boolean; isNewDevice?: boolean; passwordAgeWarning?: boolean; daysSincePasswordChange?: number }> {
+  try {
+    // Reset failed attempts and update last login
+    await updateFailedAttempts(userId, false);
+    await db
+      .update(users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(users.id, userId));
+
+    // Check device/IP
+    const { isNewDevice, isNewIp, deviceFingerprint } = await checkNewDevice(userId, req);
+
+    // Check password age
+    const { shouldWarn: passwordAgeWarning, daysSinceChange } = await checkPasswordAge(userId);
+
+    // Log success
+    await createAuditLog(userId, "login_success", req, {
+      isNewDevice,
+      isNewIp,
+      deviceFingerprint,
+      twoFactorUsed: true,
+    }, "auth");
+
+    if (isNewDevice) {
+      await createAuditLog(userId, "new_device_login", req, {
+        deviceFingerprint,
+        userAgent: req.headers["user-agent"],
+      }, "auth", undefined, "success");
+    }
+
+    return {
+      success: true,
+      isNewDevice,
+      passwordAgeWarning,
+      daysSincePasswordChange: daysSinceChange,
+    };
+  } catch (error) {
+    logger.error({ error, userId }, "Failed to complete 2FA login");
+    return { success: false };
+  }
 }
