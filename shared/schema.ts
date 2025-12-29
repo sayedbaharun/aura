@@ -1639,6 +1639,9 @@ export const people = pgTable(
     name: text("name").notNull(),
     email: text("email"),
     phone: text("phone"),
+    countryCode: text("country_code"),
+    phone2: text("phone2"),
+    countryCode2: text("country_code2"),
     company: text("company"),
     jobTitle: text("job_title"),
     birthday: date("birthday"),
@@ -1660,6 +1663,9 @@ export const people = pgTable(
     // Notes and context
     notes: text("notes"),
     tags: text("tags"),
+
+    // Category (for grouping/filtering contacts)
+    categoryId: uuid("category_id").references(() => customCategories.id, { onDelete: "set null" }),
 
     // Sync metadata (for Google Contacts integration)
     googleContactId: text("google_contact_id").unique(),
@@ -1684,6 +1690,7 @@ export const people = pgTable(
     index("idx_people_external_contact_id").on(table.externalContactId),
     index("idx_people_next_follow_up").on(table.nextFollowUp),
     index("idx_people_last_contact_date").on(table.lastContactDate),
+    index("idx_people_category_id").on(table.categoryId),
   ]
 );
 
