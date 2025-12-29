@@ -143,6 +143,8 @@ import {
   docAiTeachings,
   ventureIdeas,
   knowledgeFiles,
+  auditLogs,
+  type AuditLog,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc, isNull } from "drizzle-orm";
@@ -153,6 +155,9 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+
+  // Audit logs
+  getRecentAuditLogs(userId: string, limit?: number): Promise<AuditLog[]>;
 
   // Ventures
   getVentures(): Promise<Venture[]>;
@@ -702,6 +707,19 @@ export class DBStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  // ============================================================================
+  // AUDIT LOGS
+  // ============================================================================
+
+  async getRecentAuditLogs(userId: string, limit: number = 50): Promise<AuditLog[]> {
+    return await this.db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.userId, userId))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit);
   }
 
   // ============================================================================

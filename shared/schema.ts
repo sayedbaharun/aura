@@ -250,6 +250,16 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Trusted device type for device tracking
+export interface TrustedDevice {
+  id: string;
+  name: string;
+  ipAddress: string;
+  userAgent: string;
+  lastUsed: string;
+  createdAt: string;
+}
+
 // User storage table - Simplified for single-user (Sayed Baharun)
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -265,6 +275,16 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   failedLoginAttempts: integer("failed_login_attempts").default(0),
   lockedUntil: timestamp("locked_until"),
+  // 2FA/TOTP fields
+  totpSecret: varchar("totp_secret"), // Encrypted TOTP secret
+  totpEnabled: boolean("totp_enabled").default(false),
+  totpBackupCodes: jsonb("totp_backup_codes").$type<string[]>(), // Hashed backup codes
+  // Device/session tracking
+  lastKnownIp: varchar("last_known_ip", { length: 45 }),
+  lastKnownUserAgent: text("last_known_user_agent"),
+  trustedDevices: jsonb("trusted_devices").$type<TrustedDevice[]>(),
+  // Password age tracking
+  passwordChangedAt: timestamp("password_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
