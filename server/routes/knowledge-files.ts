@@ -98,6 +98,98 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
+// GET /:id/content - Get raw file content for viewing/embedding
+router.get("/:id/content", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    // If we have base64 data, serve it directly
+    if (file.base64Data) {
+      const buffer = Buffer.from(file.base64Data, "base64");
+      res.set({
+        "Content-Type": file.mimeType,
+        "Content-Length": buffer.length,
+        "Content-Disposition": `inline; filename="${file.originalFileName}"`,
+        "Cache-Control": "private, max-age=3600",
+      });
+      return res.send(buffer);
+    }
+
+    // If stored in Google Drive, fetch and serve
+    if (file.storageType === "google_drive" && file.googleDriveFileId) {
+      try {
+        const { downloadFile } = await import("../google-drive");
+        const buffer = await downloadFile(file.googleDriveFileId);
+
+        res.set({
+          "Content-Type": file.mimeType,
+          "Content-Length": buffer.length,
+          "Content-Disposition": `inline; filename="${file.originalFileName}"`,
+          "Cache-Control": "private, max-age=3600",
+        });
+        return res.send(buffer);
+      } catch (driveError) {
+        logger.error({ driveError, fileId: file.id }, "Failed to fetch from Drive");
+        return res.status(500).json({ error: "Failed to fetch file from Google Drive" });
+      }
+    }
+
+    return res.status(404).json({ error: "File content not available" });
+  } catch (error) {
+    logger.error({ error }, "Error fetching knowledge file content");
+    res.status(500).json({ error: "Failed to fetch knowledge file content" });
+  }
+});
+
+// GET /:id/preview - Get preview URL or embedded content
+router.get("/:id/preview", async (req: Request, res: Response) => {
+  try {
+    const file = await storage.getKnowledgeFile(req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: "Knowledge file not found" });
+    }
+
+    const isImage = file.mimeType.startsWith("image/");
+    const isPdf = file.mimeType === "application/pdf";
+    const isText = file.mimeType.startsWith("text/") ||
+                   file.mimeType === "application/json";
+
+    // For images, return base64 data URL
+    if (isImage && file.base64Data) {
+      return res.json({
+        type: "image",
+        dataUrl: `data:${file.mimeType};base64,${file.base64Data}`,
+        mimeType: file.mimeType,
+      });
+    }
+
+    // For text files, return the content
+    if (isText && file.base64Data) {
+      const content = Buffer.from(file.base64Data, "base64").toString("utf-8");
+      return res.json({
+        type: "text",
+        content,
+        mimeType: file.mimeType,
+      });
+    }
+
+    // For PDFs and other files, return URLs for embedding
+    return res.json({
+      type: isPdf ? "pdf" : "other",
+      contentUrl: `/api/knowledge-files/${file.id}/content`,
+      googleDriveUrl: file.googleDriveUrl,
+      mimeType: file.mimeType,
+      canEmbed: isImage || isPdf,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error generating preview");
+    res.status(500).json({ error: "Failed to generate preview" });
+  }
+});
+
 // POST / - Upload a new knowledge file
 router.post("/", upload.single("file"), async (req: Request, res: Response) => {
   try {
@@ -117,6 +209,7 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
       notes,
       includeInAiContext,
       aiContextPriority,
+      skipAiExtraction,
     } = req.body;
 
     // Validate ventureId is provided
@@ -132,59 +225,12 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
       mimeType: file.mimetype,
       size: file.size,
       ventureId,
-    }, "Processing knowledge file upload");
+    }, "Uploading knowledge file");
 
-    let driveFileId: string | undefined;
-    let driveUrl: string | undefined;
-    let storageType: "google_drive" | "base64" = "base64";
-    let base64Data: string | undefined;
+    // STEP 1: Store file immediately as base64 (fast, reliable)
+    const base64Data = file.buffer.toString("base64");
 
-    // Try to upload to Google Drive if configured
-    if (isDriveConfigured()) {
-      try {
-        const {
-          uploadFile,
-          createVentureFolder,
-          getOrCreateKnowledgeBaseFolder,
-        } = await import("../google-drive");
-
-        // Get or create venture folder under Knowledge Base
-        const venture = await storage.getVenture(ventureId);
-        let parentFolderId: string;
-
-        if (venture) {
-          parentFolderId = await createVentureFolder(venture.name);
-        } else {
-          parentFolderId = await getOrCreateKnowledgeBaseFolder();
-        }
-
-        // Upload to Google Drive
-        const driveFile = await uploadFile(
-          file.originalname,
-          file.buffer,
-          file.mimetype,
-          parentFolderId,
-          description
-        );
-
-        driveFileId = driveFile.id || undefined;
-        driveUrl = driveFile.webViewLink || undefined;
-        storageType = "google_drive";
-
-        logger.info({ driveFileId, driveUrl }, "File uploaded to Google Drive");
-      } catch (driveError) {
-        logger.warn({ error: driveError }, "Google Drive upload failed, falling back to base64 storage");
-        // Fall back to base64 storage
-        base64Data = file.buffer.toString("base64");
-        storageType = "base64";
-      }
-    } else {
-      // No Drive configured, use base64
-      base64Data = file.buffer.toString("base64");
-      storageType = "base64";
-    }
-
-    // Create the knowledge file record (processing pending)
+    // STEP 2: Create database record immediately
     const knowledgeFile = await storage.createKnowledgeFile({
       name: fileName,
       description,
@@ -196,27 +242,38 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
       originalFileName: file.originalname,
       mimeType: file.mimetype,
       fileSize: file.size,
-      storageType,
-      googleDriveFileId: driveFileId,
-      googleDriveUrl: driveUrl,
+      storageType: "base64",
       base64Data,
-      processingStatus: "pending",
+      processingStatus: skipAiExtraction === "true" ? "completed" : "pending",
       includeInAiContext: includeInAiContext !== "false",
       aiContextPriority: aiContextPriority ? parseInt(aiContextPriority) : 0,
       tags,
       notes,
     });
 
-    // Start processing in background (don't await)
-    processFileAsync(knowledgeFile.id, file.buffer, file.mimetype);
+    logger.info({ fileId: knowledgeFile.id, fileName }, "Knowledge file saved");
 
+    // STEP 3: Return success immediately
     res.status(201).json(knowledgeFile);
+
+    // STEP 4: Background tasks (after response sent)
+    // - Upload to Google Drive if configured
+    // - AI extraction if not skipped
+    if (skipAiExtraction !== "true") {
+      processFileAsync(knowledgeFile.id, file.buffer, file.mimetype);
+    }
+
+    // Try Google Drive upload in background
+    if (isDriveConfigured()) {
+      uploadToDriveAsync(knowledgeFile.id, file.originalname, file.buffer, file.mimetype, ventureId, description);
+    }
   } catch (error) {
-    logger.error({ error }, "Error uploading knowledge file");
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error, errorMessage, ventureId: req.body?.ventureId }, "Error uploading knowledge file");
     if (error instanceof Error && error.message.includes("Unsupported file type")) {
       res.status(400).json({ error: error.message });
     } else {
-      res.status(500).json({ error: "Failed to upload knowledge file" });
+      res.status(500).json({ error: "Failed to upload knowledge file", details: errorMessage });
     }
   }
 });
@@ -230,6 +287,17 @@ async function processFileAsync(fileId: string, buffer: Buffer, mimeType: string
     });
 
     logger.info({ fileId, mimeType }, "Starting file extraction");
+
+    // Check if OpenRouter API key is configured
+    if (!process.env.OPENROUTER_API_KEY) {
+      logger.warn({ fileId }, "OPENROUTER_API_KEY not set, skipping AI extraction");
+      await storage.updateKnowledgeFile(fileId, {
+        processingStatus: "completed",
+        extractedText: "[AI extraction skipped - API key not configured]",
+        processedAt: new Date(),
+      });
+      return;
+    }
 
     // Extract text and metadata
     const result = await extractFromFile(buffer, mimeType, { generateSummary: true });
@@ -246,15 +314,72 @@ async function processFileAsync(fileId: string, buffer: Buffer, mimeType: string
 
     logger.info({ fileId, textLength: result.extractedText.length }, "File extraction completed");
   } catch (error) {
-    logger.error({ error, fileId }, "File extraction failed");
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error({ error, errorMessage, fileId }, "File extraction failed");
 
-    // Mark as failed
+    try {
+      // Mark as failed
+      await storage.updateKnowledgeFile(fileId, {
+        processingStatus: "failed",
+        aiMetadata: {
+          errorMessage,
+        } as any,
+      });
+    } catch (updateError) {
+      logger.error({ updateError, fileId }, "Failed to update file status to failed");
+    }
+  }
+}
+
+// Background Google Drive upload
+async function uploadToDriveAsync(
+  fileId: string,
+  fileName: string,
+  buffer: Buffer,
+  mimeType: string,
+  ventureId: string,
+  description?: string
+) {
+  try {
+    const {
+      uploadFile,
+      createVentureFolder,
+      getOrCreateKnowledgeBaseFolder,
+    } = await import("../google-drive");
+
+    // Get or create venture folder under Knowledge Base
+    const venture = await storage.getVenture(ventureId);
+    let parentFolderId: string;
+
+    if (venture) {
+      parentFolderId = await createVentureFolder(venture.name);
+    } else {
+      parentFolderId = await getOrCreateKnowledgeBaseFolder();
+    }
+
+    // Upload to Google Drive
+    const driveFile = await uploadFile(
+      fileName,
+      buffer,
+      mimeType,
+      parentFolderId,
+      description
+    );
+
+    // Update record with Drive info
     await storage.updateKnowledgeFile(fileId, {
-      processingStatus: "failed",
-      aiMetadata: {
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
-      } as any,
+      storageType: "google_drive",
+      googleDriveFileId: driveFile.id || undefined,
+      googleDriveUrl: driveFile.webViewLink || undefined,
+      // Clear base64 data to save space now that it's in Drive
+      base64Data: null,
     });
+
+    logger.info({ fileId, driveFileId: driveFile.id }, "File uploaded to Google Drive");
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error({ error, errorMessage, fileId }, "Background Drive upload failed - file remains in base64 storage");
+    // Don't fail - file is still accessible via base64
   }
 }
 
