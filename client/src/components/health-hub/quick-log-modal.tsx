@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -36,11 +34,6 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
     sleepQuality: "good",
     energyLevel: 3,
     mood: "medium",
-    workoutDone: false,
-    workoutType: "none",
-    workoutSubType: "", // For strength: push/pull/legs, for cardio: hiit/zone_2
-    workoutDuration: "",
-    steps: "",
     weight: "",
     stressLevel: "medium",
     notes: "",
@@ -71,11 +64,6 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
         sleepQuality: "good",
         energyLevel: 3,
         mood: "medium",
-        workoutDone: false,
-        workoutType: "none",
-        workoutSubType: "",
-        workoutDuration: "",
-        steps: "",
         weight: "",
         stressLevel: "medium",
         notes: "",
@@ -93,27 +81,15 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Note: workoutSubType is UI-only; database enum only supports base types
-    // Append subtype info to notes if provided
-    let notes = formData.notes || "";
-    if (formData.workoutDone && formData.workoutSubType) {
-      const subtypeInfo = `Workout: ${formData.workoutType} - ${formData.workoutSubType}`;
-      notes = notes ? `${subtypeInfo}\n${notes}` : subtypeInfo;
-    }
-
     const payload = {
       date: formData.date,
       sleepHours: formData.sleepHours ? parseFloat(formData.sleepHours) : undefined,
       sleepQuality: formData.sleepQuality,
       energyLevel: formData.energyLevel,
       mood: formData.mood,
-      workoutDone: formData.workoutDone,
-      workoutType: formData.workoutDone ? formData.workoutType : "none",
-      workoutDurationMin: formData.workoutDone && formData.workoutDuration ? parseInt(formData.workoutDuration) : undefined,
-      steps: formData.steps ? parseInt(formData.steps) : undefined,
       weightKg: formData.weight ? parseFloat(formData.weight) : undefined,
       stressLevel: formData.stressLevel,
-      notes: notes || undefined,
+      notes: formData.notes || undefined,
     };
 
     // Clean data to only send non-empty values
@@ -126,9 +102,9 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Log Health Entry</DialogTitle>
+          <DialogTitle>Morning Health Log</DialogTitle>
           <DialogDescription>
-            Record your daily health metrics and wellness data
+            Record how you feel this morning. Workouts and steps can be logged in the Evening Review.
           </DialogDescription>
         </DialogHeader>
 
@@ -201,140 +177,17 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
             </Select>
           </div>
 
-          {/* Workout */}
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="workoutDone"
-                checked={formData.workoutDone}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, workoutDone: checked as boolean })
-                }
-              />
-              <Label htmlFor="workoutDone" className="cursor-pointer">
-                Workout done
-              </Label>
-            </div>
-
-            {formData.workoutDone && (
-              <div className="space-y-4 pl-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="workoutType">Workout Type</Label>
-                    <Select
-                      value={formData.workoutType}
-                      onValueChange={(value) => setFormData({ ...formData, workoutType: value, workoutSubType: "" })}
-                    >
-                      <SelectTrigger id="workoutType">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="strength">Strength</SelectItem>
-                        <SelectItem value="cardio">Cardio</SelectItem>
-                        <SelectItem value="yoga">Yoga</SelectItem>
-                        <SelectItem value="sport">Sport</SelectItem>
-                        <SelectItem value="walk">Walk</SelectItem>
-                        <SelectItem value="at_home">At Home</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Conditional sub-type for Strength */}
-                  {formData.workoutType === "strength" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="workoutSubType">Muscle Group</Label>
-                      <Select
-                        value={formData.workoutSubType}
-                        onValueChange={(value) => setFormData({ ...formData, workoutSubType: value })}
-                      >
-                        <SelectTrigger id="workoutSubType">
-                          <SelectValue placeholder="Select muscle group" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="push">Push</SelectItem>
-                          <SelectItem value="pull">Pull</SelectItem>
-                          <SelectItem value="legs">Legs</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Conditional sub-type for Cardio */}
-                  {formData.workoutType === "cardio" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="workoutSubType">Cardio Type</Label>
-                      <Select
-                        value={formData.workoutSubType}
-                        onValueChange={(value) => setFormData({ ...formData, workoutSubType: value })}
-                      >
-                        <SelectTrigger id="workoutSubType">
-                          <SelectValue placeholder="Select cardio type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hiit">HIIT</SelectItem>
-                          <SelectItem value="zone_2">Zone 2</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Duration - always show when workout is done */}
-                  {formData.workoutType !== "strength" && formData.workoutType !== "cardio" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="workoutDuration">Duration (minutes)</Label>
-                      <Input
-                        id="workoutDuration"
-                        type="number"
-                        placeholder="45"
-                        value={formData.workoutDuration}
-                        onChange={(e) => setFormData({ ...formData, workoutDuration: e.target.value })}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Duration row for strength/cardio */}
-                {(formData.workoutType === "strength" || formData.workoutType === "cardio") && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="workoutDuration">Duration (minutes)</Label>
-                      <Input
-                        id="workoutDuration"
-                        type="number"
-                        placeholder="45"
-                        value={formData.workoutDuration}
-                        onChange={(e) => setFormData({ ...formData, workoutDuration: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Steps & Weight */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="steps">Daily STEPS</Label>
-              <Input
-                id="steps"
-                type="number"
-                placeholder="10000"
-                value={formData.steps}
-                onChange={(e) => setFormData({ ...formData, steps: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="weight">Weight (kg)</Label>
-              <Input
-                id="weight"
-                type="number"
-                step="0.1"
-                placeholder="75.0"
-                value={formData.weight}
-                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-              />
-            </div>
+          {/* Weight */}
+          <div className="space-y-2">
+            <Label htmlFor="weight">Weight (kg)</Label>
+            <Input
+              id="weight"
+              type="number"
+              step="0.1"
+              placeholder="75.0"
+              value={formData.weight}
+              onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+            />
           </div>
 
           {/* Stress Level */}
@@ -357,7 +210,7 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
             <Label htmlFor="notes">Notes (optional)</Label>
             <Textarea
               id="notes"
-              placeholder="Any additional notes about your day..."
+              placeholder="How are you feeling this morning? Any context..."
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
