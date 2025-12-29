@@ -509,7 +509,7 @@ export async function logoutUser(req: Request): Promise<void> {
 export async function setupTwoFactor(
   userId: string,
   req: Request
-): Promise<{ success: boolean; secret?: string; qrCode?: string; backupCodes?: string[]; error?: string }> {
+): Promise<{ success: boolean; secret?: string; qrCode?: string; backupCodes?: string[]; recoveryKey?: string; error?: string }> {
   try {
     const [user] = await db
       .select({ email: users.email, totpEnabled: users.totpEnabled })
@@ -541,12 +541,19 @@ export async function setupTwoFactor(
       hashedBackupCodes.push(await bcrypt.hash(code, 10));
     }
 
+    // Generate emergency recovery key (32 bytes = 64 hex chars)
+    // Format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX for readability
+    const recoveryKeyRaw = crypto.randomBytes(32).toString("hex").toUpperCase();
+    const recoveryKey = recoveryKeyRaw.match(/.{1,4}/g)!.join("-");
+    const recoveryKeyHash = await bcrypt.hash(recoveryKeyRaw, 12);
+
     // Store secret temporarily (not enabled until verified)
     await db
       .update(users)
       .set({
         totpSecret: secret, // In production, encrypt this
         totpBackupCodes: hashedBackupCodes,
+        totpRecoveryKeyHash: recoveryKeyHash,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
@@ -558,6 +565,7 @@ export async function setupTwoFactor(
       secret,
       qrCode,
       backupCodes, // Show these once, user must save them
+      recoveryKey, // CRITICAL: Show once, user MUST store securely
     };
   } catch (error) {
     logger.error({ error, userId }, "Failed to setup 2FA");
@@ -717,6 +725,7 @@ export async function disableTwoFactor(
         totpSecret: null,
         totpEnabled: false,
         totpBackupCodes: null,
+        totpRecoveryKeyHash: null,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
@@ -727,6 +736,82 @@ export async function disableTwoFactor(
   } catch (error) {
     logger.error({ error, userId }, "Failed to disable 2FA");
     return { success: false, error: "Failed to disable two-factor authentication" };
+  }
+}
+
+/**
+ * Emergency recovery - disable 2FA using recovery key
+ * Use when all backup codes are lost and authenticator is unavailable
+ */
+export async function emergencyRecovery(
+  email: string,
+  password: string,
+  recoveryKey: string,
+  req: Request
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const [user] = await db
+      .select({
+        id: users.id,
+        passwordHash: users.passwordHash,
+        totpEnabled: users.totpEnabled,
+        totpRecoveryKeyHash: users.totpRecoveryKeyHash,
+      })
+      .from(users)
+      .where(eq(users.email, email));
+
+    if (!user) {
+      await createAuditLog(null, "emergency_recovery_failed", req, { email, reason: "user_not_found" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid credentials or recovery key." };
+    }
+
+    if (!user.totpEnabled) {
+      return { success: false, error: "2FA is not enabled on this account." };
+    }
+
+    if (!user.totpRecoveryKeyHash) {
+      await createAuditLog(user.id, "emergency_recovery_failed", req, { reason: "no_recovery_key" }, "auth", undefined, "failure");
+      return { success: false, error: "No recovery key configured for this account." };
+    }
+
+    // Verify password first
+    if (!user.passwordHash) {
+      return { success: false, error: "Password not configured." };
+    }
+
+    const isPasswordValid = await verifyPassword(password, user.passwordHash);
+    if (!isPasswordValid) {
+      await createAuditLog(user.id, "emergency_recovery_failed", req, { reason: "invalid_password" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid credentials or recovery key." };
+    }
+
+    // Verify recovery key (remove dashes for comparison)
+    const recoveryKeyRaw = recoveryKey.replace(/-/g, "").toUpperCase();
+    const isRecoveryKeyValid = await bcrypt.compare(recoveryKeyRaw, user.totpRecoveryKeyHash);
+
+    if (!isRecoveryKeyValid) {
+      await createAuditLog(user.id, "emergency_recovery_failed", req, { reason: "invalid_recovery_key" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid credentials or recovery key." };
+    }
+
+    // Disable 2FA completely
+    await db
+      .update(users)
+      .set({
+        totpSecret: null,
+        totpEnabled: false,
+        totpBackupCodes: null,
+        totpRecoveryKeyHash: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+
+    await createAuditLog(user.id, "emergency_recovery_success", req, {}, "auth");
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Emergency recovery failed");
+    return { success: false, error: "Recovery failed. Please contact support." };
   }
 }
 

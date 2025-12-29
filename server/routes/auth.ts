@@ -21,6 +21,7 @@ import {
   disableTwoFactor,
   regenerateBackupCodes,
   getTwoFactorStatus,
+  emergencyRecovery,
 } from "../auth";
 import { DEFAULT_USER_ID } from "./constants";
 
@@ -318,7 +319,7 @@ router.get('/2fa/status', requireAuth, async (req: any, res: Response) => {
   }
 });
 
-// Initiate 2FA setup - returns QR code and backup codes
+// Initiate 2FA setup - returns QR code, backup codes, and recovery key
 router.post('/2fa/setup', requireAuth, async (req: any, res: Response) => {
   try {
     const result = await setupTwoFactor(req.userId, req);
@@ -333,7 +334,8 @@ router.post('/2fa/setup', requireAuth, async (req: any, res: Response) => {
       secret: result.secret,
       qrCode: result.qrCode,
       backupCodes: result.backupCodes,
-      message: 'Scan the QR code with your authenticator app, then verify with a code to enable 2FA.',
+      recoveryKey: result.recoveryKey,
+      message: 'Scan the QR code with your authenticator app, then verify with a code to enable 2FA. IMPORTANT: Save the recovery key in a secure location - it is your last resort if you lose your authenticator and all backup codes.',
     });
   } catch (error) {
     logger.error({ error }, 'Error setting up 2FA');
@@ -431,6 +433,33 @@ router.get('/security-log', requireAuth, async (req: any, res: Response) => {
   } catch (error) {
     logger.error({ error }, 'Error fetching security log');
     res.status(500).json({ error: 'Failed to fetch security log' });
+  }
+});
+
+// Emergency recovery - disable 2FA using recovery key (no auth required - this IS the recovery)
+router.post('/2fa/emergency-recovery', async (req: Request, res: Response) => {
+  try {
+    const { email, password, recoveryKey } = req.body;
+
+    if (!email || !password || !recoveryKey) {
+      res.status(400).json({ error: 'Email, password, and recovery key are required' });
+      return;
+    }
+
+    const result = await emergencyRecovery(email, password, recoveryKey, req);
+
+    if (!result.success) {
+      res.status(401).json({ error: result.error });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Two-factor authentication has been disabled. You can now login with just your password. We recommend setting up 2FA again.',
+    });
+  } catch (error) {
+    logger.error({ error }, 'Emergency recovery error');
+    res.status(500).json({ error: 'Recovery failed' });
   }
 });
 
