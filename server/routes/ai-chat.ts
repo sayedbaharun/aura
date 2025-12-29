@@ -871,11 +871,11 @@ Current date: ${today}`;
         type: "function",
         function: {
           name: "create_health_entry",
-          description: "Log health metrics for a day. Use when user mentions sleep, energy, mood, workouts, weight, or how they're feeling physically.",
+          description: "Log health metrics for a day. Use when user mentions sleep, energy, mood, workouts, weight, or how they're feeling physically. ALWAYS extract and log at least one metric from what the user mentions (e.g., if they say 'slept 7 hours', set sleepHours to 7).",
           parameters: {
             type: "object",
             properties: {
-              date: { type: "string", description: "Date (YYYY-MM-DD), defaults to today" },
+              date: { type: "string", description: "Date (YYYY-MM-DD). Use today's date if not specified." },
               sleepHours: { type: "number", description: "Hours slept (e.g., 7.5)" },
               sleepQuality: { type: "string", description: "Sleep quality: poor, fair, good, excellent" },
               energyLevel: { type: "number", description: "Energy 1-5 scale" },
@@ -887,7 +887,8 @@ Current date: ${today}`;
               workoutType: { type: "string", description: "Workout type: strength, cardio, yoga, sports, none" },
               workoutDurationMin: { type: "number", description: "Workout duration in minutes" },
               notes: { type: "string", description: "Additional health notes" }
-            }
+            },
+            required: ["date"]
           }
         }
       },
@@ -1026,19 +1027,19 @@ Current date: ${today}`;
         type: "function",
         function: {
           name: "create_doc",
-          description: "Create a new document, note, SOP, or knowledge base entry. Use when user wants to save notes, create documentation, or record information.",
+          description: "Create a new document with content. ALWAYS generate meaningful body content based on the document type and user's request. Never create empty documents.",
           parameters: {
             type: "object",
             properties: {
               title: { type: "string", description: "Document title" },
-              type: { type: "string", description: "Type: page, sop, prompt, spec, template, playbook, meeting_notes, research" },
+              type: { type: "string", description: "Type: page, sop, prompt, spec, template, playbook, process, meeting_notes, research" },
               domain: { type: "string", description: "Domain: venture_ops, marketing, product, tech, trading, personal" },
-              body: { type: "string", description: "Document content (markdown)" },
+              body: { type: "string", description: "Document content in markdown. REQUIRED - generate appropriate content based on document type. For SOPs include steps, for playbooks include strategies, for checklists include checkbox items, etc." },
               ventureId: { type: "string", description: "Associated venture ID" },
               projectId: { type: "string", description: "Associated project ID" },
               tags: { type: "string", description: "Comma-separated tags" }
             },
-            required: ["title"]
+            required: ["title", "body"]
           }
         }
       },
