@@ -173,12 +173,14 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
 
         logger.info({ driveFileId, driveUrl }, "File uploaded to Google Drive");
       } catch (driveError) {
-        logger.warn({ error: driveError }, "Google Drive upload failed, falling back to base64 storage");
+        const driveErrorMsg = driveError instanceof Error ? driveError.message : 'Unknown error';
+        logger.warn({ error: driveError, errorMessage: driveErrorMsg }, "Google Drive upload failed, falling back to base64 storage");
         // Fall back to base64 storage
         base64Data = file.buffer.toString("base64");
         storageType = "base64";
       }
     } else {
+      logger.info("Google Drive not configured, using base64 storage");
       // No Drive configured, use base64
       base64Data = file.buffer.toString("base64");
       storageType = "base64";
@@ -232,6 +234,17 @@ async function processFileAsync(fileId: string, buffer: Buffer, mimeType: string
 
     logger.info({ fileId, mimeType }, "Starting file extraction");
 
+    // Check if OpenRouter API key is configured
+    if (!process.env.OPENROUTER_API_KEY) {
+      logger.warn({ fileId }, "OPENROUTER_API_KEY not set, skipping AI extraction");
+      await storage.updateKnowledgeFile(fileId, {
+        processingStatus: "completed",
+        extractedText: "[AI extraction skipped - API key not configured]",
+        processedAt: new Date(),
+      });
+      return;
+    }
+
     // Extract text and metadata
     const result = await extractFromFile(buffer, mimeType, { generateSummary: true });
 
@@ -247,15 +260,20 @@ async function processFileAsync(fileId: string, buffer: Buffer, mimeType: string
 
     logger.info({ fileId, textLength: result.extractedText.length }, "File extraction completed");
   } catch (error) {
-    logger.error({ error, fileId }, "File extraction failed");
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logger.error({ error, errorMessage, fileId }, "File extraction failed");
 
-    // Mark as failed
-    await storage.updateKnowledgeFile(fileId, {
-      processingStatus: "failed",
-      aiMetadata: {
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
-      } as any,
-    });
+    try {
+      // Mark as failed
+      await storage.updateKnowledgeFile(fileId, {
+        processingStatus: "failed",
+        aiMetadata: {
+          errorMessage,
+        } as any,
+      });
+    } catch (updateError) {
+      logger.error({ updateError, fileId }, "Failed to update file status to failed");
+    }
   }
 }
 
