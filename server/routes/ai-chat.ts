@@ -581,6 +581,20 @@ Current date: ${today}`;
       {
         type: "function",
         function: {
+          name: "read_doc",
+          description: "Read the full content of a specific document. Use when you need to read the body/content of a document, SOP, or knowledge base entry.",
+          parameters: {
+            type: "object",
+            properties: {
+              docId: { type: "string", description: "The document ID to read" }
+            },
+            required: ["docId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
           name: "get_knowledge_files",
           description: "Get uploaded knowledge files (PDFs, images, documents) with their extracted text and AI summaries. Use when user asks about uploaded files, attached documents, or needs content from PDFs/images.",
           parameters: {
@@ -1117,6 +1131,26 @@ Current date: ${today}`;
               id: d.id, title: d.title, type: d.type, status: d.status
             })));
           }
+          case "read_doc": {
+            const doc = await storage.getDoc(args.docId);
+            if (!doc) {
+              return JSON.stringify({ error: "Document not found" });
+            }
+            return JSON.stringify({
+              id: doc.id,
+              title: doc.title,
+              type: doc.type,
+              domain: doc.domain,
+              body: doc.body,
+              content: doc.content,
+              summary: doc.summary,
+              keyPoints: doc.keyPoints,
+              tags: doc.tags,
+              status: doc.status,
+              ventureId: doc.ventureId,
+              projectId: doc.projectId,
+            });
+          }
           case "get_knowledge_files": {
             const files = await storage.getKnowledgeFiles({
               ventureId: args.ventureId,
@@ -1482,8 +1516,9 @@ Current date: ${today}`;
             return JSON.stringify({ error: "Unknown tool" });
         }
       } catch (error) {
-        logger.error({ error, tool: name }, "Tool execution error");
-        return JSON.stringify({ error: "Tool execution failed" });
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error({ error, errorMessage, tool: name, args }, "Tool execution error");
+        return JSON.stringify({ error: `Tool execution failed: ${errorMessage}` });
       }
     };
 
