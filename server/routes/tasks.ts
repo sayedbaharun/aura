@@ -40,8 +40,11 @@ router.get("/", async (req: Request, res: Response) => {
   try {
     // Check if pagination is requested
     const wantsPagination = req.query.limit !== undefined || req.query.offset !== undefined;
-    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
-    const offset = parseInt(req.query.offset as string) || 0;
+    // Parse with fallback and bounds checking to handle NaN and negative values
+    const parsedLimit = parseInt(req.query.limit as string);
+    const parsedOffset = parseInt(req.query.offset as string);
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 1), 500);
+    const offset = Math.max(Number.isNaN(parsedOffset) ? 0 : parsedOffset, 0);
 
     const filters: Record<string, any> = {
       ventureId: req.query.venture_id as string,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Doc {
   id: string;
@@ -36,11 +37,9 @@ export function useDocSearch(query: string, debounceMs: number = 300) {
   const queryResult = useQuery<Doc[]>({
     queryKey: ["/api/docs/search", debouncedQuery],
     queryFn: async () => {
-      const response = await fetch(
-        `/api/docs/search?q=${encodeURIComponent(debouncedQuery)}`,
-        {
-          credentials: "include",
-        }
+      const response = await apiRequest(
+        "GET",
+        `/api/docs/search?q=${encodeURIComponent(debouncedQuery)}`
       );
 
       if (!response.ok) {
