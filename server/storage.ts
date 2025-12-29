@@ -480,6 +480,21 @@ export class DBStorage implements IStorage {
         console.log("✅ Auto-Migration: Successfully added password_hash column");
       }
 
+      // Add security columns for 2FA and session tracking
+      console.log("🔧 Auto-Migration: Ensuring security columns exist...");
+      await this.db.execute(sql`
+        ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS "totp_secret" varchar,
+        ADD COLUMN IF NOT EXISTS "totp_enabled" boolean DEFAULT false,
+        ADD COLUMN IF NOT EXISTS "totp_backup_codes" jsonb,
+        ADD COLUMN IF NOT EXISTS "totp_recovery_key_hash" varchar,
+        ADD COLUMN IF NOT EXISTS "last_known_ip" varchar(45),
+        ADD COLUMN IF NOT EXISTS "last_known_user_agent" text,
+        ADD COLUMN IF NOT EXISTS "trusted_devices" jsonb,
+        ADD COLUMN IF NOT EXISTS "password_changed_at" timestamp
+      `);
+      console.log("✅ Auto-Migration: Security columns ensured");
+
       // Check and create trading_strategies table
       const tradingStrategiesExists = await this.db.execute(sql`
         SELECT table_name FROM information_schema.tables
