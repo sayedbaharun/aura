@@ -693,17 +693,23 @@ All routes prefixed with `/api`. **147+ total endpoints**.
 ### Docs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/docs` | List docs (supports filters) |
-| GET | `/api/docs/tree` | Get hierarchical doc tree |
-| GET | `/api/docs/search` | Search docs by query |
+| GET | `/api/docs` | List docs (filters: `venture_id`, `project_id`, `type`, `domain`, `status`, `parent_id`, `limit`, `offset`) |
+| GET | `/api/docs/tree/:ventureId` | Get hierarchical doc tree for a venture |
+| GET | `/api/docs/search?q=` | Search docs by query |
+| GET | `/api/docs/children/:parentId` | Get direct children of a doc (use `null` for root level) |
+| GET | `/api/docs/quality/review-queue` | Get docs needing quality review |
+| GET | `/api/docs/quality/metrics` | Get overall doc quality metrics |
 | GET | `/api/docs/:id` | Get single doc |
-| GET | `/api/docs/:id/children` | Get doc children |
+| GET | `/api/docs/:id/quality` | Get quality breakdown for a doc |
 | POST | `/api/docs` | Create doc |
 | PATCH | `/api/docs/:id` | Update doc |
-| DELETE | `/api/docs/:id` | Delete doc (recursive) |
-| POST | `/api/docs/reorder` | Reorder docs |
-| GET | `/api/docs/:docId/attachments` | List attachments |
-| POST | `/api/docs/:docId/attachments` | Upload attachment |
+| DELETE | `/api/docs/:id` | Delete doc |
+| DELETE | `/api/docs/:id/recursive` | Delete doc and all children |
+| POST | `/api/docs/reorder` | Reorder docs (for drag and drop) |
+| POST | `/api/docs/:id/recalculate-quality` | Recalculate quality score |
+| POST | `/api/docs/:id/mark-reviewed` | Mark doc as reviewed |
+| GET | `/api/docs/:docId/attachments` | List attachments for a doc |
+| POST | `/api/docs/:docId/attachments` | Upload attachment to a doc |
 | DELETE | `/api/attachments/:id` | Delete attachment |
 
 ### Shopping

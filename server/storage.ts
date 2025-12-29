@@ -145,7 +145,7 @@ import {
   knowledgeFiles,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc, isNull } from "drizzle-orm";
 import { db as database } from "../db";
 import { calculateDocQuality } from "./doc-quality";
 
@@ -1473,7 +1473,7 @@ export class DBStorage implements IStorage {
     if (filters?.parentId !== undefined) {
       if (filters.parentId === null) {
         // Use SQL IS NULL check for root level docs
-        conditions.push(eq(docs.parentId, null as any));
+        conditions.push(isNull(docs.parentId));
       } else {
         conditions.push(eq(docs.parentId, filters.parentId));
       }
@@ -1554,7 +1554,7 @@ export class DBStorage implements IStorage {
 
     if (parentId === null) {
       // Root level docs - parentId IS NULL
-      conditions.push(eq(docs.parentId, null as any));
+      conditions.push(isNull(docs.parentId));
     } else {
       conditions.push(eq(docs.parentId, parentId));
     }
