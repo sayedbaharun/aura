@@ -212,11 +212,12 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
 
     res.status(201).json(knowledgeFile);
   } catch (error) {
-    logger.error({ error }, "Error uploading knowledge file");
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ error, errorMessage, ventureId: req.body?.ventureId }, "Error uploading knowledge file");
     if (error instanceof Error && error.message.includes("Unsupported file type")) {
       res.status(400).json({ error: error.message });
     } else {
-      res.status(500).json({ error: "Failed to upload knowledge file" });
+      res.status(500).json({ error: "Failed to upload knowledge file", details: errorMessage });
     }
   }
 });
