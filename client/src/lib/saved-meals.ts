@@ -34,14 +34,22 @@ export function saveMeal(meal: Omit<SavedMeal, "id" | "createdAt">): SavedMeal {
     createdAt: new Date().toISOString(),
   };
   meals.push(newMeal);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
+  } catch (e) {
+    console.warn("Failed to save meal to localStorage:", e);
+  }
   return newMeal;
 }
 
 export function deleteSavedMeal(id: string): void {
   const meals = getSavedMeals();
   const filtered = meals.filter((m) => m.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  } catch (e) {
+    console.warn("Failed to update localStorage after deleting meal:", e);
+  }
 }
 
 export function updateSavedMeal(id: string, updates: Partial<SavedMeal>): SavedMeal | null {
@@ -50,6 +58,10 @@ export function updateSavedMeal(id: string, updates: Partial<SavedMeal>): SavedM
   if (index === -1) return null;
 
   meals[index] = { ...meals[index], ...updates };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(meals));
+  } catch (e) {
+    console.warn("Failed to update localStorage after updating meal:", e);
+  }
   return meals[index];
 }
