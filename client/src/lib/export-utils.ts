@@ -101,11 +101,29 @@ function sanitizeFilename(filename: string): string {
 }
 
 /**
+ * Check if a URL is safe (not javascript:, data:, vbscript:, etc.)
+ */
+function isSafeUrl(url: string): boolean {
+  const trimmed = url.trim().toLowerCase();
+  // Block dangerous protocols
+  if (trimmed.startsWith('javascript:') ||
+      trimmed.startsWith('vbscript:') ||
+      trimmed.startsWith('data:text/html')) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Simple markdown to HTML converter
  * For more complex conversions, consider using a library like 'marked'
  */
 function convertMarkdownToHtml(markdown: string): string {
-  let html = markdown;
+  // First, escape HTML entities in the raw markdown to prevent XSS
+  let html = markdown
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
   // Headers
   html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
@@ -126,11 +144,22 @@ function convertMarkdownToHtml(markdown: string): string {
   // Inline code
   html = html.replace(/`(.+?)`/g, "<code>$1</code>");
 
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  // Links - with URL sanitization to prevent javascript: XSS
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+    if (isSafeUrl(url)) {
+      return `<a href="${url}">${text}</a>`;
+    }
+    // For unsafe URLs, just show the text without a link
+    return text;
+  });
 
-  // Images
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />');
+  // Images - with URL sanitization
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+    if (isSafeUrl(src)) {
+      return `<img src="${src}" alt="${alt}" />`;
+    }
+    return `[Image: ${alt}]`;
+  });
 
   // Lists
   html = html.replace(/^\* (.+)$/gim, "<li>$1</li>");

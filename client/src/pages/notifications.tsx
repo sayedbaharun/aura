@@ -14,6 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
@@ -31,6 +41,7 @@ import NotificationSettingsComponent from '@/components/notifications/notificati
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | NotificationType>('all');
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   // Load notifications
   const loadNotifications = () => {
@@ -82,9 +93,12 @@ export default function NotificationsPage() {
   };
 
   const handleClearAll = () => {
-    if (confirm('Clear all notifications? This cannot be undone.')) {
-      clearAllNotifications();
-    }
+    setClearDialogOpen(true);
+  };
+
+  const confirmClearAll = () => {
+    clearAllNotifications();
+    setClearDialogOpen(false);
   };
 
   const getNotificationIcon = (type: string) => {
@@ -280,6 +294,24 @@ export default function NotificationsPage() {
           <NotificationSettingsComponent />
         </TabsContent>
       </Tabs>
+
+      {/* Clear All Confirmation Dialog */}
+      <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all notifications?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all your notifications. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClearAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Clear All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

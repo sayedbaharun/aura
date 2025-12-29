@@ -6,6 +6,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskDetailModal } from "@/lib/task-detail-modal-store";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -47,10 +57,12 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
   const { toast } = useToast();
   const { openTaskDetail } = useTaskDetailModal();
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
   const { data: rawTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks/today"],
-    refetchInterval: 5000,
+    refetchInterval: 60000, // Refetch every minute instead of 5 seconds to reduce battery/network usage
   });
 
   // Filter tasks based on showOnlyIncomplete prop
@@ -114,9 +126,16 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
   };
 
   const handleDeleteTask = (taskId: string) => {
-    if (confirm("Are you sure you want to delete this task?")) {
-      deleteTaskMutation.mutate(taskId);
+    setTaskToDelete(taskId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteTask = () => {
+    if (taskToDelete) {
+      deleteTaskMutation.mutate(taskToDelete);
     }
+    setDeleteDialogOpen(false);
+    setTaskToDelete(null);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -202,7 +221,7 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Tasks for Today</CardTitle>
-          <Button size="sm" onClick={() => setCreateModalOpen(true)}>
+          <Button size="sm" onClick={() => setCreateModalOpen(true)} aria-label="Add new task for today">
             <Plus className="h-4 w-4 mr-1" />
             Add Task
           </Button>
@@ -295,6 +314,7 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteTask(task.id)}
+                            aria-label={`Delete task: ${task.title}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -315,6 +335,24 @@ export default function TasksForToday({ showOnlyIncomplete = false }: TasksForTo
       onOpenChange={setCreateModalOpen}
       defaultFocusDate={new Date().toISOString().split("T")[0]}
     />
+
+    {/* Delete Task Confirmation Dialog */}
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete task?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this task? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmDeleteTask} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }

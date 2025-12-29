@@ -42,10 +42,11 @@ export default function Landing() {
           </p>
         </div>
 
-        {/* Enter prompt */}
-        <div
+        {/* Enter prompt - using button for accessibility */}
+        <button
           onClick={enterApp}
-          className="mt-12 cursor-pointer group"
+          className="mt-12 cursor-pointer group bg-transparent border-none p-0"
+          aria-label="Press Enter or click to continue to dashboard"
         >
           <div className="flex items-center justify-center gap-3 text-muted-foreground group-hover:text-foreground transition-colors">
             <span className="text-lg">Press</span>
@@ -55,7 +56,7 @@ export default function Landing() {
             <span className="text-lg">to continue</span>
             <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-        </div>
+        </button>
 
         {/* Subtle footer */}
         <p className="text-xs text-muted-foreground/50 mt-16">

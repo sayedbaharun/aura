@@ -1622,22 +1622,28 @@ export class DBStorage implements IStorage {
   }
 
   async reorderDocs(docIds: string[], parentId: string | null): Promise<void> {
-    // Batch update using CASE/WHEN to minimize queries
+    // Batch update using individual parameterized queries for security
     if (docIds.length === 0) return;
 
-    // Build a single UPDATE with CASE for order values
     const now = new Date();
-    const caseStatements = docIds.map((id, i) => `WHEN id = '${id}' THEN ${i}`).join(' ');
-    const idsStr = docIds.map(id => `'${id}'`).join(',');
 
-    await this.db.execute(sql`
-      UPDATE docs
-      SET
-        "order" = CASE ${sql.raw(caseStatements)} END,
-        parent_id = ${parentId},
-        updated_at = ${now}
-      WHERE id IN (${sql.raw(idsStr)})
-    `);
+    // Use parameterized queries to prevent SQL injection
+    // Update each doc with its new order value
+    for (let i = 0; i < docIds.length; i++) {
+      const docId = docIds[i];
+      // Validate UUID format to prevent injection
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(docId)) {
+        throw new Error(`Invalid doc ID format: ${docId}`);
+      }
+
+      await this.db.update(docs)
+        .set({
+          order: i,
+          parentId: parentId,
+          updatedAt: now,
+        } as any)
+        .where(eq(docs.id, docId));
+    }
   }
 
   async updateDocQualityScore(docId: string): Promise<{ qualityScore: number; aiReady: boolean }> {

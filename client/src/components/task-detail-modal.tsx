@@ -189,7 +189,7 @@ export default function TaskDetailModal() {
     mutationFn: async (newStatus: 'completed' | 'todo') => {
       const response = await apiRequest('PATCH', `/api/tasks/${taskId}`, {
         status: newStatus,
-        completedAt: newStatus === 'completed' ? new Date() : null
+        completedAt: newStatus === 'completed' ? new Date().toISOString() : null
       });
       return response.json();
     },
