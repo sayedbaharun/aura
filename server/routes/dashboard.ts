@@ -347,7 +347,7 @@ router.get("/scorecard", async (req: Request, res: Response) => {
     // Fetch all required data in parallel
     const [healthEntries, nutritionEntries, dayData, tradingChecklists] = await Promise.all([
       storage.getHealthEntries({ dateGte: today, dateLte: today }),
-      storage.getNutritionEntries({ dateGte: today, dateLte: today }),
+      storage.getNutritionEntries({ date: today }),
       storage.getDay(dayId),
       storage.getDailyTradingChecklists({ date: today }),
     ]);
