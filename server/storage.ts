@@ -15,6 +15,8 @@ import {
   type InsertWeek,
   type HealthEntry,
   type InsertHealthEntry,
+  type BloodworkEntry,
+  type InsertBloodworkEntry,
   type NutritionEntry,
   type InsertNutritionEntry,
   type Doc,
@@ -102,6 +104,7 @@ import {
   days,
   weeks,
   healthEntries,
+  bloodworkEntries,
   nutritionEntries,
   docs,
   docChunks,
@@ -226,6 +229,13 @@ export interface IStorage {
   getHealthEntry(id: string): Promise<HealthEntry | undefined>;
   createHealthEntry(data: InsertHealthEntry): Promise<HealthEntry>;
   updateHealthEntry(id: string, data: Partial<InsertHealthEntry>): Promise<HealthEntry | undefined>;
+
+  // Bloodwork Entries
+  getBloodworkEntries(filters?: { dateGte?: string; dateLte?: string }): Promise<BloodworkEntry[]>;
+  getBloodworkEntry(id: string): Promise<BloodworkEntry | undefined>;
+  createBloodworkEntry(data: InsertBloodworkEntry): Promise<BloodworkEntry>;
+  updateBloodworkEntry(id: string, data: Partial<InsertBloodworkEntry>): Promise<BloodworkEntry | undefined>;
+  deleteBloodworkEntry(id: string): Promise<void>;
 
   // Nutrition Entries
   getNutritionEntries(filters?: { dayId?: string; date?: string }): Promise<NutritionEntry[]>;
@@ -1374,6 +1384,59 @@ export class DBStorage implements IStorage {
       .where(eq(healthEntries.id, id))
       .returning();
     return updated;
+  }
+
+  // ============================================================================
+  // BLOODWORK ENTRIES
+  // ============================================================================
+
+  async getBloodworkEntries(filters?: { dateGte?: string; dateLte?: string }): Promise<BloodworkEntry[]> {
+    const conditions = [];
+
+    if (filters?.dateGte) {
+      conditions.push(gte(bloodworkEntries.date, filters.dateGte));
+    }
+    if (filters?.dateLte) {
+      conditions.push(lte(bloodworkEntries.date, filters.dateLte));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return await this.db
+      .select()
+      .from(bloodworkEntries)
+      .where(whereClause)
+      .orderBy(desc(bloodworkEntries.date));
+  }
+
+  async getBloodworkEntry(id: string): Promise<BloodworkEntry | undefined> {
+    const [entry] = await this.db
+      .select()
+      .from(bloodworkEntries)
+      .where(eq(bloodworkEntries.id, id))
+      .limit(1);
+    return entry;
+  }
+
+  async createBloodworkEntry(insertEntry: InsertBloodworkEntry): Promise<BloodworkEntry> {
+    const [entry] = await this.db
+      .insert(bloodworkEntries)
+      .values(insertEntry as any)
+      .returning();
+    return entry;
+  }
+
+  async updateBloodworkEntry(id: string, updates: Partial<InsertBloodworkEntry>): Promise<BloodworkEntry | undefined> {
+    const [updated] = await this.db
+      .update(bloodworkEntries)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(bloodworkEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBloodworkEntry(id: string): Promise<void> {
+    await this.db.delete(bloodworkEntries).where(eq(bloodworkEntries.id, id));
   }
 
   // ============================================================================

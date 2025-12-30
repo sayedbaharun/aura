@@ -639,6 +639,9 @@ export const days = pgTable(
       journalEntry?: string;
       gratitude?: string[];
       tomorrowPriorities?: string[];
+      fastingHours?: number; // Hours fasted (target: 16)
+      fastingCompleted?: boolean; // Met 16hr target
+      deepWorkHours?: number; // Hours of deep work completed
       completedAt?: string;
     }>(),
     // Trading journal for the day
@@ -786,6 +789,67 @@ export const insertHealthEntrySchema = createInsertSchema(healthEntries)
 
 export type InsertHealthEntry = z.infer<typeof insertHealthEntrySchema>;
 export type HealthEntry = typeof healthEntries.$inferSelect;
+
+// BLOODWORK ENTRIES: Quarterly lab results for health optimization
+export const bloodworkEntries = pgTable(
+  "bloodwork_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    date: date("date").notNull(),
+    labName: text("lab_name"), // Name of the lab/clinic
+    // Metabolic markers (insulin resistance focus)
+    hba1c: real("hba1c"), // Glycated hemoglobin (%)
+    fastingGlucose: real("fasting_glucose"), // mg/dL
+    fastingInsulin: real("fasting_insulin"), // μIU/mL
+    homaIr: real("homa_ir"), // Calculated: (glucose * insulin) / 405
+    // Lipid panel
+    totalCholesterol: real("total_cholesterol"), // mg/dL
+    hdlCholesterol: real("hdl_cholesterol"), // mg/dL
+    ldlCholesterol: real("ldl_cholesterol"), // mg/dL
+    triglycerides: real("triglycerides"), // mg/dL
+    // Hormones
+    testosterone: real("testosterone"), // ng/dL (total)
+    freeTestosterone: real("free_testosterone"), // pg/mL
+    cortisol: real("cortisol"), // μg/dL
+    // Thyroid
+    tsh: real("tsh"), // mIU/L
+    freeT3: real("free_t3"), // pg/mL
+    freeT4: real("free_t4"), // ng/dL
+    // Vitamins & minerals
+    vitaminD: real("vitamin_d"), // ng/mL
+    vitaminB12: real("vitamin_b12"), // pg/mL
+    ferritin: real("ferritin"), // ng/mL
+    iron: real("iron"), // μg/dL
+    // Inflammation & liver
+    crp: real("crp"), // mg/L (C-reactive protein)
+    alt: real("alt"), // U/L (liver enzyme)
+    ast: real("ast"), // U/L (liver enzyme)
+    // Kidney function
+    creatinine: real("creatinine"), // mg/dL
+    egfr: real("egfr"), // mL/min/1.73m²
+    // Notes and context
+    notes: text("notes"),
+    attachmentUrl: text("attachment_url"), // Link to PDF/image of results
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_bloodwork_entries_date").on(table.date),
+  ]
+);
+
+export const insertBloodworkEntrySchema = createInsertSchema(bloodworkEntries)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    date: dateStringRequiredSchema,
+  });
+
+export type InsertBloodworkEntry = z.infer<typeof insertBloodworkEntrySchema>;
+export type BloodworkEntry = typeof bloodworkEntries.$inferSelect;
 
 // NUTRITION ENTRIES: Meal logs
 export const nutritionEntries = pgTable(

@@ -161,3 +161,112 @@ export function MissionStatement({ mission }: MissionStatementProps) {
         </div>
     );
 }
+
+// ============================================================================
+// DAILY SCORECARD
+// ============================================================================
+
+export interface ScorecardMetric {
+    label: string;
+    target: string;
+    actual: string | number | null;
+    status: 'success' | 'warning' | 'danger' | 'pending';
+    icon?: React.ReactNode;
+}
+
+interface DailyScorecardProps {
+    metrics: ScorecardMetric[];
+    morningComplete?: boolean;
+    eveningComplete?: boolean;
+}
+
+export function DailyScorecard({ metrics, morningComplete, eveningComplete }: DailyScorecardProps) {
+    const getStatusColor = (status: ScorecardMetric['status']) => {
+        switch (status) {
+            case 'success': return 'text-green-500';
+            case 'warning': return 'text-yellow-500';
+            case 'danger': return 'text-red-500';
+            default: return 'text-muted-foreground';
+        }
+    };
+
+    const getStatusIcon = (status: ScorecardMetric['status']) => {
+        switch (status) {
+            case 'success': return '✓';
+            case 'warning': return '○';
+            case 'danger': return '✗';
+            default: return '·';
+        }
+    };
+
+    const completedCount = metrics.filter(m => m.status === 'success').length;
+    const totalCount = metrics.length;
+    const scorePercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    return (
+        <Card className="border-none bg-background/50 shadow-sm">
+            <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                        Daily Scorecard
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                        <span className={cn(
+                            "text-2xl font-bold",
+                            scorePercent >= 80 ? "text-green-500" :
+                            scorePercent >= 50 ? "text-yellow-500" : "text-red-500"
+                        )}>
+                            {scorePercent}%
+                        </span>
+                    </div>
+                </div>
+                <div className="flex gap-2 mt-1">
+                    <span className={cn(
+                        "text-xs px-2 py-0.5 rounded-full",
+                        morningComplete
+                            ? "bg-green-500/10 text-green-600"
+                            : "bg-muted text-muted-foreground"
+                    )}>
+                        {morningComplete ? "☀️ AM ✓" : "☀️ AM"}
+                    </span>
+                    <span className={cn(
+                        "text-xs px-2 py-0.5 rounded-full",
+                        eveningComplete
+                            ? "bg-green-500/10 text-green-600"
+                            : "bg-muted text-muted-foreground"
+                    )}>
+                        {eveningComplete ? "🌙 PM ✓" : "🌙 PM"}
+                    </span>
+                </div>
+            </CardHeader>
+            <CardContent className="pt-2">
+                <div className="space-y-1">
+                    {metrics.map((metric, idx) => (
+                        <div
+                            key={idx}
+                            className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0"
+                        >
+                            <div className="flex items-center gap-2">
+                                <span className={cn("text-sm font-medium", getStatusColor(metric.status))}>
+                                    {getStatusIcon(metric.status)}
+                                </span>
+                                <span className="text-sm text-foreground">{metric.label}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs text-muted-foreground">
+                                    {metric.target}
+                                </span>
+                                <span className={cn(
+                                    "text-sm font-medium min-w-[40px] text-right",
+                                    getStatusColor(metric.status)
+                                )}>
+                                    {metric.actual ?? '-'}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
