@@ -450,7 +450,10 @@ router.get("/scorecard", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("[Dashboard Scorecard] Error:", error);
-    res.status(500).json({ message: "Failed to fetch scorecard" });
+    res.status(500).json({
+      message: "Failed to fetch scorecard",
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
