@@ -897,6 +897,90 @@ export async function getTwoFactorStatus(
 }
 
 /**
+ * Reset password using recovery key (for when user is locked out)
+ * This allows resetting password without being logged in, using the recovery key
+ */
+export async function resetPasswordWithRecoveryKey(
+  email: string,
+  recoveryKey: string,
+  newPassword: string,
+  req: Request
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const [user] = await db
+      .select({
+        id: users.id,
+        totpRecoveryKeyHash: users.totpRecoveryKeyHash,
+      })
+      .from(users)
+      .where(eq(users.email, email));
+
+    if (!user) {
+      await createAuditLog(null, "password_reset_failed", req, { email, reason: "user_not_found" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid email or recovery key." };
+    }
+
+    if (!user.totpRecoveryKeyHash) {
+      await createAuditLog(user.id, "password_reset_failed", req, { reason: "no_recovery_key" }, "auth", undefined, "failure");
+      return { success: false, error: "No recovery key configured. You must have set up 2FA to use this feature." };
+    }
+
+    // Verify recovery key (remove dashes for comparison)
+    const recoveryKeyRaw = recoveryKey.replace(/-/g, "").toUpperCase();
+    const isRecoveryKeyValid = await bcrypt.compare(recoveryKeyRaw, user.totpRecoveryKeyHash);
+
+    if (!isRecoveryKeyValid) {
+      await createAuditLog(user.id, "password_reset_failed", req, { reason: "invalid_recovery_key" }, "auth", undefined, "failure");
+      return { success: false, error: "Invalid email or recovery key." };
+    }
+
+    // Validate new password
+    if (newPassword.length < 12) {
+      return { success: false, error: "Password must be at least 12 characters" };
+    }
+
+    if (!/[A-Z]/.test(newPassword)) {
+      return { success: false, error: "Password must contain at least one uppercase letter" };
+    }
+
+    if (!/[a-z]/.test(newPassword)) {
+      return { success: false, error: "Password must contain at least one lowercase letter" };
+    }
+
+    if (!/[0-9]/.test(newPassword)) {
+      return { success: false, error: "Password must contain at least one number" };
+    }
+
+    if (!/[^A-Za-z0-9]/.test(newPassword)) {
+      return { success: false, error: "Password must contain at least one special character" };
+    }
+
+    // Reset password and invalidate all sessions
+    const passwordHash = await hashPassword(newPassword);
+    await db
+      .update(users)
+      .set({
+        passwordHash,
+        passwordChangedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+
+    // Invalidate all sessions
+    await invalidateOtherSessions(user.id);
+
+    await createAuditLog(user.id, "password_reset_success", req, { method: "recovery_key" }, "auth");
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Password reset failed");
+    return { success: false, error: "Password reset failed. Please try again." };
+  }
+}
+
+/**
  * Complete login after 2FA verification (used after verifyTwoFactorLogin)
  */
 export async function completeTwoFactorLogin(

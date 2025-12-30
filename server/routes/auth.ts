@@ -22,6 +22,7 @@ import {
   regenerateBackupCodes,
   getTwoFactorStatus,
   emergencyRecovery,
+  resetPasswordWithRecoveryKey,
 } from "../auth";
 import { DEFAULT_USER_ID } from "./constants";
 
@@ -460,6 +461,33 @@ router.post('/2fa/emergency-recovery', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, 'Emergency recovery error');
     res.status(500).json({ error: 'Recovery failed' });
+  }
+});
+
+// Password reset using recovery key (no auth required - for locked out users)
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { email, recoveryKey, newPassword } = req.body;
+
+    if (!email || !recoveryKey || !newPassword) {
+      res.status(400).json({ error: 'Email, recovery key, and new password are required' });
+      return;
+    }
+
+    const result = await resetPasswordWithRecoveryKey(email, recoveryKey, newPassword, req);
+
+    if (!result.success) {
+      res.status(401).json({ error: result.error });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Password has been reset. You can now login with your new password.',
+    });
+  } catch (error) {
+    logger.error({ error }, 'Password reset error');
+    res.status(500).json({ error: 'Password reset failed' });
   }
 });
 

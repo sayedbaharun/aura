@@ -1,7 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Sun } from "lucide-react";
+import { User, Sun, Shield } from "lucide-react";
 import ProfileSettings from "@/components/settings/profile-settings";
 import MorningRitualConfig from "@/components/settings/morning-ritual-config";
+import SecuritySettings from "@/components/settings/security-settings";
 
 export default function SettingsPage() {
   return (
@@ -22,10 +23,14 @@ export default function SettingsPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Profile</span>
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">Security</span>
             </TabsTrigger>
             <TabsTrigger value="morning" className="flex items-center gap-2">
               <Sun className="h-4 w-4" />
@@ -35,6 +40,10 @@ export default function SettingsPage() {
 
           <TabsContent value="profile">
             <ProfileSettings />
+          </TabsContent>
+
+          <TabsContent value="security">
+            <SecuritySettings />
           </TabsContent>
 
           <TabsContent value="morning">
