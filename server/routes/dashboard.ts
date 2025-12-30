@@ -356,15 +356,20 @@ router.get("/scorecard", async (req: Request, res: Response) => {
     const day = dayData;
     const tradingChecklist = tradingChecklists[0];
 
-    // Calculate nutrition totals
-    const totalProtein = nutritionEntries.reduce((sum, e) => sum + (e.proteinG || 0), 0);
-    const totalCalories = nutritionEntries.reduce((sum, e) => sum + (e.calories || 0), 0);
+    // Calculate nutrition totals (with defensive checks)
+    const totalProtein = Array.isArray(nutritionEntries)
+      ? nutritionEntries.reduce((sum, e) => sum + (e.proteinG || 0), 0)
+      : 0;
+    const totalCalories = Array.isArray(nutritionEntries)
+      ? nutritionEntries.reduce((sum, e) => sum + (e.calories || 0), 0)
+      : 0;
 
     // Calculate trading P&L from trading journal or checklist
     let tradingPnL: number | null = null;
-    if (day?.tradingJournal?.sessions) {
-      tradingPnL = day.tradingJournal.sessions.reduce((sum: number, s: { pnl?: number }) => sum + (s.pnl || 0), 0);
-    } else if (tradingChecklist?.trades) {
+    const sessions = day?.tradingJournal?.sessions;
+    if (Array.isArray(sessions) && sessions.length > 0) {
+      tradingPnL = sessions.reduce((sum: number, s: { pnl?: number }) => sum + (s.pnl || 0), 0);
+    } else if (tradingChecklist?.trades && Array.isArray(tradingChecklist.trades)) {
       tradingPnL = (tradingChecklist.trades as any[]).reduce((sum, t) => sum + (t.pnl || 0), 0);
     }
 
