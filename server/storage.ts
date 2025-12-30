@@ -1715,15 +1715,25 @@ export class DBStorage implements IStorage {
     averageScore: number;
     needsReview: number;
   }> {
-    const allDocs = await this.db.select().from(docs).where(eq(docs.status, 'active'));
+    // Use SQL aggregations instead of fetching all docs for efficiency
+    const result = await this.db
+      .select({
+        totalDocs: sql<number>`count(*)::int`,
+        aiReadyDocs: sql<number>`count(*) filter (where ${docs.aiReady} = true)::int`,
+        averageScore: sql<number>`coalesce(round(avg(${docs.qualityScore}))::int, 0)`,
+        needsReview: sql<number>`count(*) filter (where coalesce(${docs.qualityScore}, 0) < 70)::int`,
+      })
+      .from(docs)
+      .where(eq(docs.status, 'active'));
 
-    const totalDocs = allDocs.length;
-    const aiReadyDocs = allDocs.filter(d => d.aiReady).length;
+    const { totalDocs, aiReadyDocs, averageScore, needsReview } = result[0] || {
+      totalDocs: 0,
+      aiReadyDocs: 0,
+      averageScore: 0,
+      needsReview: 0,
+    };
+
     const aiReadyPercent = totalDocs > 0 ? Math.round((aiReadyDocs / totalDocs) * 100) : 0;
-    const averageScore = totalDocs > 0
-      ? Math.round(allDocs.reduce((sum, d) => sum + (d.qualityScore || 0), 0) / totalDocs)
-      : 0;
-    const needsReview = allDocs.filter(d => (d.qualityScore || 0) < 70).length;
 
     return {
       totalDocs,
@@ -3836,44 +3846,67 @@ export class DBStorage implements IStorage {
     unexploredQuestions: number;
   }> {
     try {
-      // Get all scenarios for the venture
-      const scenarios = await this.getVentureScenarios(ventureId);
+      // Run aggregation queries in parallel for efficiency
+      const [scenarioStats, indicatorStats, recentSignals, questionStats] = await Promise.all([
+        // Scenario counts by quadrant (single query)
+        this.db
+          .select({
+            total: sql<number>`count(*)::int`,
+            growth: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'growth')::int`,
+            collapse: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'collapse')::int`,
+            transformation: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'transformation')::int`,
+            constraint: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'constraint')::int`,
+          })
+          .from(ventureScenarios)
+          .where(eq(ventureScenarios.ventureId, ventureId)),
 
-      // Count scenarios by quadrant
-      const scenariosByQuadrant: Record<string, number> = {
-        growth: 0,
-        collapse: 0,
-        transformation: 0,
-        constraint: 0,
+        // Indicator counts by status (single query)
+        this.db
+          .select({
+            green: sql<number>`count(*) filter (where ${scenarioIndicators.currentStatus} = 'green')::int`,
+            yellow: sql<number>`count(*) filter (where ${scenarioIndicators.currentStatus} = 'yellow')::int`,
+            red: sql<number>`count(*) filter (where ${scenarioIndicators.currentStatus} = 'red')::int`,
+          })
+          .from(scenarioIndicators)
+          .where(eq(scenarioIndicators.ventureId, ventureId)),
+
+        // Recent signals (limit 5, already ordered by createdAt desc)
+        this.db
+          .select()
+          .from(trendSignals)
+          .where(eq(trendSignals.ventureId, ventureId))
+          .orderBy(desc(trendSignals.createdAt))
+          .limit(5),
+
+        // Unexplored questions count (single query)
+        this.db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(whatIfQuestions)
+          .where(and(
+            eq(whatIfQuestions.ventureId, ventureId),
+            eq(whatIfQuestions.explored, false)
+          )),
+      ]);
+
+      const scenariosByQuadrant = {
+        growth: scenarioStats[0]?.growth ?? 0,
+        collapse: scenarioStats[0]?.collapse ?? 0,
+        transformation: scenarioStats[0]?.transformation ?? 0,
+        constraint: scenarioStats[0]?.constraint ?? 0,
       };
-      scenarios.forEach(s => {
-        if (s.quadrant) {
-          scenariosByQuadrant[s.quadrant] = (scenariosByQuadrant[s.quadrant] || 0) + 1;
-        }
-      });
 
-      // Get indicators and count by status
-      const indicators = await this.getScenarioIndicators({ ventureId });
       const indicatorsByStatus = {
-        green: indicators.filter(i => i.currentStatus === 'green').length,
-        yellow: indicators.filter(i => i.currentStatus === 'yellow').length,
-        red: indicators.filter(i => i.currentStatus === 'red').length,
+        green: indicatorStats[0]?.green ?? 0,
+        yellow: indicatorStats[0]?.yellow ?? 0,
+        red: indicatorStats[0]?.red ?? 0,
       };
-
-      // Get recent signals (last 5)
-      const allSignals = await this.getTrendSignals(ventureId);
-      const recentSignals = allSignals.slice(0, 5);
-
-      // Count unexplored questions
-      const questions = await this.getWhatIfQuestions(ventureId, { explored: false });
-      const unexploredQuestions = questions.length;
 
       return {
-        scenarioCount: scenarios.length,
+        scenarioCount: scenarioStats[0]?.total ?? 0,
         scenariosByQuadrant,
         indicatorsByStatus,
         recentSignals,
-        unexploredQuestions,
+        unexploredQuestions: questionStats[0]?.count ?? 0,
       };
     } catch (error) {
       console.error("Error fetching foresight summary:", error);
