@@ -495,6 +495,19 @@ export class DBStorage implements IStorage {
       `);
       console.log("✅ Auto-Migration: Security columns ensured");
 
+      // Add user profile columns (date/time format preferences)
+      console.log("🔧 Auto-Migration: Ensuring user profile columns exist...");
+      await this.db.execute(sql`
+        ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS "date_format" varchar DEFAULT 'yyyy-MM-dd',
+        ADD COLUMN IF NOT EXISTS "time_format" varchar DEFAULT '24h',
+        ADD COLUMN IF NOT EXISTS "week_starts_on" integer DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "last_login_at" timestamp,
+        ADD COLUMN IF NOT EXISTS "failed_login_attempts" integer DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "locked_until" timestamp
+      `);
+      console.log("✅ Auto-Migration: User profile columns ensured");
+
       // Check and create trading_strategies table
       const tradingStrategiesExists = await this.db.execute(sql`
         SELECT table_name FROM information_schema.tables
