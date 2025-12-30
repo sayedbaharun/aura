@@ -342,13 +342,12 @@ router.get("/next-meeting", async (req: Request, res: Response) => {
 router.get("/scorecard", async (req: Request, res: Response) => {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const dayId = `day_${today}`;
 
     // Fetch all required data in parallel
     const [healthEntries, nutritionEntries, dayData, tradingChecklists] = await Promise.all([
       storage.getHealthEntries({ dateGte: today, dateLte: today }),
       storage.getNutritionEntries({ date: today }),
-      storage.getDay(dayId),
+      storage.getDay(today),
       storage.getDailyTradingChecklists({ date: today }),
     ]);
 
