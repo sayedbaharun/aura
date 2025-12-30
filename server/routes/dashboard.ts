@@ -338,4 +338,115 @@ router.get("/next-meeting", async (req: Request, res: Response) => {
   }
 });
 
+// Get daily scorecard data
+router.get("/scorecard", async (req: Request, res: Response) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const dayId = `day_${today}`;
+
+    // Fetch all required data in parallel
+    const [healthEntries, nutritionEntries, dayData, tradingChecklists] = await Promise.all([
+      storage.getHealthEntries({ dateGte: today, dateLte: today }),
+      storage.getNutritionEntries({ dateGte: today, dateLte: today }),
+      storage.getDay(dayId),
+      storage.getDailyTradingChecklists({ date: today }),
+    ]);
+
+    const health = healthEntries[0];
+    const day = dayData;
+    const tradingChecklist = tradingChecklists[0];
+
+    // Calculate nutrition totals
+    const totalProtein = nutritionEntries.reduce((sum, e) => sum + (e.proteinG || 0), 0);
+    const totalCalories = nutritionEntries.reduce((sum, e) => sum + (e.calories || 0), 0);
+
+    // Calculate trading P&L from trading journal or checklist
+    let tradingPnL: number | null = null;
+    if (day?.tradingJournal?.sessions) {
+      tradingPnL = day.tradingJournal.sessions.reduce((sum: number, s: { pnl?: number }) => sum + (s.pnl || 0), 0);
+    } else if (tradingChecklist?.trades) {
+      tradingPnL = (tradingChecklist.trades as any[]).reduce((sum, t) => sum + (t.pnl || 0), 0);
+    }
+
+    // Build metrics with status
+    const metrics = [
+      {
+        label: "Sleep",
+        target: "7+ hrs",
+        actual: health?.sleepHours ? `${health.sleepHours}h` : null,
+        status: !health?.sleepHours ? 'pending' :
+                health.sleepHours >= 7 ? 'success' :
+                health.sleepHours >= 6 ? 'warning' : 'danger'
+      },
+      {
+        label: "Weight",
+        target: "↓ trend",
+        actual: health?.weightKg ? `${health.weightKg}kg` : null,
+        status: health?.weightKg ? 'success' : 'pending'
+      },
+      {
+        label: "Fasting",
+        target: "16 hrs",
+        actual: day?.eveningRituals?.fastingHours ? `${day.eveningRituals.fastingHours}h` : null,
+        status: !day?.eveningRituals?.fastingHours ? 'pending' :
+                day.eveningRituals.fastingHours >= 16 ? 'success' :
+                day.eveningRituals.fastingHours >= 14 ? 'warning' : 'danger'
+      },
+      {
+        label: "Protein",
+        target: "200g+",
+        actual: totalProtein > 0 ? `${Math.round(totalProtein)}g` : null,
+        status: totalProtein === 0 ? 'pending' :
+                totalProtein >= 200 ? 'success' :
+                totalProtein >= 150 ? 'warning' : 'danger'
+      },
+      {
+        label: "Calories",
+        target: "<2000",
+        actual: totalCalories > 0 ? `${Math.round(totalCalories)}` : null,
+        status: totalCalories === 0 ? 'pending' :
+                totalCalories <= 2000 ? 'success' :
+                totalCalories <= 2200 ? 'warning' : 'danger'
+      },
+      {
+        label: "Deep Work",
+        target: "5 hrs",
+        actual: day?.eveningRituals?.deepWorkHours ? `${day.eveningRituals.deepWorkHours}h` : null,
+        status: !day?.eveningRituals?.deepWorkHours ? 'pending' :
+                day.eveningRituals.deepWorkHours >= 5 ? 'success' :
+                day.eveningRituals.deepWorkHours >= 3 ? 'warning' : 'danger'
+      },
+      {
+        label: "Trading P&L",
+        target: "green",
+        actual: tradingPnL !== null ? (tradingPnL >= 0 ? `+$${tradingPnL}` : `-$${Math.abs(tradingPnL)}`) : null,
+        status: tradingPnL === null ? 'pending' :
+                tradingPnL > 0 ? 'success' :
+                tradingPnL === 0 ? 'warning' : 'danger'
+      },
+      {
+        label: "Workout",
+        target: "Y/N",
+        actual: health?.workoutDone !== undefined ? (health.workoutDone ? "Yes" : "No") : null,
+        status: health?.workoutDone === undefined ? 'pending' :
+                health.workoutDone ? 'success' : 'danger'
+      },
+    ];
+
+    // Check ritual completion
+    const morningComplete = !!(day?.morningRituals?.completedAt);
+    const eveningComplete = !!(day?.eveningRituals?.completedAt);
+
+    res.json({
+      date: today,
+      metrics,
+      morningComplete,
+      eveningComplete,
+    });
+  } catch (error) {
+    console.error("[Dashboard Scorecard] Error:", error);
+    res.status(500).json({ message: "Failed to fetch scorecard" });
+  }
+});
+
 export default router;

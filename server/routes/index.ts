@@ -20,6 +20,7 @@ import capturesRoutes from "./captures";
 import daysRoutes from "./days";
 import weeksRoutes from "./weeks";
 import healthRoutes from "./health";
+import bloodworkRoutes from "./bloodwork";
 import nutritionRoutes from "./nutrition";
 import docsRoutes from "./docs";
 import attachmentsRoutes from "./attachments";
@@ -115,6 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // HEALTH & NUTRITION
   // ============================================================================
   app.use('/api/health', healthRoutes);
+  app.use('/api/bloodwork', bloodworkRoutes);
   app.use('/api/nutrition', nutritionRoutes);
 
   // ============================================================================

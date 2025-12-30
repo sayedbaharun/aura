@@ -2,7 +2,7 @@
 // Build version: 2025-12-02-v5
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { HealthBattery, ContextCard, MissionStatement } from "@/components/cockpit/cockpit-components";
+import { HealthBattery, ContextCard, MissionStatement, DailyScorecard, type ScorecardMetric } from "@/components/cockpit/cockpit-components";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -97,6 +97,17 @@ export default function CommandCenterV2() {
             if (!res.ok) throw new Error("Failed to fetch week");
             return res.json();
         }
+    });
+
+    // Fetch daily scorecard
+    const { data: scorecardData, isLoading: isLoadingScorecard } = useQuery({
+        queryKey: ["dashboard-scorecard"],
+        queryFn: async () => {
+            const res = await fetch("/api/dashboard/scorecard");
+            if (!res.ok) throw new Error("Failed to fetch scorecard");
+            return res.json();
+        },
+        refetchInterval: 60000 // Refresh every minute
     });
 
     // Update time every minute
@@ -462,6 +473,30 @@ export default function CommandCenterV2() {
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* Daily Scorecard */}
+                    {isLoadingScorecard ? (
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                                    Daily Scorecard
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {[1, 2, 3, 4].map(i => (
+                                        <Skeleton key={i} className="h-6 w-full" />
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : scorecardData?.metrics && (
+                        <DailyScorecard
+                            metrics={scorecardData.metrics}
+                            morningComplete={scorecardData.morningComplete}
+                            eveningComplete={scorecardData.eveningComplete}
+                        />
+                    )}
                 </div>
 
                 {/* CENTER: ACTIVE CONTEXT */}

@@ -31,7 +31,9 @@ import {
   TrendingUp,
   AlertCircle,
   Calendar,
-  BookOpen
+  BookOpen,
+  Timer,
+  Utensils
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -75,6 +77,9 @@ interface Day {
     journalEntry?: string;
     gratitude?: string[];
     tomorrowPriorities?: string[];
+    fastingHours?: number;
+    fastingCompleted?: boolean;
+    deepWorkHours?: number;
     windDown?: {
       clearInbox?: boolean;
       rescheduleUnfinished?: boolean;
@@ -168,6 +173,8 @@ export default function EveningReview() {
     gratitude: ["", "", ""],
     tomorrowPriorities: ["", "", ""],
     reviewCompleted: false,
+    fastingHours: 0,
+    deepWorkHours: 0,
     windDown: {
       clearInbox: false,
       rescheduleUnfinished: false,
@@ -270,6 +277,8 @@ export default function EveningReview() {
       gratitude: ["", "", ""],
       tomorrowPriorities: ["", "", ""],
       reviewCompleted: false,
+      fastingHours: 0,
+      deepWorkHours: 0,
       windDown: {
         clearInbox: false,
         rescheduleUnfinished: false,
@@ -293,6 +302,8 @@ export default function EveningReview() {
         gratitude: Array.isArray(gratitudeData) ? gratitudeData : ["", "", ""],
         tomorrowPriorities: Array.isArray(prioritiesData) ? prioritiesData : ["", "", ""],
         reviewCompleted: dayData.eveningRituals?.reviewCompleted || false,
+        fastingHours: dayData.eveningRituals?.fastingHours || 0,
+        deepWorkHours: dayData.eveningRituals?.deepWorkHours || 0,
         windDown: {
           clearInbox: dayData.eveningRituals?.windDown?.clearInbox ?? false,
           rescheduleUnfinished: dayData.eveningRituals?.windDown?.rescheduleUnfinished ?? false,
@@ -332,6 +343,9 @@ export default function EveningReview() {
         journalEntry: review.reflectionPm,
         gratitude: review.gratitude.filter(g => g.trim()),
         tomorrowPriorities: review.tomorrowPriorities.filter(p => p.trim()),
+        fastingHours: review.fastingHours || undefined,
+        fastingCompleted: review.fastingHours >= 16,
+        deepWorkHours: review.deepWorkHours || undefined,
         windDown: {
           ...review.windDown,
           completedAt: Object.values(review.windDown).some(v => v === true)
@@ -583,6 +597,88 @@ export default function EveningReview() {
               />
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Daily Metrics - Fasting & Deep Work */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Timer className="h-5 w-5 text-purple-500" />
+            Daily Metrics
+          </CardTitle>
+          <CardDescription>
+            Track your fasting window and deep work hours
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Fasting Hours */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Utensils className="h-4 w-4 text-orange-500" />
+                <Label htmlFor="fasting-hours" className="font-medium">Fasting Hours</Label>
+                <span className="text-xs text-muted-foreground ml-auto">Target: 16h</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="fasting-hours"
+                  type="number"
+                  min={0}
+                  max={24}
+                  step={0.5}
+                  placeholder="0"
+                  value={review.fastingHours || ""}
+                  onChange={(e) => setReview({ ...review, fastingHours: parseFloat(e.target.value) || 0 })}
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">hours</span>
+                {review.fastingHours >= 16 && (
+                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Target Met
+                  </Badge>
+                )}
+              </div>
+              <Progress
+                value={Math.min((review.fastingHours / 16) * 100, 100)}
+                className={`h-2 ${review.fastingHours >= 16 ? '[&>div]:bg-green-500' : '[&>div]:bg-orange-500'}`}
+              />
+            </div>
+
+            {/* Deep Work Hours */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Timer className="h-4 w-4 text-purple-500" />
+                <Label htmlFor="deep-work-hours" className="font-medium">Deep Work Hours</Label>
+                <span className="text-xs text-muted-foreground ml-auto">Target: 5h</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="deep-work-hours"
+                  type="number"
+                  min={0}
+                  max={12}
+                  step={0.5}
+                  placeholder="0"
+                  value={review.deepWorkHours || ""}
+                  onChange={(e) => setReview({ ...review, deepWorkHours: parseFloat(e.target.value) || 0 })}
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">hours</span>
+                {review.deepWorkHours >= 5 && (
+                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Target Met
+                  </Badge>
+                )}
+              </div>
+              <Progress
+                value={Math.min((review.deepWorkHours / 5) * 100, 100)}
+                className={`h-2 ${review.deepWorkHours >= 5 ? '[&>div]:bg-green-500' : '[&>div]:bg-purple-500'}`}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 

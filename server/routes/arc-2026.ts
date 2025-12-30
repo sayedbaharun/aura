@@ -21,7 +21,7 @@ const MONTHS = [
 
 // Monthly sprint focus suggestions
 const MONTHLY_SPRINTS: Record<string, string[]> = {
-  "Health & Energy": [
+  "Body": [
     "January - Foundation (establish baseline routines)",
     "February - Fitness Push (strength training 5x/week)",
     "March - Nutrition Dial-In (hit protein targets daily)",
@@ -35,7 +35,7 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
     "November - Consolidation (lock in gains)",
     "December - Maintenance & Review"
   ],
-  "Wealth & Ventures": [
+  "Build": [
     "January - Q1 Planning (revenue targets)",
     "February - Execution Sprint (ship features)",
     "March - Q1 Close (revenue push)",
@@ -49,7 +49,7 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
     "November - Black Friday/EOY Push",
     "December - Review & 2027 Planning"
   ],
-  "Knowledge & Skills": [
+  "Mind": [
     "January - Learning Systems Setup (daily habits for all 3 tracks)",
     "February - Q1 Consistency (establish Arabic/Trading/AI daily rhythm)",
     "March - First Milestone Check (assess progress, adjust approach)",
@@ -63,7 +63,7 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
     "November - Consolidation (lock in gains, fill knowledge gaps)",
     "December - Annual Review (certify progress, plan 2027 curriculum)"
   ],
-  "Systems & Habits": [
+  "Flow": [
     "January - Ritual Establishment (morning/evening)",
     "February - Environment Design (workspace, tools)",
     "March - Automation (systems, templates)",
@@ -79,27 +79,31 @@ const MONTHLY_SPRINTS: Record<string, string[]> = {
   ]
 };
 
-// Project configurations
+// Project configurations with new pillar names
 const PROJECT_CONFIGS = [
   {
-    name: "Health & Energy",
-    outcome: "Optimal physical and mental performance through consistent health habits",
-    notes: "Track: sleep quality, energy levels, workout consistency, nutrition adherence, weight/body composition"
+    name: "Body",
+    outcome: "107.9kg → 94kg | 16hr daily fast | 200g protein | <2000 cal | Improve insulin resistance",
+    notes: "Track: weight, body composition, sleep quality, energy levels, workout consistency, nutrition adherence, bloodwork markers",
+    icon: "💪"
   },
   {
-    name: "Wealth & Ventures",
-    outcome: "Revenue growth across all ventures with sustainable systems",
-    notes: "Track: monthly revenue, runway, key metrics per venture, investment returns"
+    name: "Build",
+    outcome: "$1M revenue | $80-85k/month trading | myDub.ai MVP by end of January",
+    notes: "Track: monthly revenue, trading P&L, venture milestones, runway, key metrics per venture",
+    icon: "🏗️"
   },
   {
-    name: "Knowledge & Skills",
-    outcome: "Master Arabic, elevate trading skills, and stay ahead on AI developments",
-    notes: "Track 3 pillars:\n• ARABIC: lessons/week, vocabulary learned, conversation hours, media consumed\n• TRADING: courses completed, strategies backtested, journal entries, win rate improvement\n• AI: papers read, tools mastered, projects built, newsletters/podcasts consumed"
+    name: "Mind",
+    outcome: "Master Arabic, elevate trading (scalping), stay ahead on AI, deepen health knowledge",
+    notes: "Track 3 pillars:\n• ARABIC: lessons/week, vocabulary learned, conversation hours, media consumed\n• TRADING: courses completed, strategies backtested, journal entries, win rate improvement\n• AI: papers read, tools mastered, projects built, newsletters/podcasts consumed",
+    icon: "🧠"
   },
   {
-    name: "Systems & Habits",
-    outcome: "Bulletproof routines and systems that compound over time",
-    notes: "Track: morning ritual streak, evening review streak, deep work hours, habit completion rate"
+    name: "Flow",
+    outcome: "5 hrs deep work daily | Consistent morning/evening rituals | Systems that compound",
+    notes: "Track: morning ritual streak, evening review streak, deep work hours, fasting hours, habit completion rate",
+    icon: "⚡"
   }
 ];
 
@@ -123,18 +127,18 @@ router.post("/2026-arc", async (req, res) => {
       notes: `# 2026 Arc
 
 ## Philosophy
-The 2026 Arc is a year-long transformation framework built on parallel execution, not sequential phases.
+Go all in. 100% commitment. The 2026 Arc is a year-long transformation framework built on parallel execution, not sequential phases.
 
 ## Structure
 - **Tier 1: Non-Negotiables** - Daily habits that run 365 days
 - **Tier 2: Core Execution** - Primary venture/work (5-6 hrs/day)
 - **Tier 3: Growth Sprints** - Monthly rotating focus areas
 
-## Domains
-1. Health & Energy - Physical foundation
-2. Wealth & Ventures - Revenue and business growth
-3. Knowledge & Skills - Continuous learning
-4. Systems & Habits - Routines and productivity
+## The 4 Pillars
+1. **Body** 💪 - Physical foundation (107.9kg → 94kg)
+2. **Build** 🏗️ - Revenue and business growth ($1M target)
+3. **Mind** 🧠 - Arabic, Trading, AI, Health knowledge
+4. **Flow** ⚡ - 5hrs deep work, rituals, systems
 
 ## Monthly Cadence
 - 1st of month: Set monthly sprint goal, review last month
@@ -212,34 +216,39 @@ Who are you becoming by Dec 31, 2026?
       body: `# 2026 Arc Playbook
 
 ## Vision
-[Define your 2026 vision here]
+Go all in. 100% commitment.
 
 ## Identity Goal
 Who are you becoming by Dec 31, 2026?
 > [Your identity statement]
 
-## Annual Targets
+## Annual Targets by Pillar
 
-### Health & Energy
-- [ ] Target weight/body composition
-- [ ] Workout consistency %
-- [ ] Sleep average hours
-- [ ] Energy level average
+### 💪 Body
+- [ ] Weight: 107.9kg → 94kg (-13.9kg)
+- [ ] Daily fasting: 16 hours minimum
+- [ ] Protein: 200g daily
+- [ ] Calories: <2000/day
+- [ ] Improve insulin resistance (track via bloodwork)
+- [ ] Workout consistency: 5x/week
 
-### Wealth & Ventures
-- [ ] Annual revenue target
-- [ ] Net worth target
-- [ ] Key venture milestones
+### 🏗️ Build
+- [ ] Total revenue: $1M
+- [ ] Trading income: $80-85k/month
+- [ ] myDub.ai MVP: End of January
+- [ ] Key venture milestones defined
 
-### Knowledge & Skills (3 Parallel Tracks - Daily)
-**Arabic**: [ ] fluency level target, [ ] conversation hours/week
-**Trading**: [ ] win rate target, [ ] strategies mastered
-**AI**: [ ] tools mastered, [ ] projects shipped
+### 🧠 Mind (3 Parallel Tracks - Daily)
+**Arabic**: [ ] Beginner → Conversational, [ ] 2hrs/week
+**Trading**: [ ] Master scalping, [ ] Documented edge
+**AI**: [ ] Stay cutting edge, [ ] Ship AI features
+**Health**: [ ] Deep knowledge on metabolic health
 
-### Systems & Habits
-- [ ] Morning ritual streak target
-- [ ] Deep work hours/week target
-- [ ] Habit completion rate target
+### ⚡ Flow
+- [ ] Deep work: 5 hours daily
+- [ ] Morning ritual streak: 365 days
+- [ ] Evening ritual streak: 365 days
+- [ ] Fasting target hit: 365 days
 
 ## Non-Negotiables (Tier 1)
 These run every single day, 365 days:
@@ -248,8 +257,8 @@ These run every single day, 365 days:
 2. **Movement**: 30 min (walk/workout)
 3. **Morning Ritual**: Press-ups, reading, planning
 4. **Top 3 Outcomes**: Set every morning
-5. **Evening Review**: 10 min reflection
-6. **Nutrition**: Log meals, hit protein target
+5. **Evening Review**: 10 min reflection + fasting/deep work log
+6. **Nutrition**: Log meals, hit 200g protein, <2000 cal
 7. **Learning Block**: 30-60 min across 3 tracks:
    - Arabic: 15 min (vocab, app, or media)
    - Trading: 15 min (journal, analysis, or study)
@@ -267,11 +276,11 @@ These run every single day, 365 days:
 - **Weekly**: Quick review (30 min Sunday)
 - **End of month**: Full review with metrics
 
-## Quarterly Check-ins
-- Q1 (Apr 1): First quarter assessment
-- Q2 (Jul 1): Mid-year review
-- Q3 (Oct 1): Q3 assessment, Q4 planning
-- Q4 (Jan 1, 2027): Annual review
+## Quarterly Check-ins + Bloodwork
+- Q1 (Apr 1): First quarter assessment + bloodwork
+- Q2 (Jul 1): Mid-year review + bloodwork
+- Q3 (Oct 1): Q3 assessment, Q4 planning + bloodwork
+- Q4 (Jan 1, 2027): Annual review + bloodwork
 `
     });
 
@@ -288,39 +297,60 @@ These run every single day, 365 days:
       order: 2,
       body: `# 2026 Annual Goals & Metrics
 
-## Health & Energy Metrics
+## 💪 Body Metrics
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| Weight | | | |
-| Body Fat % | | | |
-| Workout Days/Week | 5 | | |
-| Avg Sleep Hours | 7.5 | | |
-| Avg Energy (1-5) | 4 | | |
+| Metric | Start | Target | Current | Status |
+|--------|-------|--------|---------|--------|
+| Weight (kg) | 107.9 | 94 | | |
+| Body Fat % | | | | |
+| Fasting Hours/Day | | 16 | | |
+| Protein (g/day) | | 200 | | |
+| Calories/Day | | <2000 | | |
+| Workout Days/Week | | 5 | | |
+| Avg Sleep Hours | | 7.5 | | |
+| Avg Energy (1-5) | | 4 | | |
 
-## Wealth & Ventures Metrics
+### Bloodwork Targets (Quarterly)
+| Marker | Start | Target | Q1 | Q2 | Q3 | Q4 |
+|--------|-------|--------|----|----|----|----|
+| HbA1c | | <5.7% | | | | |
+| Fasting Glucose | | <100 | | | | |
+| HOMA-IR | | <2 | | | | |
+| Triglycerides | | <150 | | | | |
+
+## 🏗️ Build Metrics
 
 | Venture | Revenue Target | Current | Status |
 |---------|---------------|---------|--------|
-| [Venture 1] | | | |
-| [Venture 2] | | | |
-| Total | | | |
+| Trading | $960k-$1M | | |
+| myDub.ai | MVP by Jan 31 | | |
+| Total | $1M | | |
 
-## Knowledge & Skills Metrics
+| Trading Metric | Target | Current |
+|----------------|--------|---------|
+| Monthly P&L | $80-85k | |
+| Win Rate | | |
+| Max Drawdown | | |
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| Books Read | 24 | 0 | |
-| Courses Completed | 4 | 0 | |
-| Certifications | 1 | 0 | |
+## 🧠 Mind Metrics
 
-## Systems & Habits Metrics
+| Track | Metric | Target | Current | Status |
+|-------|--------|--------|---------|--------|
+| Arabic | Fluency Level | Conversational | | |
+| Arabic | Weekly Hours | 2 | | |
+| Trading | Strategies Mastered | 3 | | |
+| Trading | Journal Entries | 365 | | |
+| AI | Tools Mastered | 10 | | |
+| AI | Projects Shipped | 4 | | |
+
+## ⚡ Flow Metrics
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
 | Morning Ritual Streak | 365 | 0 | |
-| Evening Review Streak | 365 | 0 | |
-| Deep Work Hrs/Week | 20 | | |
+| Evening Ritual Streak | 365 | 0 | |
+| Deep Work Hrs/Day | 5 | | |
+| Fasting Target Days | 365 | 0 | |
 `
     });
 
@@ -423,9 +453,7 @@ What am I grateful for this month?
         ventureId: venture.id,
         parentId: domainFolder.id,
         status: "draft",
-        icon: config.name === "Health & Energy" ? "💪" :
-              config.name === "Wealth & Ventures" ? "💰" :
-              config.name === "Knowledge & Skills" ? "📚" : "⚙️",
+        icon: config.icon,
         isFolder: false,
         order: PROJECT_CONFIGS.indexOf(config) + 1,
         body: `# ${config.name} Playbook
@@ -837,7 +865,7 @@ router.get("/2026-arc/audit", async (req, res) => {
 
     // Get projects
     const projects = await storage.getProjects({ ventureId: arc2026.id });
-    const expectedProjects = ["Health & Energy", "Wealth & Ventures", "Knowledge & Skills", "Systems & Habits"];
+    const expectedProjects = ["Body", "Build", "Mind", "Flow"];
 
     const projectStatus = expectedProjects.map(name => ({
       name,
@@ -869,10 +897,10 @@ router.get("/2026-arc/audit", async (req, res) => {
       "January 2026 Review",
       "Quarterly Reviews",
       "Domain Playbooks",
-      "Health & Energy Playbook",
-      "Wealth & Ventures Playbook",
-      "Knowledge & Skills Playbook",
-      "Systems & Habits Playbook",
+      "Body Playbook",
+      "Build Playbook",
+      "Mind Playbook",
+      "Flow Playbook",
       "Education Tracks",
       "Arabic Learning Track",
       "Trading Education Track",
@@ -916,7 +944,8 @@ router.get("/2026-arc/audit", async (req, res) => {
   } catch (error) {
     logger.error({ error }, "Error auditing 2026 Arc");
     res.status(500).json({
-      error: "Failed to audit 2026 Arc"
+      error: "Failed to audit 2026 Arc",
+      details: error instanceof Error ? error.message : String(error)
     });
   }
 });
