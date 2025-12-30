@@ -318,22 +318,30 @@ router.get("/profile", async (req: Request, res: Response) => {
 // Update user profile
 router.patch("/profile", async (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, email, timezone, dateFormat, timeFormat, weekStartsOn } = req.body;
-
-    // Get existing user to preserve email if not provided
+    // Get existing user first to preserve data not being updated
     const existingUser = await storage.getUser(DEFAULT_USER_ID);
-    const userEmail = email || existingUser?.email || "user@sb-os.com";
 
-    const user = await storage.upsertUser({
+    // Only include fields that are explicitly provided (not undefined)
+    // This prevents overwriting existing data with NULL
+    const updates: Record<string, any> = {
       id: DEFAULT_USER_ID,
-      email: userEmail,
-      firstName,
-      lastName,
-      timezone,
-      dateFormat,
-      timeFormat,
-      weekStartsOn,
-    });
+    };
+
+    // Only update fields that are explicitly provided in the request
+    if (req.body.email !== undefined) updates.email = req.body.email;
+    if (req.body.firstName !== undefined) updates.firstName = req.body.firstName;
+    if (req.body.lastName !== undefined) updates.lastName = req.body.lastName;
+    if (req.body.timezone !== undefined) updates.timezone = req.body.timezone;
+    if (req.body.dateFormat !== undefined) updates.dateFormat = req.body.dateFormat;
+    if (req.body.timeFormat !== undefined) updates.timeFormat = req.body.timeFormat;
+    if (req.body.weekStartsOn !== undefined) updates.weekStartsOn = req.body.weekStartsOn;
+
+    // Ensure email is always set (use existing or default)
+    if (!updates.email) {
+      updates.email = existingUser?.email || "user@sb-os.com";
+    }
+
+    const user = await storage.upsertUser(updates);
 
     res.json(user);
   } catch (error) {
