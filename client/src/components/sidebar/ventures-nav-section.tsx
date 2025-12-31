@@ -56,10 +56,8 @@ export default function VenturesNavSection({
     queryKey: ["/api/ventures"],
   });
 
-  // Filter to only show active/ongoing ventures
-  const activeVentures = ventures.filter(v =>
-    ["ongoing", "building", "planning", "active", "development"].includes(v.status)
-  );
+  // Filter to show all ventures except archived
+  const activeVentures = ventures.filter(v => v.status !== "archived");
 
   // Initialize from localStorage
   const [isExpanded, setIsExpanded] = useState(() => {

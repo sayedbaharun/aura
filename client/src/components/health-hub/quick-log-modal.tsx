@@ -35,6 +35,7 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
     energyLevel: 3,
     mood: "medium",
     weight: "",
+    bodyFat: "",
     stressLevel: "medium",
     notes: "",
   });
@@ -65,6 +66,7 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
         energyLevel: 3,
         mood: "medium",
         weight: "",
+        bodyFat: "",
         stressLevel: "medium",
         notes: "",
       });
@@ -88,6 +90,7 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
       energyLevel: formData.energyLevel,
       mood: formData.mood,
       weightKg: formData.weight ? parseFloat(formData.weight) : undefined,
+      bodyFatPercent: formData.bodyFat ? parseFloat(formData.bodyFat) : undefined,
       stressLevel: formData.stressLevel,
       notes: formData.notes || undefined,
     };
@@ -177,17 +180,30 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
             </Select>
           </div>
 
-          {/* Weight */}
-          <div className="space-y-2">
-            <Label htmlFor="weight">Weight (kg)</Label>
-            <Input
-              id="weight"
-              type="number"
-              step="0.1"
-              placeholder="75.0"
-              value={formData.weight}
-              onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-            />
+          {/* Weight & Body Fat */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="weight">Weight (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                step="0.1"
+                placeholder="75.0"
+                value={formData.weight}
+                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bodyFat">Body Fat %</Label>
+              <Input
+                id="bodyFat"
+                type="number"
+                step="0.1"
+                placeholder="15.0"
+                value={formData.bodyFat}
+                onChange={(e) => setFormData({ ...formData, bodyFat: e.target.value })}
+              />
+            </div>
           </div>
 
           {/* Stress Level */}
