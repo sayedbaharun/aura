@@ -33,7 +33,11 @@ import {
   Calendar,
   BookOpen,
   Timer,
-  Utensils
+  Utensils,
+  Languages,
+  LineChart,
+  Cpu,
+  GraduationCap
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -80,6 +84,11 @@ interface Day {
     fastingHours?: number;
     fastingCompleted?: boolean;
     deepWorkHours?: number;
+    learningBlock?: {
+      arabic?: boolean;
+      trading?: boolean;
+      ai?: boolean;
+    };
     windDown?: {
       clearInbox?: boolean;
       rescheduleUnfinished?: boolean;
@@ -175,6 +184,11 @@ export default function EveningReview() {
     reviewCompleted: false,
     fastingHours: 0,
     deepWorkHours: 0,
+    learningBlock: {
+      arabic: false,
+      trading: false,
+      ai: false,
+    },
     windDown: {
       clearInbox: false,
       rescheduleUnfinished: false,
@@ -279,6 +293,11 @@ export default function EveningReview() {
       reviewCompleted: false,
       fastingHours: 0,
       deepWorkHours: 0,
+      learningBlock: {
+        arabic: false,
+        trading: false,
+        ai: false,
+      },
       windDown: {
         clearInbox: false,
         rescheduleUnfinished: false,
@@ -304,6 +323,11 @@ export default function EveningReview() {
         reviewCompleted: dayData.eveningRituals?.reviewCompleted || false,
         fastingHours: dayData.eveningRituals?.fastingHours || 0,
         deepWorkHours: dayData.eveningRituals?.deepWorkHours || 0,
+        learningBlock: {
+          arabic: dayData.eveningRituals?.learningBlock?.arabic ?? false,
+          trading: dayData.eveningRituals?.learningBlock?.trading ?? false,
+          ai: dayData.eveningRituals?.learningBlock?.ai ?? false,
+        },
         windDown: {
           clearInbox: dayData.eveningRituals?.windDown?.clearInbox ?? false,
           rescheduleUnfinished: dayData.eveningRituals?.windDown?.rescheduleUnfinished ?? false,
@@ -346,6 +370,7 @@ export default function EveningReview() {
         fastingHours: review.fastingHours || undefined,
         fastingCompleted: review.fastingHours >= 16,
         deepWorkHours: review.deepWorkHours || undefined,
+        learningBlock: review.learningBlock,
         windDown: {
           ...review.windDown,
           completedAt: Object.values(review.windDown).some(v => v === true)
@@ -678,6 +703,105 @@ export default function EveningReview() {
                 className={`h-2 ${review.deepWorkHours >= 5 ? '[&>div]:bg-green-500' : '[&>div]:bg-purple-500'}`}
               />
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Learning Block */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GraduationCap className="h-5 w-5 text-blue-500" />
+            Learning Block
+          </CardTitle>
+          <CardDescription>
+            Did you spend time on your 3 learning tracks today? (15 min each)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Arabic */}
+            <div className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <Checkbox
+                id="learning-arabic"
+                checked={review.learningBlock.arabic}
+                onCheckedChange={(checked) =>
+                  setReview({
+                    ...review,
+                    learningBlock: { ...review.learningBlock, arabic: checked as boolean },
+                  })
+                }
+              />
+              <div className="flex items-center gap-2 flex-1">
+                <Languages className="h-5 w-5 text-emerald-500" />
+                <Label htmlFor="learning-arabic" className="font-medium cursor-pointer">
+                  Arabic
+                </Label>
+              </div>
+              {review.learningBlock.arabic && (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              )}
+            </div>
+
+            {/* Trading */}
+            <div className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <Checkbox
+                id="learning-trading"
+                checked={review.learningBlock.trading}
+                onCheckedChange={(checked) =>
+                  setReview({
+                    ...review,
+                    learningBlock: { ...review.learningBlock, trading: checked as boolean },
+                  })
+                }
+              />
+              <div className="flex items-center gap-2 flex-1">
+                <LineChart className="h-5 w-5 text-amber-500" />
+                <Label htmlFor="learning-trading" className="font-medium cursor-pointer">
+                  Trading
+                </Label>
+              </div>
+              {review.learningBlock.trading && (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              )}
+            </div>
+
+            {/* AI */}
+            <div className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <Checkbox
+                id="learning-ai"
+                checked={review.learningBlock.ai}
+                onCheckedChange={(checked) =>
+                  setReview({
+                    ...review,
+                    learningBlock: { ...review.learningBlock, ai: checked as boolean },
+                  })
+                }
+              />
+              <div className="flex items-center gap-2 flex-1">
+                <Cpu className="h-5 w-5 text-purple-500" />
+                <Label htmlFor="learning-ai" className="font-medium cursor-pointer">
+                  AI
+                </Label>
+              </div>
+              {review.learningBlock.ai && (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              )}
+            </div>
+          </div>
+
+          {/* Progress indicator */}
+          <div className="pt-4 mt-4 border-t">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Learning progress</span>
+              <span className="font-medium">
+                {Object.values(review.learningBlock).filter(v => v === true).length}/3 tracks
+              </span>
+            </div>
+            <Progress
+              value={(Object.values(review.learningBlock).filter(v => v === true).length / 3) * 100}
+              className="h-2 mt-2"
+            />
           </div>
         </CardContent>
       </Card>
