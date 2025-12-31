@@ -29,6 +29,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import NavSection, { NavItemConfig } from "./nav-section";
+import VenturesNavSection from "./ventures-nav-section";
 import NavItem from "./nav-item";
 import Logo from "../logo";
 import { Button } from "@/components/ui/button";
@@ -123,11 +124,6 @@ const navigationSections: Array<{ label: string; items: NavItemConfig[]; default
   {
     label: "Work",
     items: [
-      {
-        href: "/ventures",
-        icon: Briefcase,
-        label: "Ventures",
-      },
       {
         href: "/venture-lab",
         icon: FlaskConical,
@@ -352,15 +348,23 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
         {/* Navigation sections */}
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          {navigationSections.map((section) => (
-            <NavSection
-              key={section.label}
-              label={section.label}
-              items={section.items}
-              isCollapsed={isCollapsed}
-              onItemClick={onClose} // Close mobile menu on nav
-              defaultExpanded={section.defaultExpanded}
-            />
+          {navigationSections.map((section, index) => (
+            <div key={section.label}>
+              <NavSection
+                label={section.label}
+                items={section.items}
+                isCollapsed={isCollapsed}
+                onItemClick={onClose} // Close mobile menu on nav
+                defaultExpanded={section.defaultExpanded}
+              />
+              {/* Insert VenturesNavSection after Daily section */}
+              {section.label === "Daily" && (
+                <VenturesNavSection
+                  isCollapsed={isCollapsed}
+                  onItemClick={onClose}
+                />
+              )}
+            </div>
           ))}
         </div>
 
