@@ -760,6 +760,7 @@ export const healthEntries = pgTable(
     workoutType: workoutTypeEnum("workout_type"),
     workoutDurationMin: integer("workout_duration_min"),
     weightKg: real("weight_kg"),
+    bodyFatPercent: real("body_fat_percent"),
     stressLevel: stressLevelEnum("stress_level"),
     tags: jsonb("tags").$type<string[]>().default([]),
     notes: text("notes"),

@@ -42,6 +42,7 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
     workoutDuration: "",
     steps: "",
     weight: "",
+    bodyFat: "",
     stressLevel: "medium",
     notes: "",
   });
@@ -77,6 +78,7 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
         workoutDuration: "",
         steps: "",
         weight: "",
+        bodyFat: "",
         stressLevel: "medium",
         notes: "",
       });
@@ -112,6 +114,7 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
       workoutDurationMin: formData.workoutDone && formData.workoutDuration ? parseInt(formData.workoutDuration) : undefined,
       steps: formData.steps ? parseInt(formData.steps) : undefined,
       weightKg: formData.weight ? parseFloat(formData.weight) : undefined,
+      bodyFatPercent: formData.bodyFat ? parseFloat(formData.bodyFat) : undefined,
       stressLevel: formData.stressLevel,
       notes: notes || undefined,
     };
@@ -312,8 +315,8 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
             )}
           </div>
 
-          {/* Steps & Weight */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Steps, Weight & Body Fat */}
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="steps">Daily STEPS</Label>
               <Input
@@ -333,6 +336,17 @@ export default function QuickLogModal({ open, onOpenChange, defaultDate }: Quick
                 placeholder="75.0"
                 value={formData.weight}
                 onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bodyFat">Body Fat %</Label>
+              <Input
+                id="bodyFat"
+                type="number"
+                step="0.1"
+                placeholder="15.0"
+                value={formData.bodyFat}
+                onChange={(e) => setFormData({ ...formData, bodyFat: e.target.value })}
               />
             </div>
           </div>
