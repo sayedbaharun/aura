@@ -6,12 +6,14 @@ interface HealthHubHeaderProps {
   dateRange: string;
   onDateRangeChange: (range: string) => void;
   onOpenQuickLog: () => void;
+  hideTitle?: boolean;
 }
 
 export default function HealthHubHeader({
   dateRange,
   onDateRangeChange,
   onOpenQuickLog,
+  hideTitle = false,
 }: HealthHubHeaderProps) {
   const handleExport = () => {
     // TODO: Implement CSV export
@@ -20,16 +22,18 @@ export default function HealthHubHeader({
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <Heart className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Health & Performance</h1>
+      {!hideTitle && (
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <Heart className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Health & Performance</h1>
+          </div>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Track your physical and mental wellness, workouts, and sleep patterns
+          </p>
         </div>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Track your physical and mental wellness, workouts, and sleep patterns
-        </p>
-      </div>
-      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+      )}
+      <div className={`flex items-center gap-2 sm:gap-3 flex-wrap ${hideTitle ? 'ml-auto' : ''}`}>
         <Select value={dateRange} onValueChange={onDateRangeChange}>
           <SelectTrigger className="w-32 sm:w-40">
             <SelectValue />

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { subDays, startOfMonth } from "date-fns";
-import { Heart } from "lucide-react";
+import { Heart, Activity, FlaskConical } from "lucide-react";
 import HealthHubHeader from "@/components/health-hub/health-hub-header";
 import HealthCalendar from "@/components/health-hub/health-calendar";
 import QuickStats from "@/components/health-hub/quick-stats";
@@ -10,7 +10,9 @@ import PerformanceInsights from "@/components/health-hub/performance-insights";
 import DayDetailModal from "@/components/health-hub/day-detail-modal";
 import QuickLogModal from "@/components/health-hub/quick-log-modal";
 import EditHealthEntryModal from "@/components/health-hub/edit-health-entry-modal";
+import BloodworkTab from "@/components/health-hub/bloodwork-tab";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface HealthEntry {
   id: string;
@@ -115,57 +117,86 @@ export default function HealthHub() {
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
-      <HealthHubHeader
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        onOpenQuickLog={() => setQuickLogOpen(true)}
-      />
+      <div className="flex items-center gap-3 mb-2">
+        <Heart className="h-8 w-8 text-primary" />
+        <h1 className="text-3xl font-bold tracking-tight">Health & Performance</h1>
+      </div>
 
-      {/* Empty State */}
-      {filteredEntries.length === 0 ? (
-        <div className="text-center py-16">
-          <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-2xl font-semibold mb-2">No health data yet</h2>
-          <p className="text-muted-foreground mb-6">
-            Start logging your health metrics to see insights and track your wellness journey
-          </p>
-          <button
-            onClick={() => setQuickLogOpen(true)}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-          >
-            Log Your First Day
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Calendar */}
-            <div className="lg:col-span-2">
-              <HealthCalendar
-                healthEntries={filteredEntries}
-                currentMonth={startOfMonth(new Date())}
-                onDayClick={handleDayClick}
-              />
-            </div>
+      {/* Tabs */}
+      <Tabs defaultValue="daily" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="daily" className="gap-2">
+            <Activity className="h-4 w-4" />
+            Daily Health
+          </TabsTrigger>
+          <TabsTrigger value="bloodwork" className="gap-2">
+            <FlaskConical className="h-4 w-4" />
+            Bloodwork
+          </TabsTrigger>
+        </TabsList>
 
-            {/* Quick Stats */}
-            <div>
-              <QuickStats healthEntries={filteredEntries} />
-            </div>
-          </div>
-
-          {/* Health Metrics Table */}
-          <HealthMetricsTable
-            healthEntries={filteredEntries}
-            onViewDay={handleDayClick}
-            onEditEntry={handleEditEntry}
+        {/* Daily Health Tab */}
+        <TabsContent value="daily" className="space-y-6">
+          {/* Header Controls */}
+          <HealthHubHeader
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            onOpenQuickLog={() => setQuickLogOpen(true)}
+            hideTitle={true}
           />
 
-          {/* Performance Insights */}
-          <PerformanceInsights healthEntries={filteredEntries} />
-        </>
-      )}
+          {/* Empty State */}
+          {filteredEntries.length === 0 ? (
+            <div className="text-center py-16">
+              <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+              <h2 className="text-2xl font-semibold mb-2">No health data yet</h2>
+              <p className="text-muted-foreground mb-6">
+                Start logging your health metrics to see insights and track your wellness journey
+              </p>
+              <button
+                onClick={() => setQuickLogOpen(true)}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+              >
+                Log Your First Day
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Main Content Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Calendar */}
+                <div className="lg:col-span-2">
+                  <HealthCalendar
+                    healthEntries={filteredEntries}
+                    currentMonth={startOfMonth(new Date())}
+                    onDayClick={handleDayClick}
+                  />
+                </div>
+
+                {/* Quick Stats */}
+                <div>
+                  <QuickStats healthEntries={filteredEntries} />
+                </div>
+              </div>
+
+              {/* Health Metrics Table */}
+              <HealthMetricsTable
+                healthEntries={filteredEntries}
+                onViewDay={handleDayClick}
+                onEditEntry={handleEditEntry}
+              />
+
+              {/* Performance Insights */}
+              <PerformanceInsights healthEntries={filteredEntries} />
+            </>
+          )}
+        </TabsContent>
+
+        {/* Bloodwork Tab */}
+        <TabsContent value="bloodwork">
+          <BloodworkTab />
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <QuickLogModal open={quickLogOpen} onOpenChange={setQuickLogOpen} />
