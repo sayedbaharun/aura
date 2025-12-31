@@ -950,4 +950,240 @@ router.get("/2026-arc/audit", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/setup/2026-arc/review-tasks
+ * Creates all review tasks for 2026:
+ * - 52 Weekly Review tasks (every Sunday)
+ * - 12 Monthly Review tasks (1st of each month)
+ * - 4 Quarterly Bloodwork + Review tasks
+ */
+router.post("/2026-arc/review-tasks", async (req, res) => {
+  try {
+    logger.info("Creating 2026 Arc review tasks...");
+
+    // Find the 2026 Arc venture
+    const ventures = await storage.getVentures();
+    const arc2026 = ventures.find(v => v.name === "2026 Arc");
+
+    if (!arc2026) {
+      return res.status(400).json({
+        success: false,
+        error: "2026 Arc venture not found. Run POST /api/setup/2026-arc first."
+      });
+    }
+
+    // Find the Flow project for linking review tasks
+    const projects = await storage.getProjects({ ventureId: arc2026.id });
+    const flowProject = projects.find(p => p.name === "Flow");
+
+    const createdTasks: { type: string; count: number; ids: string[] }[] = [];
+
+    // 1. Create 52 Weekly Review tasks (every Sunday in 2026)
+    const weeklyTasks: string[] = [];
+    const startDate = new Date("2026-01-04"); // First Sunday of 2026
+
+    for (let week = 0; week < 52; week++) {
+      const sunday = new Date(startDate);
+      sunday.setDate(startDate.getDate() + (week * 7));
+
+      if (sunday.getFullYear() > 2026) break;
+
+      const dateStr = sunday.toISOString().split("T")[0];
+      const weekNum = week + 1;
+
+      const task = await storage.createTask({
+        title: `Weekly Review - Week ${weekNum}`,
+        status: "backlog",
+        priority: "P2",
+        type: "admin",
+        domain: "personal",
+        ventureId: arc2026.id,
+        projectId: flowProject?.id,
+        focusDate: dateStr,
+        estEffort: 0.5,
+        notes: `## Weekly Review - Week ${weekNum} of 2026
+
+### Review Questions
+- What were my top wins this week?
+- What didn't go as planned?
+- What did I learn?
+- What will I do differently next week?
+
+### Metrics Check
+- Morning ritual streak: /7
+- Evening review streak: /7
+- Deep work hours: /35 target
+- Learning block completion: /7
+
+### Next Week Focus
+- Top 3 priorities for next week:
+  1.
+  2.
+  3.
+`,
+        tags: "review,weekly,2026-arc"
+      });
+
+      weeklyTasks.push(task.id);
+    }
+
+    createdTasks.push({ type: "Weekly Review", count: weeklyTasks.length, ids: weeklyTasks });
+    logger.info({ count: weeklyTasks.length }, "Created weekly review tasks");
+
+    // 2. Create 12 Monthly Review tasks (1st of each month)
+    const monthlyTasks: string[] = [];
+
+    for (let month = 0; month < 12; month++) {
+      const monthNum = month + 1;
+      const monthStr = monthNum.toString().padStart(2, "0");
+      const dateStr = `2026-${monthStr}-01`;
+      const monthName = MONTHS[month];
+
+      const task = await storage.createTask({
+        title: `Monthly Review - ${monthName} 2026`,
+        status: "backlog",
+        priority: "P1",
+        type: "admin",
+        domain: "personal",
+        ventureId: arc2026.id,
+        projectId: flowProject?.id,
+        focusDate: dateStr,
+        estEffort: 1,
+        notes: `## Monthly Review - ${monthName} 2026
+
+### Monthly Sprint Review
+What was the sprint focus? How did it go?
+
+### By the Numbers
+
+| Pillar | Target | Actual | Notes |
+|--------|--------|--------|-------|
+| Body | | | |
+| Build | | | |
+| Mind | | | |
+| Flow | | | |
+
+### Wins 🎉
+1.
+2.
+3.
+
+### Lessons Learned
+1.
+2.
+
+### Next Month Sprint
+Focus:
+
+### Gratitude
+What am I grateful for this month?
+`,
+        tags: "review,monthly,2026-arc"
+      });
+
+      monthlyTasks.push(task.id);
+    }
+
+    createdTasks.push({ type: "Monthly Review", count: monthlyTasks.length, ids: monthlyTasks });
+    logger.info({ count: monthlyTasks.length }, "Created monthly review tasks");
+
+    // 3. Create 4 Quarterly Bloodwork + Review tasks
+    const quarterlyTasks: string[] = [];
+    const quarterlyDates = [
+      { date: "2026-04-01", quarter: "Q1", name: "Q1 Review + Bloodwork" },
+      { date: "2026-07-01", quarter: "Q2", name: "Q2 Mid-Year Review + Bloodwork" },
+      { date: "2026-10-01", quarter: "Q3", name: "Q3 Review + Bloodwork" },
+      { date: "2027-01-01", quarter: "Q4", name: "2026 Annual Review + Bloodwork" },
+    ];
+
+    for (const q of quarterlyDates) {
+      const task = await storage.createTask({
+        title: q.name,
+        status: "backlog",
+        priority: "P0",
+        type: "admin",
+        domain: "personal",
+        ventureId: arc2026.id,
+        projectId: flowProject?.id,
+        focusDate: q.date,
+        estEffort: 2,
+        notes: `## ${q.name}
+
+### 🩸 Bloodwork
+- [ ] Schedule bloodwork appointment
+- [ ] Complete bloodwork
+- [ ] Log results in Health Hub → Bloodwork tab
+- [ ] Compare to previous quarter
+
+### Quarterly Metrics
+
+#### 💪 Body
+| Metric | Start of Q | End of Q | Target | Status |
+|--------|-----------|----------|--------|--------|
+| Weight | | | 94kg | |
+| Body Fat % | | | | |
+| HbA1c | | | <5.7% | |
+| HOMA-IR | | | <2 | |
+
+#### 🏗️ Build
+| Venture | Q Revenue | Target | Status |
+|---------|----------|--------|--------|
+| Trading | | | |
+| myDub.ai | | | |
+
+#### 🧠 Mind
+| Track | Progress | Notes |
+|-------|----------|-------|
+| Arabic | | |
+| Trading | | |
+| AI | | |
+
+#### ⚡ Flow
+| Metric | Average | Target |
+|--------|---------|--------|
+| Morning Ritual % | | 90%+ |
+| Deep Work Hrs/Day | | 5 |
+| Learning Block % | | 80%+ |
+
+### Identity Check
+Am I becoming who I set out to be?
+
+### Course Corrections
+What needs to change for next quarter?
+`,
+        tags: "review,quarterly,bloodwork,2026-arc"
+      });
+
+      quarterlyTasks.push(task.id);
+    }
+
+    createdTasks.push({ type: "Quarterly Bloodwork + Review", count: quarterlyTasks.length, ids: quarterlyTasks });
+    logger.info({ count: quarterlyTasks.length }, "Created quarterly review tasks");
+
+    res.json({
+      success: true,
+      message: "2026 Arc review tasks created!",
+      data: {
+        venture: { id: arc2026.id, name: arc2026.name },
+        project: flowProject ? { id: flowProject.id, name: flowProject.name } : null,
+        tasks: createdTasks,
+        summary: {
+          weekly: weeklyTasks.length,
+          monthly: monthlyTasks.length,
+          quarterly: quarterlyTasks.length,
+          total: weeklyTasks.length + monthlyTasks.length + quarterlyTasks.length
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error({ error }, "Error creating 2026 Arc review tasks");
+    res.status(500).json({
+      success: false,
+      error: "Failed to create 2026 Arc review tasks",
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 export default router;
