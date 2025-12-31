@@ -993,7 +993,7 @@ router.post("/2026-arc/review-tasks", async (req, res) => {
 
       const task = await storage.createTask({
         title: `Weekly Review - Week ${weekNum}`,
-        status: "backlog",
+        status: "todo",
         priority: "P2",
         type: "admin",
         domain: "personal",
@@ -1041,7 +1041,7 @@ router.post("/2026-arc/review-tasks", async (req, res) => {
 
       const task = await storage.createTask({
         title: `Monthly Review - ${monthName} 2026`,
-        status: "backlog",
+        status: "todo",
         priority: "P1",
         type: "admin",
         domain: "personal",
@@ -1099,7 +1099,7 @@ What am I grateful for this month?
     for (const q of quarterlyDates) {
       const task = await storage.createTask({
         title: q.name,
-        status: "backlog",
+        status: "todo",
         priority: "P0",
         type: "admin",
         domain: "personal",
