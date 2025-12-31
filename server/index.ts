@@ -186,7 +186,7 @@ app.use(session({
     httpOnly: true, // Prevents XSS attacks from reading cookie
     secure: isProduction, // HTTPS only in production
     sameSite: isProduction ? 'strict' : 'lax', // CSRF protection
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 4 * 60 * 60 * 1000, // 4 hours (reduced from 24 for security)
   },
 }));
 

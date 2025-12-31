@@ -41,6 +41,21 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Retry logic: only retry on network errors or 5xx server errors, not 4xx client errors
+const shouldRetry = (failureCount: number, error: unknown): boolean => {
+  if (failureCount >= 2) return false;
+  if (error instanceof Error) {
+    const message = error.message;
+    // Don't retry on client errors (4xx)
+    if (/^4\d{2}:/.test(message)) return false;
+    // Retry on server errors (5xx) or network failures
+    if (/^5\d{2}:/.test(message) || message.includes("Failed to fetch")) {
+      return true;
+    }
+  }
+  return false;
+};
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -52,10 +67,12 @@ export const queryClient = new QueryClient({
       staleTime: 30 * 1000,
       // Keep unused queries in cache for 5 minutes before garbage collection
       gcTime: 5 * 60 * 1000,
-      retry: false,
+      retry: shouldRetry,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     },
     mutations: {
-      retry: false,
+      retry: shouldRetry,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     },
   },
 });

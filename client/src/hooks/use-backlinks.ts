@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Doc {
   id: string;
@@ -29,11 +30,9 @@ export function useBacklinks(docId: string | undefined, docTitle: string | undef
       // Search for documents containing [[Title]](doc-id) or [[Title]]
       // We'll search by title since that's what appears in the link syntax
       const searchQuery = `[[${docTitle}]]`;
-      const response = await fetch(
-        `/api/docs/search?q=${encodeURIComponent(searchQuery)}`,
-        {
-          credentials: "include",
-        }
+      const response = await apiRequest(
+        "GET",
+        `/api/docs/search?q=${encodeURIComponent(searchQuery)}`
       );
 
       if (!response.ok) {

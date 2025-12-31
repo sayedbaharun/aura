@@ -48,16 +48,20 @@ export function useAttachments(docId: string | undefined | null) {
   // Create a new attachment
   const createAttachment = useMutation({
     mutationFn: async (data: CreateAttachmentData) => {
+      // Use data.docId to ensure we're using the correct docId at mutation time
+      const targetDocId = data.docId;
       const response = await apiRequest(
         "POST",
-        `/api/docs/${docId}/attachments`,
+        `/api/docs/${targetDocId}/attachments`,
         data
       );
-      return response.json();
+      return { ...(await response.json()), _docId: targetDocId };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // Use the docId from the mutation result to invalidate the correct cache
+      const targetDocId = result._docId || docId;
       queryClient.invalidateQueries({
-        queryKey: [`/api/docs/${docId}/attachments`],
+        queryKey: [`/api/docs/${targetDocId}/attachments`],
       });
       toast({
         title: "Attachment added",
@@ -77,10 +81,14 @@ export function useAttachments(docId: string | undefined | null) {
   const deleteAttachment = useMutation({
     mutationFn: async (attachmentId: string) => {
       await apiRequest("DELETE", `/api/attachments/${attachmentId}`);
+      // Return the current docId so onSuccess can use it
+      return { _docId: docId };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // Use the docId captured at mutation time
+      const targetDocId = result._docId;
       queryClient.invalidateQueries({
-        queryKey: [`/api/docs/${docId}/attachments`],
+        queryKey: [`/api/docs/${targetDocId}/attachments`],
       });
       toast({
         title: "Attachment deleted",

@@ -96,6 +96,8 @@ import {
   type InsertVentureIdea,
   type DocChunk,
   type InsertDocChunk,
+  type KnowledgeFile,
+  type InsertKnowledgeFile,
   ventures,
   projects,
   phases,
@@ -143,9 +145,12 @@ import {
   docAiPatterns,
   docAiTeachings,
   ventureIdeas,
+  knowledgeFiles,
+  auditLogs,
+  type AuditLog,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc, isNull } from "drizzle-orm";
 import { db as database } from "../db";
 import { calculateDocQuality } from "./doc-quality";
 
@@ -153,6 +158,9 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+
+  // Audit logs
+  getRecentAuditLogs(userId: string, limit?: number): Promise<AuditLog[]>;
 
   // Ventures
   getVentures(): Promise<Venture[]>;
@@ -341,6 +349,7 @@ export interface IStorage {
   }): Promise<Person[]>;
   getPerson(id: string): Promise<Person | undefined>;
   getPersonByGoogleId(googleContactId: string): Promise<Person | undefined>;
+  getPersonByExternalId(externalContactId: string): Promise<Person | undefined>;
   getPersonByEmail(email: string): Promise<Person | undefined>;
   createPerson(data: InsertPerson): Promise<Person>;
   updatePerson(id: string, data: Partial<InsertPerson>): Promise<Person | undefined>;
@@ -480,6 +489,34 @@ export class DBStorage implements IStorage {
         await this.db.execute(sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password_hash" varchar`);
         console.log("✅ Auto-Migration: Successfully added password_hash column");
       }
+
+      // Add security columns for 2FA and session tracking
+      console.log("🔧 Auto-Migration: Ensuring security columns exist...");
+      await this.db.execute(sql`
+        ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS "totp_secret" varchar,
+        ADD COLUMN IF NOT EXISTS "totp_enabled" boolean DEFAULT false,
+        ADD COLUMN IF NOT EXISTS "totp_backup_codes" jsonb,
+        ADD COLUMN IF NOT EXISTS "totp_recovery_key_hash" varchar,
+        ADD COLUMN IF NOT EXISTS "last_known_ip" varchar(45),
+        ADD COLUMN IF NOT EXISTS "last_known_user_agent" text,
+        ADD COLUMN IF NOT EXISTS "trusted_devices" jsonb,
+        ADD COLUMN IF NOT EXISTS "password_changed_at" timestamp
+      `);
+      console.log("✅ Auto-Migration: Security columns ensured");
+
+      // Add user profile columns (date/time format preferences)
+      console.log("🔧 Auto-Migration: Ensuring user profile columns exist...");
+      await this.db.execute(sql`
+        ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS "date_format" varchar DEFAULT 'yyyy-MM-dd',
+        ADD COLUMN IF NOT EXISTS "time_format" varchar DEFAULT '24h',
+        ADD COLUMN IF NOT EXISTS "week_starts_on" integer DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "last_login_at" timestamp,
+        ADD COLUMN IF NOT EXISTS "failed_login_attempts" integer DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "locked_until" timestamp
+      `);
+      console.log("✅ Auto-Migration: User profile columns ensured");
 
       // Check and create trading_strategies table
       const tradingStrategiesExists = await this.db.execute(sql`
@@ -708,6 +745,19 @@ export class DBStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  // ============================================================================
+  // AUDIT LOGS
+  // ============================================================================
+
+  async getRecentAuditLogs(userId: string, limit: number = 50): Promise<AuditLog[]> {
+    return await this.db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.userId, userId))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit);
   }
 
   // ============================================================================
@@ -1532,7 +1582,7 @@ export class DBStorage implements IStorage {
     if (filters?.parentId !== undefined) {
       if (filters.parentId === null) {
         // Use SQL IS NULL check for root level docs
-        conditions.push(eq(docs.parentId, null as any));
+        conditions.push(isNull(docs.parentId));
       } else {
         conditions.push(eq(docs.parentId, filters.parentId));
       }
@@ -1613,7 +1663,7 @@ export class DBStorage implements IStorage {
 
     if (parentId === null) {
       // Root level docs - parentId IS NULL
-      conditions.push(eq(docs.parentId, null as any));
+      conditions.push(isNull(docs.parentId));
     } else {
       conditions.push(eq(docs.parentId, parentId));
     }
@@ -1663,22 +1713,28 @@ export class DBStorage implements IStorage {
   }
 
   async reorderDocs(docIds: string[], parentId: string | null): Promise<void> {
-    // Batch update using CASE/WHEN to minimize queries
+    // Batch update using individual parameterized queries for security
     if (docIds.length === 0) return;
 
-    // Build a single UPDATE with CASE for order values
     const now = new Date();
-    const caseStatements = docIds.map((id, i) => `WHEN id = '${id}' THEN ${i}`).join(' ');
-    const idsStr = docIds.map(id => `'${id}'`).join(',');
 
-    await this.db.execute(sql`
-      UPDATE docs
-      SET
-        "order" = CASE ${sql.raw(caseStatements)} END,
-        parent_id = ${parentId},
-        updated_at = ${now}
-      WHERE id IN (${sql.raw(idsStr)})
-    `);
+    // Use parameterized queries to prevent SQL injection
+    // Update each doc with its new order value
+    for (let i = 0; i < docIds.length; i++) {
+      const docId = docIds[i];
+      // Validate UUID format to prevent injection
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(docId)) {
+        throw new Error(`Invalid doc ID format: ${docId}`);
+      }
+
+      await this.db.update(docs)
+        .set({
+          order: i,
+          parentId: parentId,
+          updatedAt: now,
+        } as any)
+        .where(eq(docs.id, docId));
+    }
   }
 
   async updateDocQualityScore(docId: string): Promise<{ qualityScore: number; aiReady: boolean }> {
@@ -1735,15 +1791,25 @@ export class DBStorage implements IStorage {
     averageScore: number;
     needsReview: number;
   }> {
-    const allDocs = await this.db.select().from(docs).where(eq(docs.status, 'active'));
+    // Use SQL aggregations instead of fetching all docs for efficiency
+    const result = await this.db
+      .select({
+        totalDocs: sql<number>`count(*)::int`,
+        aiReadyDocs: sql<number>`count(*) filter (where ${docs.aiReady} = true)::int`,
+        averageScore: sql<number>`coalesce(round(avg(${docs.qualityScore}))::int, 0)`,
+        needsReview: sql<number>`count(*) filter (where coalesce(${docs.qualityScore}, 0) < 70)::int`,
+      })
+      .from(docs)
+      .where(eq(docs.status, 'active'));
 
-    const totalDocs = allDocs.length;
-    const aiReadyDocs = allDocs.filter(d => d.aiReady).length;
+    const { totalDocs, aiReadyDocs, averageScore, needsReview } = result[0] || {
+      totalDocs: 0,
+      aiReadyDocs: 0,
+      averageScore: 0,
+      needsReview: 0,
+    };
+
     const aiReadyPercent = totalDocs > 0 ? Math.round((aiReadyDocs / totalDocs) * 100) : 0;
-    const averageScore = totalDocs > 0
-      ? Math.round(allDocs.reduce((sum, d) => sum + (d.qualityScore || 0), 0) / totalDocs)
-      : 0;
-    const needsReview = allDocs.filter(d => (d.qualityScore || 0) < 70).length;
 
     return {
       totalDocs,
@@ -3279,6 +3345,20 @@ export class DBStorage implements IStorage {
     }
   }
 
+  async getPersonByExternalId(externalContactId: string): Promise<Person | undefined> {
+    try {
+      const [person] = await this.db
+        .select()
+        .from(people)
+        .where(eq(people.externalContactId, externalContactId))
+        .limit(1);
+      return person;
+    } catch (error) {
+      console.error("Error fetching person by external ID (table may not exist):", error);
+      return undefined;
+    }
+  }
+
   async getPersonByEmail(email: string): Promise<Person | undefined> {
     try {
       const [person] = await this.db
@@ -3842,44 +3922,67 @@ export class DBStorage implements IStorage {
     unexploredQuestions: number;
   }> {
     try {
-      // Get all scenarios for the venture
-      const scenarios = await this.getVentureScenarios(ventureId);
+      // Run aggregation queries in parallel for efficiency
+      const [scenarioStats, indicatorStats, recentSignals, questionStats] = await Promise.all([
+        // Scenario counts by quadrant (single query)
+        this.db
+          .select({
+            total: sql<number>`count(*)::int`,
+            growth: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'growth')::int`,
+            collapse: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'collapse')::int`,
+            transformation: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'transformation')::int`,
+            constraint: sql<number>`count(*) filter (where ${ventureScenarios.quadrant} = 'constraint')::int`,
+          })
+          .from(ventureScenarios)
+          .where(eq(ventureScenarios.ventureId, ventureId)),
 
-      // Count scenarios by quadrant
-      const scenariosByQuadrant: Record<string, number> = {
-        growth: 0,
-        collapse: 0,
-        transformation: 0,
-        constraint: 0,
+        // Indicator counts by status (single query)
+        this.db
+          .select({
+            green: sql<number>`count(*) filter (where ${scenarioIndicators.currentStatus} = 'green')::int`,
+            yellow: sql<number>`count(*) filter (where ${scenarioIndicators.currentStatus} = 'yellow')::int`,
+            red: sql<number>`count(*) filter (where ${scenarioIndicators.currentStatus} = 'red')::int`,
+          })
+          .from(scenarioIndicators)
+          .where(eq(scenarioIndicators.ventureId, ventureId)),
+
+        // Recent signals (limit 5, already ordered by createdAt desc)
+        this.db
+          .select()
+          .from(trendSignals)
+          .where(eq(trendSignals.ventureId, ventureId))
+          .orderBy(desc(trendSignals.createdAt))
+          .limit(5),
+
+        // Unexplored questions count (single query)
+        this.db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(whatIfQuestions)
+          .where(and(
+            eq(whatIfQuestions.ventureId, ventureId),
+            eq(whatIfQuestions.explored, false)
+          )),
+      ]);
+
+      const scenariosByQuadrant = {
+        growth: scenarioStats[0]?.growth ?? 0,
+        collapse: scenarioStats[0]?.collapse ?? 0,
+        transformation: scenarioStats[0]?.transformation ?? 0,
+        constraint: scenarioStats[0]?.constraint ?? 0,
       };
-      scenarios.forEach(s => {
-        if (s.quadrant) {
-          scenariosByQuadrant[s.quadrant] = (scenariosByQuadrant[s.quadrant] || 0) + 1;
-        }
-      });
 
-      // Get indicators and count by status
-      const indicators = await this.getScenarioIndicators({ ventureId });
       const indicatorsByStatus = {
-        green: indicators.filter(i => i.currentStatus === 'green').length,
-        yellow: indicators.filter(i => i.currentStatus === 'yellow').length,
-        red: indicators.filter(i => i.currentStatus === 'red').length,
+        green: indicatorStats[0]?.green ?? 0,
+        yellow: indicatorStats[0]?.yellow ?? 0,
+        red: indicatorStats[0]?.red ?? 0,
       };
-
-      // Get recent signals (last 5)
-      const allSignals = await this.getTrendSignals(ventureId);
-      const recentSignals = allSignals.slice(0, 5);
-
-      // Count unexplored questions
-      const questions = await this.getWhatIfQuestions(ventureId, { explored: false });
-      const unexploredQuestions = questions.length;
 
       return {
-        scenarioCount: scenarios.length,
+        scenarioCount: scenarioStats[0]?.total ?? 0,
         scenariosByQuadrant,
         indicatorsByStatus,
         recentSignals,
-        unexploredQuestions,
+        unexploredQuestions: questionStats[0]?.count ?? 0,
       };
     } catch (error) {
       console.error("Error fetching foresight summary:", error);
@@ -4499,6 +4602,161 @@ export class DBStorage implements IStorage {
       await this.db.delete(ventureIdeas).where(eq(ventureIdeas.id, id));
     } catch (error) {
       console.error("Error deleting venture idea (table may not exist):", error);
+    }
+  }
+
+  // ============================================================================
+  // KNOWLEDGE FILES (File uploads with AI reading)
+  // ============================================================================
+
+  async getKnowledgeFiles(
+    filters?: {
+      ventureId?: string;
+      projectId?: string;
+      taskId?: string;
+      docId?: string;
+      category?: string;
+      processingStatus?: string;
+      includeInAiContext?: boolean;
+      limit?: number;
+    }
+  ): Promise<KnowledgeFile[]> {
+    try {
+      const conditions: any[] = [];
+
+      if (filters?.ventureId) {
+        conditions.push(eq(knowledgeFiles.ventureId, filters.ventureId));
+      }
+      if (filters?.projectId) {
+        conditions.push(eq(knowledgeFiles.projectId, filters.projectId));
+      }
+      if (filters?.taskId) {
+        conditions.push(eq(knowledgeFiles.taskId, filters.taskId));
+      }
+      if (filters?.docId) {
+        conditions.push(eq(knowledgeFiles.docId, filters.docId));
+      }
+      if (filters?.category) {
+        conditions.push(eq(knowledgeFiles.category, filters.category as any));
+      }
+      if (filters?.processingStatus) {
+        conditions.push(eq(knowledgeFiles.processingStatus, filters.processingStatus as any));
+      }
+      if (filters?.includeInAiContext !== undefined) {
+        conditions.push(eq(knowledgeFiles.includeInAiContext, filters.includeInAiContext));
+      }
+
+      const query = this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(knowledgeFiles.aiContextPriority), desc(knowledgeFiles.createdAt));
+
+      if (filters?.limit) {
+        return await query.limit(filters.limit);
+      }
+
+      return await query;
+    } catch (error) {
+      console.error("Error fetching knowledge files (table may not exist):", error);
+      return [];
+    }
+  }
+
+  async getKnowledgeFile(id: string): Promise<KnowledgeFile | undefined> {
+    try {
+      const [file] = await this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(eq(knowledgeFiles.id, id))
+        .limit(1);
+      return file;
+    } catch (error) {
+      console.error("Error fetching knowledge file (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async getKnowledgeFileByDriveId(driveFileId: string): Promise<KnowledgeFile | undefined> {
+    try {
+      const [file] = await this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(eq(knowledgeFiles.googleDriveFileId, driveFileId))
+        .limit(1);
+      return file;
+    } catch (error) {
+      console.error("Error fetching knowledge file by drive ID (table may not exist):", error);
+      return undefined;
+    }
+  }
+
+  async createKnowledgeFile(data: InsertKnowledgeFile): Promise<KnowledgeFile> {
+    try {
+      const [file] = await this.db
+        .insert(knowledgeFiles)
+        .values(data as any)
+        .returning();
+      return file;
+    } catch (error) {
+      console.error("Error creating knowledge file:", error);
+      throw error;
+    }
+  }
+
+  async updateKnowledgeFile(
+    id: string,
+    updates: Partial<InsertKnowledgeFile>
+  ): Promise<KnowledgeFile | undefined> {
+    try {
+      const [updated] = await this.db
+        .update(knowledgeFiles)
+        .set({ ...updates, updatedAt: new Date() } as any)
+        .where(eq(knowledgeFiles.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating knowledge file:", error);
+      throw error;
+    }
+  }
+
+  async deleteKnowledgeFile(id: string): Promise<void> {
+    try {
+      await this.db
+        .delete(knowledgeFiles)
+        .where(eq(knowledgeFiles.id, id));
+    } catch (error) {
+      console.error("Error deleting knowledge file:", error);
+      throw error;
+    }
+  }
+
+  async getKnowledgeFilesForAiContext(
+    ventureId: string,
+    options?: { limit?: number }
+  ): Promise<KnowledgeFile[]> {
+    try {
+      const query = this.db
+        .select()
+        .from(knowledgeFiles)
+        .where(
+          and(
+            eq(knowledgeFiles.ventureId, ventureId),
+            eq(knowledgeFiles.includeInAiContext, true),
+            eq(knowledgeFiles.processingStatus, 'completed' as any)
+          )
+        )
+        .orderBy(desc(knowledgeFiles.aiContextPriority), desc(knowledgeFiles.createdAt));
+
+      if (options?.limit) {
+        return await query.limit(options.limit);
+      }
+
+      return await query;
+    } catch (error) {
+      console.error("Error fetching knowledge files for AI context:", error);
+      return [];
     }
   }
 

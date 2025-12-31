@@ -8,6 +8,7 @@ import { logger } from "../logger";
 import { insertPersonSchema } from "@shared/schema";
 import { z } from "zod";
 import * as googleContacts from "../google-contacts";
+import * as contactsApi from "../contacts-api";
 
 const router = Router();
 
@@ -256,6 +257,111 @@ router.post("/google-contacts/sync", async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, "Error syncing Google Contacts");
     res.status(500).json({ error: "Failed to sync Google Contacts" });
+  }
+});
+
+// ============================================================================
+// EXTERNAL CONTACTS API INTEGRATION
+// ============================================================================
+
+// Check External Contacts API connection status
+router.get("/contacts-api/status", async (req: Request, res: Response) => {
+  try {
+    if (!contactsApi.isConfigured()) {
+      return res.json({
+        configured: false,
+        connected: false,
+        error: "Contacts API not configured. Set CONTACTS_API_KEY and CONTACTS_API_URL environment variables.",
+      });
+    }
+
+    const status = await contactsApi.checkConnection();
+    res.json({
+      configured: true,
+      ...status,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error checking Contacts API status");
+    res.status(500).json({ error: "Failed to check Contacts API status" });
+  }
+});
+
+// Sync contacts from External Contacts API
+router.post("/contacts-api/sync", async (req: Request, res: Response) => {
+  try {
+    if (!contactsApi.isConfigured()) {
+      return res.status(400).json({ error: "Contacts API not configured" });
+    }
+
+    const contacts = await contactsApi.fetchContacts();
+
+    const results: contactsApi.ContactsApiSyncResult = {
+      synced: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+      items: [],
+    };
+
+    for (const contact of contacts) {
+      try {
+        const personData = contactsApi.externalContactToPerson(contact);
+        const externalIdStr = contact.id != null ? String(contact.id) : null;
+
+        // Check if person already exists by external ID (if available)
+        let existingPerson: any = null;
+        if (externalIdStr) {
+          existingPerson = await storage.getPersonByExternalId(externalIdStr);
+        }
+
+        // If not found by external ID, try by email
+        if (!existingPerson && personData.email) {
+          existingPerson = await storage.getPersonByEmail(personData.email);
+        }
+
+        if (existingPerson) {
+          // Update existing person with new data from external API
+          // But preserve local enrichments
+          const updated = await storage.updatePerson(existingPerson.id, {
+            ...personData,
+            // Don't overwrite local enrichments
+            notes: existingPerson.notes || personData.notes,
+            relationship: existingPerson.relationship || personData.relationship,
+            importance: existingPerson.importance || personData.importance,
+            contactFrequency: existingPerson.contactFrequency,
+            howWeMet: existingPerson.howWeMet || personData.howWeMet,
+            ventureId: existingPerson.ventureId,
+            lastContactDate: existingPerson.lastContactDate,
+            nextFollowUp: existingPerson.nextFollowUp,
+            needsEnrichment: existingPerson.needsEnrichment,
+          });
+          results.updated++;
+          results.items.push({
+            externalId: externalIdStr,
+            name: personData.name,
+            personId: updated?.id,
+            action: 'updated',
+          });
+        } else {
+          // Create new person
+          const newPerson = await storage.createPerson(personData);
+          results.synced++;
+          results.items.push({
+            externalId: externalIdStr,
+            name: personData.name,
+            personId: newPerson.id,
+            action: 'created',
+          });
+        }
+      } catch (error: any) {
+        results.errors.push(`Error syncing contact ${contact.name || contact.id}: ${error.message}`);
+      }
+    }
+
+    res.json(results);
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack }, "Error syncing from Contacts API");
+    res.status(500).json({ error: "Failed to sync from Contacts API", details: error.message });
   }
 });
 

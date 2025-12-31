@@ -581,6 +581,100 @@ Current date: ${today}`;
       {
         type: "function",
         function: {
+          name: "read_doc",
+          description: "Read the full content of a specific document. Use when you need to read the body/content of a document, SOP, or knowledge base entry.",
+          parameters: {
+            type: "object",
+            properties: {
+              docId: { type: "string", description: "The document ID to read" }
+            },
+            required: ["docId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "search_docs",
+          description: "Search documents by keyword. Use when user asks to find documents about a topic, or search the knowledge base.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "Search query - keywords to find in documents" },
+              type: { type: "string", description: "Optional filter by type: sop, prompt, spec, template, playbook" },
+              ventureId: { type: "string", description: "Optional filter by venture" }
+            },
+            required: ["query"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "query_knowledge_base",
+          description: "Intelligently search and answer questions from the knowledge base (docs + uploaded files). Uses semantic search. Use when user asks 'what do my docs say about X' or needs information from their knowledge base.",
+          parameters: {
+            type: "object",
+            properties: {
+              question: { type: "string", description: "The question to answer or topic to search" },
+              ventureId: { type: "string", description: "Optional filter by venture" },
+              limit: { type: "number", description: "Max results (default 5)" }
+            },
+            required: ["question"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_insights",
+          description: "Get AI-generated insights and patterns. Use when user asks for analysis, patterns, trends, or insights about their data.",
+          parameters: {
+            type: "object",
+            properties: {
+              area: {
+                type: "string",
+                description: "Area to analyze: health, productivity, trading, tasks, projects, overall",
+                enum: ["health", "productivity", "trading", "tasks", "projects", "overall"]
+              },
+              days: { type: "number", description: "Number of days to analyze (default 30)" }
+            },
+            required: ["area"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_knowledge_files",
+          description: "Get uploaded knowledge files (PDFs, images, documents) with their extracted text and AI summaries. Use when user asks about uploaded files, attached documents, or needs content from PDFs/images.",
+          parameters: {
+            type: "object",
+            properties: {
+              ventureId: { type: "string", description: "Filter by venture" },
+              category: { type: "string", description: "Filter by category: document, strategy, playbook, notes, research, reference, template, image" },
+              includeContent: { type: "boolean", description: "Include extracted text content (can be large)" }
+            }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "read_knowledge_file",
+          description: "Read the full content of a specific knowledge file. Use when you need the complete extracted text from a PDF, image, or document.",
+          parameters: {
+            type: "object",
+            properties: {
+              fileId: { type: "string", description: "The knowledge file ID" }
+            },
+            required: ["fileId"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
           name: "get_summary",
           description: "Get a summary of the user's system - venture count, active projects, pending tasks, etc.",
           parameters: { type: "object", properties: {}, required: [] }
@@ -777,11 +871,11 @@ Current date: ${today}`;
         type: "function",
         function: {
           name: "create_health_entry",
-          description: "Log health metrics for a day. Use when user mentions sleep, energy, mood, workouts, weight, or how they're feeling physically.",
+          description: "Log health metrics for a day. Use when user mentions sleep, energy, mood, workouts, weight, or how they're feeling physically. ALWAYS extract and log at least one metric from what the user mentions (e.g., if they say 'slept 7 hours', set sleepHours to 7).",
           parameters: {
             type: "object",
             properties: {
-              date: { type: "string", description: "Date (YYYY-MM-DD), defaults to today" },
+              date: { type: "string", description: "Date (YYYY-MM-DD). Use today's date if not specified." },
               sleepHours: { type: "number", description: "Hours slept (e.g., 7.5)" },
               sleepQuality: { type: "string", description: "Sleep quality: poor, fair, good, excellent" },
               energyLevel: { type: "number", description: "Energy 1-5 scale" },
@@ -793,7 +887,8 @@ Current date: ${today}`;
               workoutType: { type: "string", description: "Workout type: strength, cardio, yoga, sports, none" },
               workoutDurationMin: { type: "number", description: "Workout duration in minutes" },
               notes: { type: "string", description: "Additional health notes" }
-            }
+            },
+            required: ["date"]
           }
         }
       },
@@ -932,19 +1027,19 @@ Current date: ${today}`;
         type: "function",
         function: {
           name: "create_doc",
-          description: "Create a new document, note, SOP, or knowledge base entry. Use when user wants to save notes, create documentation, or record information.",
+          description: "Create a new document with content. ALWAYS generate meaningful body content based on the document type and user's request. Never create empty documents.",
           parameters: {
             type: "object",
             properties: {
               title: { type: "string", description: "Document title" },
-              type: { type: "string", description: "Type: page, sop, prompt, spec, template, playbook, meeting_notes, research" },
+              type: { type: "string", description: "Type: page, sop, prompt, spec, template, playbook, process, meeting_notes, research" },
               domain: { type: "string", description: "Domain: venture_ops, marketing, product, tech, trading, personal" },
-              body: { type: "string", description: "Document content (markdown)" },
+              body: { type: "string", description: "Document content in markdown. REQUIRED - generate appropriate content based on document type. For SOPs include steps, for playbooks include strategies, for checklists include checkbox items, etc." },
               ventureId: { type: "string", description: "Associated venture ID" },
               projectId: { type: "string", description: "Associated project ID" },
               tags: { type: "string", description: "Comma-separated tags" }
             },
-            required: ["title"]
+            required: ["title", "body"]
           }
         }
       },
@@ -1087,6 +1182,232 @@ Current date: ${today}`;
             return JSON.stringify(docs.map((d: any) => ({
               id: d.id, title: d.title, type: d.type, status: d.status
             })));
+          }
+          case "read_doc": {
+            const doc = await storage.getDoc(args.docId);
+            if (!doc) {
+              return JSON.stringify({ error: "Document not found" });
+            }
+            return JSON.stringify({
+              id: doc.id,
+              title: doc.title,
+              type: doc.type,
+              domain: doc.domain,
+              body: doc.body,
+              content: doc.content,
+              summary: doc.summary,
+              keyPoints: doc.keyPoints,
+              tags: doc.tags,
+              status: doc.status,
+              ventureId: doc.ventureId,
+              projectId: doc.projectId,
+            });
+          }
+          case "search_docs": {
+            const docs = await storage.searchDocs(args.query);
+            // Filter by type/venture if provided
+            let filtered = docs;
+            if (args.type) {
+              filtered = filtered.filter(d => d.type === args.type);
+            }
+            if (args.ventureId) {
+              filtered = filtered.filter(d => d.ventureId === args.ventureId);
+            }
+            return JSON.stringify(filtered.slice(0, 20).map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              type: d.type,
+              summary: d.summary,
+              body: d.body?.substring(0, 500) + (d.body?.length > 500 ? '...' : ''),
+            })));
+          }
+          case "query_knowledge_base": {
+            // Use hybrid search for intelligent querying
+            const { hybridSearch } = await import("../vector-search");
+            const results = await hybridSearch(args.question, {
+              ventureId: args.ventureId,
+              limit: args.limit || 5,
+            });
+
+            if (results.length === 0) {
+              // Fallback to simple search
+              const docs = await storage.searchDocs(args.question);
+              const files = await storage.getKnowledgeFiles({
+                ventureId: args.ventureId,
+                processingStatus: "completed"
+              });
+
+              const docResults = docs.slice(0, 3).map(d => ({
+                type: 'doc',
+                title: d.title,
+                content: d.summary || d.body?.substring(0, 500) || '',
+              }));
+
+              const fileResults = files
+                .filter(f => f.extractedText?.toLowerCase().includes(args.question.toLowerCase()))
+                .slice(0, 3)
+                .map(f => ({
+                  type: 'file',
+                  title: f.name,
+                  content: f.aiSummary || f.extractedText?.substring(0, 500) || '',
+                }));
+
+              return JSON.stringify({
+                answer: "Found some potentially relevant content:",
+                results: [...docResults, ...fileResults],
+              });
+            }
+
+            return JSON.stringify({
+              answer: `Found ${results.length} relevant items:`,
+              results: results.map(r => ({
+                type: r.type,
+                title: r.title,
+                content: r.content.substring(0, 500),
+                relevance: Math.round(r.similarity * 100) + '%',
+              })),
+            });
+          }
+          case "get_insights": {
+            const days = args.days || 30;
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - days);
+
+            const insights: any = { area: args.area, period: `${days} days`, insights: [] };
+
+            if (args.area === 'health' || args.area === 'overall') {
+              const health = await storage.getHealthEntries({
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0]
+              });
+              if (health.length > 0) {
+                const avgSleep = health.reduce((sum, h) => sum + (h.sleepHours || 0), 0) / health.length;
+                const avgEnergy = health.reduce((sum, h) => sum + (h.energyLevel || 0), 0) / health.length;
+                const workoutDays = health.filter(h => h.workoutDone).length;
+                insights.health = {
+                  avgSleepHours: avgSleep.toFixed(1),
+                  avgEnergyLevel: avgEnergy.toFixed(1),
+                  workoutFrequency: `${workoutDays}/${health.length} days`,
+                  trend: avgEnergy >= 3.5 ? 'positive' : avgEnergy >= 2.5 ? 'stable' : 'needs attention',
+                };
+                insights.insights.push(
+                  avgSleep < 7 ? `⚠️ Average sleep (${avgSleep.toFixed(1)}h) is below recommended 7-8h` : `✅ Good sleep average: ${avgSleep.toFixed(1)}h`,
+                  avgEnergy < 3 ? `⚠️ Energy levels trending low (${avgEnergy.toFixed(1)}/5)` : `✅ Energy levels healthy: ${avgEnergy.toFixed(1)}/5`
+                );
+              }
+            }
+
+            if (args.area === 'productivity' || args.area === 'tasks' || args.area === 'overall') {
+              const tasks = await storage.getTasks({});
+              const completed = tasks.filter(t => t.status === 'done');
+              const overdue = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done');
+              const inProgress = tasks.filter(t => t.status === 'in_progress');
+
+              insights.tasks = {
+                total: tasks.length,
+                completed: completed.length,
+                inProgress: inProgress.length,
+                overdue: overdue.length,
+                completionRate: tasks.length > 0 ? Math.round(completed.length / tasks.length * 100) + '%' : 'N/A',
+              };
+
+              if (overdue.length > 0) {
+                insights.insights.push(`⚠️ ${overdue.length} overdue tasks need attention`);
+              }
+              if (inProgress.length > 5) {
+                insights.insights.push(`⚠️ ${inProgress.length} tasks in progress - consider focusing on fewer items`);
+              }
+            }
+
+            if (args.area === 'projects' || args.area === 'overall') {
+              const projects = await storage.getProjects({});
+              const active = projects.filter(p => p.status === 'in_progress');
+              const blocked = projects.filter(p => p.status === 'blocked');
+
+              insights.projects = {
+                total: projects.length,
+                active: active.length,
+                blocked: blocked.length,
+              };
+
+              if (blocked.length > 0) {
+                insights.insights.push(`🚧 ${blocked.length} blocked projects: ${blocked.map(p => p.name).join(', ')}`);
+              }
+            }
+
+            if (args.area === 'trading' || args.area === 'overall') {
+              const checklists = await storage.getDailyTradingChecklists({});
+              if (checklists.length > 0) {
+                const withTrades = checklists.filter(c => c.trades && (c.trades as any[]).length > 0);
+                const totalPnL = withTrades.reduce((sum, c) => {
+                  const trades = c.trades as any[];
+                  return sum + trades.reduce((s, t) => s + (t.pnl || 0), 0);
+                }, 0);
+
+                insights.trading = {
+                  sessionsLogged: checklists.length,
+                  sessionsWithTrades: withTrades.length,
+                  totalPnL: totalPnL,
+                };
+
+                if (totalPnL < 0) {
+                  insights.insights.push(`📉 Trading P&L is negative (${totalPnL}) - review strategy`);
+                } else if (totalPnL > 0) {
+                  insights.insights.push(`📈 Trading P&L is positive (+${totalPnL})`);
+                }
+              }
+            }
+
+            return JSON.stringify(insights);
+          }
+          case "get_knowledge_files": {
+            const files = await storage.getKnowledgeFiles({
+              ventureId: args.ventureId,
+              category: args.category,
+              processingStatus: "completed", // Only return processed files
+            });
+            return JSON.stringify(files.map((f: any) => {
+              const result: any = {
+                id: f.id,
+                name: f.name,
+                category: f.category,
+                mimeType: f.mimeType,
+                summary: f.aiSummary,
+                tags: f.aiTags,
+                processingStatus: f.processingStatus,
+                ventureId: f.ventureId,
+              };
+              // Include content if requested (for detailed analysis)
+              if (args.includeContent && f.extractedText) {
+                // Truncate very long content
+                result.extractedText = f.extractedText.length > 5000
+                  ? f.extractedText.substring(0, 5000) + "\n[... truncated ...]"
+                  : f.extractedText;
+              }
+              return result;
+            }));
+          }
+          case "read_knowledge_file": {
+            const file = await storage.getKnowledgeFile(args.fileId);
+            if (!file) {
+              return JSON.stringify({ error: "Knowledge file not found" });
+            }
+            if (file.processingStatus !== "completed") {
+              return JSON.stringify({
+                error: "File not yet processed",
+                status: file.processingStatus
+              });
+            }
+            return JSON.stringify({
+              id: file.id,
+              name: file.name,
+              category: file.category,
+              extractedText: file.extractedText,
+              summary: file.aiSummary,
+              tags: file.aiTags,
+              metadata: file.aiMetadata,
+            });
           }
           case "get_summary": {
             const [ventures, projects, tasks, captures] = await Promise.all([
@@ -1405,8 +1726,9 @@ Current date: ${today}`;
             return JSON.stringify({ error: "Unknown tool" });
         }
       } catch (error) {
-        logger.error({ error, tool: name }, "Tool execution error");
-        return JSON.stringify({ error: "Tool execution failed" });
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error({ error, errorMessage, tool: name, args }, "Tool execution error");
+        return JSON.stringify({ error: `Tool execution failed: ${errorMessage}` });
       }
     };
 

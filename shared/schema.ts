@@ -250,6 +250,16 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Trusted device type for device tracking
+export interface TrustedDevice {
+  id: string;
+  name: string;
+  ipAddress: string;
+  userAgent: string;
+  lastUsed: string;
+  createdAt: string;
+}
+
 // User storage table - Simplified for single-user (Sayed Baharun)
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -265,6 +275,17 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   failedLoginAttempts: integer("failed_login_attempts").default(0),
   lockedUntil: timestamp("locked_until"),
+  // 2FA/TOTP fields
+  totpSecret: varchar("totp_secret"), // Encrypted TOTP secret
+  totpEnabled: boolean("totp_enabled").default(false),
+  totpBackupCodes: jsonb("totp_backup_codes").$type<string[]>(), // Hashed backup codes
+  totpRecoveryKeyHash: varchar("totp_recovery_key_hash"), // Emergency recovery key (hashed)
+  // Device/session tracking
+  lastKnownIp: varchar("last_known_ip", { length: 45 }),
+  lastKnownUserAgent: text("last_known_user_agent"),
+  trustedDevices: jsonb("trusted_devices").$type<TrustedDevice[]>(),
+  // Password age tracking
+  passwordChangedAt: timestamp("password_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1704,6 +1725,9 @@ export const people = pgTable(
     name: text("name").notNull(),
     email: text("email"),
     phone: text("phone"),
+    countryCode: text("country_code"),
+    phone2: text("phone2"),
+    countryCode2: text("country_code2"),
     company: text("company"),
     jobTitle: text("job_title"),
     birthday: date("birthday"),
@@ -1726,9 +1750,16 @@ export const people = pgTable(
     notes: text("notes"),
     tags: text("tags"),
 
+    // Category (for grouping/filtering contacts)
+    categoryId: uuid("category_id").references(() => customCategories.id, { onDelete: "set null" }),
+
     // Sync metadata (for Google Contacts integration)
     googleContactId: text("google_contact_id").unique(),
     googleEtag: text("google_etag"),
+
+    // Sync metadata (for external Contacts API integration)
+    externalContactId: text("external_contact_id").unique(),
+
     needsEnrichment: boolean("needs_enrichment").default(true),
 
     // Timestamps
@@ -1742,8 +1773,10 @@ export const people = pgTable(
     index("idx_people_importance").on(table.importance),
     index("idx_people_venture_id").on(table.ventureId),
     index("idx_people_google_contact_id").on(table.googleContactId),
+    index("idx_people_external_contact_id").on(table.externalContactId),
     index("idx_people_next_follow_up").on(table.nextFollowUp),
     index("idx_people_last_contact_date").on(table.lastContactDate),
+    index("idx_people_category_id").on(table.categoryId),
   ]
 );
 
@@ -1924,6 +1957,121 @@ export const insertTradingKnowledgeDocSchema = createInsertSchema(tradingKnowled
 
 export type TradingKnowledgeDoc = typeof tradingKnowledgeDocs.$inferSelect;
 export type InsertTradingKnowledgeDoc = z.infer<typeof insertTradingKnowledgeDocSchema>;
+
+// ----------------------------------------------------------------------------
+// KNOWLEDGE FILES (Venture-linked file uploads with AI reading)
+// ----------------------------------------------------------------------------
+
+// Category enum for knowledge files
+export const knowledgeFileCategoryEnum = pgEnum('knowledge_file_category', [
+  'document',     // General documents
+  'strategy',     // Strategy documents
+  'playbook',     // Step-by-step playbooks
+  'notes',        // Personal notes
+  'research',     // Research and analysis
+  'reference',    // Reference materials
+  'template',     // Templates
+  'image',        // Images and diagrams
+  'spreadsheet',  // Spreadsheets and data
+  'presentation', // Presentations
+  'other'         // Other files
+]);
+
+// Storage type enum
+export const knowledgeFileStorageEnum = pgEnum('knowledge_file_storage', [
+  'google_drive', // Stored in Google Drive
+  'base64',       // Base64 encoded in DB
+  'url'           // External URL
+]);
+
+// Processing status enum
+export const knowledgeFileProcessingStatusEnum = pgEnum('knowledge_file_processing_status', [
+  'pending',      // Waiting to be processed
+  'processing',   // Currently being processed
+  'completed',    // Processing complete
+  'failed'        // Processing failed
+]);
+
+// Knowledge Files: Venture-linked file uploads with AI reading capability
+export const knowledgeFiles = pgTable(
+  "knowledge_files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Ownership & linking
+    ventureId: uuid("venture_id").references(() => ventures.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    docId: uuid("doc_id").references(() => docs.id, { onDelete: "set null" }),
+
+    // File info
+    name: text("name").notNull(),
+    description: text("description"),
+    category: knowledgeFileCategoryEnum("category").default("document"),
+
+    // Original file details
+    originalFileName: text("original_file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileSize: integer("file_size"), // Size in bytes
+
+    // Storage
+    storageType: knowledgeFileStorageEnum("storage_type").default("google_drive"),
+    googleDriveFileId: text("google_drive_file_id"), // Google Drive file ID
+    googleDriveUrl: text("google_drive_url"), // Web view link
+    storageUrl: text("storage_url"), // For external URLs
+    base64Data: text("base64_data"), // For small files stored in DB
+
+    // AI Processing
+    processingStatus: knowledgeFileProcessingStatusEnum("processing_status").default("pending"),
+    extractedText: text("extracted_text"), // Text extracted from file (PDF, images via OCR)
+    aiSummary: text("ai_summary"), // AI-generated summary
+    aiTags: jsonb("ai_tags").$type<string[]>().default([]), // AI-suggested tags
+    aiMetadata: jsonb("ai_metadata").$type<{
+      confidence?: number;
+      noteType?: string;
+      hasActionItems?: boolean;
+      keyTopics?: string[];
+      entities?: string[];
+      processingModel?: string;
+      processingTime?: number;
+      errorMessage?: string;
+      [key: string]: any;
+    }>(),
+
+    // Context inclusion for AI
+    includeInAiContext: boolean("include_in_ai_context").default(true),
+    aiContextPriority: integer("ai_context_priority").default(0), // Higher = included first
+
+    // User-provided metadata
+    tags: text("tags"), // Comma-separated user tags
+    notes: text("notes"),
+
+    // Timestamps
+    processedAt: timestamp("processed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_knowledge_files_venture_id").on(table.ventureId),
+    index("idx_knowledge_files_project_id").on(table.projectId),
+    index("idx_knowledge_files_task_id").on(table.taskId),
+    index("idx_knowledge_files_doc_id").on(table.docId),
+    index("idx_knowledge_files_category").on(table.category),
+    index("idx_knowledge_files_processing_status").on(table.processingStatus),
+    index("idx_knowledge_files_include_in_ai_context").on(table.includeInAiContext),
+    index("idx_knowledge_files_google_drive_file_id").on(table.googleDriveFileId),
+    index("idx_knowledge_files_created_at").on(table.createdAt),
+  ]
+);
+
+export const insertKnowledgeFileSchema = createInsertSchema(knowledgeFiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type KnowledgeFile = typeof knowledgeFiles.$inferSelect;
+export type InsertKnowledgeFile = z.infer<typeof insertKnowledgeFileSchema>;
 
 // ----------------------------------------------------------------------------
 // STRATEGIC FORESIGHT MODULE
