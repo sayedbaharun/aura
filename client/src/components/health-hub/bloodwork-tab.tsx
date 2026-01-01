@@ -219,7 +219,6 @@ function BloodworkCard({ entry, onEdit, onDelete }: { entry: BloodworkEntry; onE
               <MetricRow label="HbA1c" value={entry.hba1c} unit="%" refKey="hba1c" />
               <MetricRow label="Fasting Glucose" value={entry.fastingGlucose} unit="mg/dL" refKey="fastingGlucose" />
               <MetricRow label="Fasting Insulin" value={entry.fastingInsulin} unit="μIU/mL" />
-              <MetricRow label="HOMA-IR" value={entry.homaIr} unit="" refKey="homaIr" />
             </div>
 
             {/* Lipid Panel */}
@@ -231,42 +230,27 @@ function BloodworkCard({ entry, onEdit, onDelete }: { entry: BloodworkEntry; onE
               <MetricRow label="Triglycerides" value={entry.triglycerides} unit="mg/dL" refKey="triglycerides" />
             </div>
 
-            {/* Thyroid */}
-            <div>
-              <h4 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wide">Thyroid</h4>
-              <MetricRow label="TSH" value={entry.tsh} unit="mIU/L" refKey="tsh" />
-              <MetricRow label="Free T3" value={entry.freeT3} unit="pg/mL" />
-              <MetricRow label="Free T4" value={entry.freeT4} unit="ng/dL" />
-            </div>
-
             {/* Vitamins */}
             <div>
-              <h4 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wide">Vitamins & Minerals</h4>
+              <h4 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wide">Vitamins</h4>
               <MetricRow label="Vitamin D" value={entry.vitaminD} unit="ng/mL" refKey="vitaminD" />
               <MetricRow label="Vitamin B12" value={entry.vitaminB12} unit="pg/mL" />
-              <MetricRow label="Ferritin" value={entry.ferritin} unit="ng/mL" />
-              <MetricRow label="Iron" value={entry.iron} unit="μg/dL" />
             </div>
 
             {/* Hormones */}
-            {(entry.testosterone || entry.cortisol) && (
-              <div>
-                <h4 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wide">Hormones</h4>
-                <MetricRow label="Testosterone" value={entry.testosterone} unit="ng/dL" />
-                <MetricRow label="Free Testosterone" value={entry.freeTestosterone} unit="pg/mL" />
-                <MetricRow label="Cortisol" value={entry.cortisol} unit="μg/dL" />
-              </div>
-            )}
+            <div>
+              <h4 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wide">Hormones</h4>
+              <MetricRow label="Testosterone" value={entry.testosterone} unit="ng/dL" />
+              <MetricRow label="Free Testosterone" value={entry.freeTestosterone} unit="pg/mL" />
+            </div>
 
             {/* Inflammation & Liver */}
-            {(entry.crp || entry.alt || entry.ast) && (
-              <div>
-                <h4 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wide">Inflammation & Liver</h4>
-                <MetricRow label="CRP" value={entry.crp} unit="mg/L" />
-                <MetricRow label="ALT" value={entry.alt} unit="U/L" />
-                <MetricRow label="AST" value={entry.ast} unit="U/L" />
-              </div>
-            )}
+            <div>
+              <h4 className="font-medium mb-2 text-sm text-muted-foreground uppercase tracking-wide">Inflammation & Liver</h4>
+              <MetricRow label="CRP" value={entry.crp} unit="mg/L" />
+              <MetricRow label="ALT" value={entry.alt} unit="U/L" />
+              <MetricRow label="AST" value={entry.ast} unit="U/L" />
+            </div>
 
             {/* Notes */}
             {entry.notes && (
@@ -296,12 +280,16 @@ function AddBloodworkDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     hdlCholesterol: "",
     ldlCholesterol: "",
     triglycerides: "",
-    // Thyroid
-    tsh: "",
     // Vitamins
     vitaminD: "",
     vitaminB12: "",
-    ferritin: "",
+    // Hormones
+    testosterone: "",
+    freeTestosterone: "",
+    // Inflammation & Liver
+    crp: "",
+    alt: "",
+    ast: "",
     // Notes
     notes: "",
   });
@@ -329,10 +317,13 @@ function AddBloodworkDialog({ open, onOpenChange }: { open: boolean; onOpenChang
         hdlCholesterol: "",
         ldlCholesterol: "",
         triglycerides: "",
-        tsh: "",
         vitaminD: "",
         vitaminB12: "",
-        ferritin: "",
+        testosterone: "",
+        freeTestosterone: "",
+        crp: "",
+        alt: "",
+        ast: "",
         notes: "",
       });
     },
@@ -352,10 +343,13 @@ function AddBloodworkDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     if (formData.hdlCholesterol) data.hdlCholesterol = parseFloat(formData.hdlCholesterol);
     if (formData.ldlCholesterol) data.ldlCholesterol = parseFloat(formData.ldlCholesterol);
     if (formData.triglycerides) data.triglycerides = parseFloat(formData.triglycerides);
-    if (formData.tsh) data.tsh = parseFloat(formData.tsh);
     if (formData.vitaminD) data.vitaminD = parseFloat(formData.vitaminD);
     if (formData.vitaminB12) data.vitaminB12 = parseFloat(formData.vitaminB12);
-    if (formData.ferritin) data.ferritin = parseFloat(formData.ferritin);
+    if (formData.testosterone) data.testosterone = parseFloat(formData.testosterone);
+    if (formData.freeTestosterone) data.freeTestosterone = parseFloat(formData.freeTestosterone);
+    if (formData.crp) data.crp = parseFloat(formData.crp);
+    if (formData.alt) data.alt = parseFloat(formData.alt);
+    if (formData.ast) data.ast = parseFloat(formData.ast);
     if (formData.notes) data.notes = formData.notes;
     createMutation.mutate(data);
   };
@@ -479,23 +473,12 @@ function AddBloodworkDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             </div>
           </div>
 
-          {/* Other Markers */}
+          {/* Vitamins */}
           <div>
-            <h4 className="font-medium mb-3 text-sm text-muted-foreground uppercase tracking-wide">Other Markers</h4>
+            <h4 className="font-medium mb-3 text-sm text-muted-foreground uppercase tracking-wide">Vitamins</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="tsh">TSH (mIU/L)</Label>
-                <Input
-                  id="tsh"
-                  type="number"
-                  step="0.01"
-                  placeholder="2.0"
-                  value={formData.tsh}
-                  onChange={(e) => setFormData({ ...formData, tsh: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="vitaminD">Vitamin D</Label>
+                <Label htmlFor="vitaminD">Vitamin D (ng/mL)</Label>
                 <Input
                   id="vitaminD"
                   type="number"
@@ -505,7 +488,7 @@ function AddBloodworkDialog({ open, onOpenChange }: { open: boolean; onOpenChang
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="vitaminB12">Vitamin B12</Label>
+                <Label htmlFor="vitaminB12">Vitamin B12 (pg/mL)</Label>
                 <Input
                   id="vitaminB12"
                   type="number"
@@ -514,14 +497,70 @@ function AddBloodworkDialog({ open, onOpenChange }: { open: boolean; onOpenChang
                   onChange={(e) => setFormData({ ...formData, vitaminB12: e.target.value })}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Hormones */}
+          <div>
+            <h4 className="font-medium mb-3 text-sm text-muted-foreground uppercase tracking-wide">Hormones</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="ferritin">Ferritin</Label>
+                <Label htmlFor="testosterone">Testosterone (ng/dL)</Label>
                 <Input
-                  id="ferritin"
+                  id="testosterone"
                   type="number"
-                  placeholder="100"
-                  value={formData.ferritin}
-                  onChange={(e) => setFormData({ ...formData, ferritin: e.target.value })}
+                  placeholder="500"
+                  value={formData.testosterone}
+                  onChange={(e) => setFormData({ ...formData, testosterone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="freeTestosterone">Free Testosterone (pg/mL)</Label>
+                <Input
+                  id="freeTestosterone"
+                  type="number"
+                  step="0.1"
+                  placeholder="15"
+                  value={formData.freeTestosterone}
+                  onChange={(e) => setFormData({ ...formData, freeTestosterone: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Inflammation & Liver */}
+          <div>
+            <h4 className="font-medium mb-3 text-sm text-muted-foreground uppercase tracking-wide">Inflammation & Liver</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="crp">CRP (mg/L)</Label>
+                <Input
+                  id="crp"
+                  type="number"
+                  step="0.1"
+                  placeholder="1.0"
+                  value={formData.crp}
+                  onChange={(e) => setFormData({ ...formData, crp: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="alt">ALT (U/L)</Label>
+                <Input
+                  id="alt"
+                  type="number"
+                  placeholder="25"
+                  value={formData.alt}
+                  onChange={(e) => setFormData({ ...formData, alt: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ast">AST (U/L)</Label>
+                <Input
+                  id="ast"
+                  type="number"
+                  placeholder="25"
+                  value={formData.ast}
+                  onChange={(e) => setFormData({ ...formData, ast: e.target.value })}
                 />
               </div>
             </div>
