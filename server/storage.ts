@@ -154,6 +154,25 @@ import { eq, desc, and, or, gte, lte, not, inArray, like, sql, asc, isNull } fro
 import { db as database } from "../db";
 import { calculateDocQuality } from "./doc-quality";
 
+/**
+ * Escape special SQL LIKE wildcard characters to prevent wildcard injection.
+ * In PostgreSQL/SQL, the LIKE operator treats % and _ as wildcards:
+ * - % matches zero or more characters
+ * - _ matches exactly one character
+ *
+ * This function escapes these characters so they are treated literally,
+ * preventing users from crafting queries that bypass intended search behavior.
+ *
+ * @param input - The user-provided search string
+ * @returns The escaped string safe for use in LIKE patterns
+ */
+export function escapeLikeWildcards(input: string): string {
+  return input
+    .replace(/\\/g, '\\\\')  // Escape backslashes first
+    .replace(/%/g, '\\%')    // Escape % wildcard
+    .replace(/_/g, '\\_');   // Escape _ wildcard
+}
+
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -1644,14 +1663,17 @@ export class DBStorage implements IStorage {
   }
 
   async searchDocs(query: string): Promise<Doc[]> {
+    // Escape LIKE wildcards to prevent wildcard injection attacks
+    const escapedQuery = escapeLikeWildcards(query);
+
     // Search in title and body
     return await this.db
       .select()
       .from(docs)
       .where(
         or(
-          like(docs.title, `%${query}%`),
-          like(docs.body, `%${query}%`)
+          like(docs.title, `%${escapedQuery}%`),
+          like(docs.body, `%${escapedQuery}%`)
         )
       )
       .orderBy(desc(docs.updatedAt))
