@@ -1105,19 +1105,35 @@ export class DBStorage implements IStorage {
   }
 
   /**
-   * Get top priority tasks - filters in database, not JS
+   * Get top priority tasks - prioritizes today-relevant tasks first
+   * Sort order:
+   * 1. Today-relevant (overdue, due today, focusDate = today) come first
+   * 2. Within that, sort by priority (P0, P1, P2, P3)
+   * 3. Then by urgency (overdue > due today > focus today > future)
+   * 4. Fall back to high-priority future tasks if not enough today-relevant
    */
   async getTopPriorityTasks(today: string, limit: number = 5): Promise<Task[]> {
-    // Use SQL case for scoring to sort by priority + urgency
     return await this.db
       .select()
       .from(tasks)
       .where(not(inArray(tasks.status, ['completed', 'on_hold'])))
       .orderBy(
-        // P0 first, then P1, P2, P3
+        // Today-relevant tasks first (overdue, due today, or focusDate = today)
+        sql`case
+          when ${tasks.dueDate} < ${today} then 0
+          when ${tasks.dueDate} = ${today} then 0
+          when ${tasks.focusDate} = ${today} then 0
+          else 1
+        end`,
+        // Then by priority (P0, P1, P2, P3)
         sql`case ${tasks.priority} when 'P0' then 0 when 'P1' then 1 when 'P2' then 2 else 3 end`,
-        // Overdue first
-        sql`case when ${tasks.dueDate} < ${today} then 0 when ${tasks.dueDate} = ${today} then 1 else 2 end`,
+        // Then by urgency within priority (overdue first, then due today, then focus today)
+        sql`case
+          when ${tasks.dueDate} < ${today} then 0
+          when ${tasks.dueDate} = ${today} then 1
+          when ${tasks.focusDate} = ${today} then 2
+          else 3
+        end`,
         desc(tasks.createdAt)
       )
       .limit(limit);
