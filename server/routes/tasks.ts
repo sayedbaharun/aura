@@ -11,6 +11,31 @@ import { SLOT_TIMES, VALID_TASK_STATUSES } from "./constants";
 
 const router = Router();
 
+/**
+ * Ensures tags is always an array. Handles cases where tags might be:
+ * - null/undefined -> returns []
+ * - a string -> splits by comma and trims
+ * - already an array -> returns as-is
+ */
+function ensureTagsArray(tags: unknown): string[] {
+  if (!tags) return [];
+  if (Array.isArray(tags)) return tags;
+  if (typeof tags === 'string') {
+    return tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+  }
+  return [];
+}
+
+/**
+ * Normalizes a task object to ensure tags is always an array
+ */
+function normalizeTask<T extends { tags?: unknown }>(task: T): T & { tags: string[] } {
+  return {
+    ...task,
+    tags: ensureTagsArray(task.tags),
+  };
+}
+
 // Nullable fields that need sanitization
 const NULLABLE_FIELDS = ['dueDate', 'focusDate', 'notes', 'ventureId', 'projectId', 'phaseId', 'dayId', 'focusSlot'];
 
@@ -80,19 +105,22 @@ router.get("/", async (req: Request, res: Response) => {
 
     const tasks = await storage.getTasks(cleanFilters);
 
+    // Normalize tags to ensure they're always arrays
+    const normalizedTasks = tasks.map(normalizeTask);
+
     // Return with pagination metadata if pagination was requested, otherwise return array
     if (wantsPagination) {
       res.json({
-        data: tasks,
+        data: normalizedTasks,
         pagination: {
           limit,
           offset,
-          count: tasks.length,
-          hasMore: tasks.length === limit,
+          count: normalizedTasks.length,
+          hasMore: normalizedTasks.length === limit,
         }
       });
     } else {
-      res.json(tasks);
+      res.json(normalizedTasks);
     }
   } catch (error) {
     logger.error({ error }, "Error fetching tasks");
@@ -105,7 +133,8 @@ router.get("/today", async (req: Request, res: Response) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const tasks = await storage.getTasksForToday(today);
-    res.json(tasks);
+    // Normalize tags to ensure they're always arrays
+    res.json(tasks.map(normalizeTask));
   } catch (error) {
     logger.error({ error }, "Error fetching today's tasks");
     res.status(500).json({ error: "Failed to fetch today's tasks" });
@@ -119,7 +148,8 @@ router.get("/:id", async (req: Request, res: Response) => {
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
     }
-    res.json(task);
+    // Normalize tags to ensure they're always arrays
+    res.json(normalizeTask(task));
   } catch (error) {
     logger.error({ error }, "Error fetching task");
     res.status(500).json({ error: "Failed to fetch task" });
@@ -132,7 +162,8 @@ router.post("/", async (req: Request, res: Response) => {
     const sanitizedBody = sanitizeBody(req.body);
     const validatedData = insertTaskSchema.parse(sanitizedBody);
     const task = await storage.createTask(validatedData);
-    res.status(201).json(task);
+    // Normalize tags to ensure they're always arrays
+    res.status(201).json(normalizeTask(task));
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Invalid task data", details: error.errors });
@@ -232,6 +263,9 @@ router.patch("/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Task not found" });
     }
 
+    // Normalize tags to ensure they're always arrays
+    const normalizedTask = normalizeTask(task);
+
     // If task was marked completed and has a project, check project completion
     if (updates.status === 'completed' && task.projectId) {
       const allTasks = await storage.getTasks({ projectId: task.projectId });
@@ -239,7 +273,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
       if (allDone) {
         return res.json({
-          task,
+          task: normalizedTask,
           suggestion: {
             type: 'project_completion',
             message: `All tasks in project completed. Mark project as done?`,
@@ -249,7 +283,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ task, calendarSynced: isCalendarConfigured() && !!calendarEventId });
+    res.json({ task: normalizedTask, calendarSynced: isCalendarConfigured() && !!calendarEventId });
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Invalid task data", details: error.errors });

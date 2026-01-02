@@ -9,6 +9,31 @@ import { PRIORITY_ORDER } from "./constants";
 
 const router = Router();
 
+/**
+ * Ensures tags is always an array. Handles cases where tags might be:
+ * - null/undefined -> returns []
+ * - a string -> splits by comma and trims
+ * - already an array -> returns as-is
+ */
+function ensureTagsArray(tags: unknown): string[] {
+  if (!tags) return [];
+  if (Array.isArray(tags)) return tags;
+  if (typeof tags === 'string') {
+    return tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+  }
+  return [];
+}
+
+/**
+ * Normalizes a task object to ensure tags is always an array
+ */
+function normalizeTask<T extends { tags?: unknown }>(task: T): T & { tags: string[] } {
+  return {
+    ...task,
+    tags: ensureTagsArray(task.tags),
+  };
+}
+
 // Get readiness score based on health data
 router.get("/readiness", async (req: Request, res: Response) => {
   try {
@@ -168,7 +193,8 @@ router.get("/tasks", async (req: Request, res: Response) => {
       return pA - pB;
     });
 
-    res.json(activeTasks);
+    // Normalize tags to ensure they're always arrays
+    res.json(activeTasks.map(normalizeTask));
   } catch (error) {
     console.error("[Dashboard Tasks] Error:", error);
     res.status(500).json({ message: "Failed to fetch today's tasks" });
@@ -185,8 +211,9 @@ router.get("/urgent", async (req: Request, res: Response) => {
       t.priority === 'P0' && t.dueDate && t.dueDate < today
     );
 
+    // Normalize tags to ensure they're always arrays
     res.json({
-      tasks: urgentTasks,
+      tasks: urgentTasks.map(normalizeTask),
       count: urgentTasks.length,
       onFire: isOnFire
     });
