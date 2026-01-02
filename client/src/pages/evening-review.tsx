@@ -211,11 +211,11 @@ export default function EveningReview() {
     },
   });
 
-  // Fetch tasks for the selected day
+  // Fetch tasks for the selected day (includes focusDate, dueDate, and overdue tasks)
   const { data: tasks = [] } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", { focusDate: selectedDate }],
+    queryKey: ["/api/tasks/today", { date: selectedDate }],
     queryFn: async () => {
-      const res = await fetch(`/api/tasks?focusDate=${selectedDate}`, { credentials: "include" });
+      const res = await fetch(`/api/tasks/today?date=${selectedDate}`, { credentials: "include" });
       return await res.json();
     },
   });

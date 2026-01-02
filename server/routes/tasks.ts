@@ -128,16 +128,24 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// Get today's tasks (special endpoint)
+// Get tasks for a specific date (defaults to today)
+// Includes: focusDate = date OR dueDate <= date (overdue) OR dayId = date's dayId
 router.get("/today", async (req: Request, res: Response) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const tasks = await storage.getTasksForToday(today);
+    const dateParam = req.query.date as string;
+    const targetDate = dateParam || new Date().toISOString().split('T')[0];
+
+    // Validate date format if provided
+    if (dateParam && !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+    }
+
+    const tasks = await storage.getTasksForToday(targetDate);
     // Normalize tags to ensure they're always arrays
     res.json(tasks.map(normalizeTask));
   } catch (error) {
-    logger.error({ error }, "Error fetching today's tasks");
-    res.status(500).json({ error: "Failed to fetch today's tasks" });
+    logger.error({ error }, "Error fetching tasks for date");
+    res.status(500).json({ error: "Failed to fetch tasks for date" });
   }
 });
 
