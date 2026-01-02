@@ -1030,13 +1030,15 @@ router.post("/2026-arc/review-tasks", async (req, res) => {
     createdTasks.push({ type: "Weekly Review", count: weeklyTasks.length, ids: weeklyTasks });
     logger.info({ count: weeklyTasks.length }, "Created weekly review tasks");
 
-    // 2. Create 12 Monthly Review tasks (1st of each month)
+    // 2. Create 12 Monthly Review tasks (last day of each month)
     const monthlyTasks: string[] = [];
 
     for (let month = 0; month < 12; month++) {
       const monthNum = month + 1;
+      // Get last day of month by going to next month day 0
+      const lastDay = new Date(2026, monthNum, 0).getDate();
       const monthStr = monthNum.toString().padStart(2, "0");
-      const dateStr = `2026-${monthStr}-01`;
+      const dateStr = `2026-${monthStr}-${lastDay}`;
       const monthName = MONTHS[month];
 
       const task = await storage.createTask({
@@ -1181,6 +1183,73 @@ What needs to change for next quarter?
     res.status(500).json({
       success: false,
       error: "Failed to create 2026 Arc review tasks",
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
+ * PATCH /api/setup/2026-arc/fix-monthly-dates
+ * Fixes existing monthly review tasks to use last day of month instead of 1st
+ */
+router.patch("/2026-arc/fix-monthly-dates", async (req, res) => {
+  try {
+    logger.info("Fixing monthly review task dates...");
+
+    // Get all tasks with "Monthly Review" in title
+    const allTasks = await storage.getTasks({});
+    const monthlyTasks = allTasks.filter(t =>
+      t.title.startsWith("Monthly Review - ") && t.title.endsWith(" 2026")
+    );
+
+    if (monthlyTasks.length === 0) {
+      return res.json({
+        success: true,
+        message: "No monthly review tasks found to fix",
+        updated: 0
+      });
+    }
+
+    const updates: { id: string; title: string; oldDate: string; newDate: string }[] = [];
+
+    for (const task of monthlyTasks) {
+      // Extract month name from title like "Monthly Review - January 2026"
+      const match = task.title.match(/Monthly Review - (\w+) 2026/);
+      if (!match) continue;
+
+      const monthName = match[1];
+      const monthIndex = MONTHS.indexOf(monthName);
+      if (monthIndex === -1) continue;
+
+      const monthNum = monthIndex + 1;
+      const lastDay = new Date(2026, monthNum, 0).getDate();
+      const monthStr = monthNum.toString().padStart(2, "0");
+      const newDateStr = `2026-${monthStr}-${lastDay}`;
+
+      // Only update if different
+      if (task.focusDate !== newDateStr) {
+        await storage.updateTask(task.id, { focusDate: newDateStr });
+        updates.push({
+          id: task.id,
+          title: task.title,
+          oldDate: task.focusDate || "null",
+          newDate: newDateStr
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Fixed ${updates.length} monthly review task dates`,
+      updated: updates.length,
+      details: updates
+    });
+
+  } catch (error) {
+    logger.error({ error }, "Error fixing monthly review dates");
+    res.status(500).json({
+      success: false,
+      error: "Failed to fix monthly review dates",
       details: error instanceof Error ? error.message : String(error)
     });
   }
