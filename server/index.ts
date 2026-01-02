@@ -166,6 +166,18 @@ const PgSession = connectPgSimple(session);
 const sessionPool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: isProduction ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true" } : false,
+  // Connection pool settings to prevent ERR_CONNECTION_RESET on Neon/Railway
+  max: 5, // Fewer connections needed for sessions
+  min: 1, // At least 1 connection
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 10000, // Return error after 10 seconds if no connection
+  keepAlive: true, // Enable TCP keep-alive
+  keepAliveInitialDelayMillis: 10000, // Start keep-alive after 10 seconds of idle
+});
+
+// Handle session pool errors to prevent unhandled exceptions
+sessionPool.on('error', (err) => {
+  log(`Session pool error: ${err.message}`);
 });
 
 // SESSION_SECRET is validated in env-validator.ts - this will fail in production if not set
