@@ -423,6 +423,7 @@ export const ventures = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
+    slug: varchar("slug", { length: 100 }).unique(), // URL-friendly identifier (e.g., "mydub-ai")
     status: ventureStatusEnum("status").default("planning").notNull(),
     oneLiner: text("one_liner"),
     domain: ventureDomainEnum("domain"), // Deprecated but kept for backward compatibility
@@ -439,6 +440,7 @@ export const ventures = pgTable(
     index("idx_ventures_domain").on(table.domain),
     // Performance: ventures are sorted by createdAt
     index("idx_ventures_created_at").on(table.createdAt),
+    index("idx_ventures_slug").on(table.slug),
   ]
 );
 

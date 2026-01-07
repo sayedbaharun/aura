@@ -184,6 +184,8 @@ export interface IStorage {
   // Ventures
   getVentures(): Promise<Venture[]>;
   getVenture(id: string): Promise<Venture | undefined>;
+  getVentureBySlug(slug: string): Promise<Venture | undefined>;
+  getVentureByIdOrSlug(idOrSlug: string): Promise<Venture | undefined>;
   createVenture(data: InsertVenture): Promise<Venture>;
   updateVenture(id: string, data: Partial<InsertVenture>): Promise<Venture | undefined>;
   deleteVenture(id: string): Promise<void>;
@@ -483,6 +485,28 @@ export interface IStorage {
 }
 
 // PostgreSQL Storage Implementation
+/**
+ * Generate a URL-friendly slug from a name
+ * e.g., "MyDub.ai" -> "mydub-ai", "2026 Arc" -> "2026-arc"
+ */
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+    .replace(/\s+/g, '-')          // Replace spaces with hyphens
+    .replace(/-+/g, '-')           // Collapse multiple hyphens
+    .replace(/^-|-$/g, '')         // Trim leading/trailing hyphens
+    .substring(0, 100);            // Limit length
+}
+
+/**
+ * Check if a string looks like a UUID
+ */
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 export class DBStorage implements IStorage {
   private db = database;
 
@@ -812,15 +836,63 @@ export class DBStorage implements IStorage {
     return venture;
   }
 
+  async getVentureBySlug(slug: string): Promise<Venture | undefined> {
+    const [venture] = await this.db
+      .select()
+      .from(ventures)
+      .where(eq(ventures.slug, slug))
+      .limit(1);
+    return venture;
+  }
+
+  async getVentureByIdOrSlug(idOrSlug: string): Promise<Venture | undefined> {
+    // If it looks like a UUID, lookup by ID first
+    if (isUUID(idOrSlug)) {
+      const venture = await this.getVenture(idOrSlug);
+      if (venture) return venture;
+    }
+    // Otherwise try slug lookup
+    return this.getVentureBySlug(idOrSlug);
+  }
+
   async createVenture(insertVenture: InsertVenture): Promise<Venture> {
+    // Auto-generate slug from name if not provided
+    let slug = insertVenture.slug || generateSlug(insertVenture.name);
+
+    // Ensure slug is unique by appending a number if needed
+    let counter = 1;
+    let uniqueSlug = slug;
+    while (await this.getVentureBySlug(uniqueSlug)) {
+      uniqueSlug = `${slug}-${counter}`;
+      counter++;
+    }
+
     const [venture] = await this.db
       .insert(ventures)
-      .values(insertVenture)
+      .values({ ...insertVenture, slug: uniqueSlug })
       .returning();
     return venture;
   }
 
   async updateVenture(id: string, updates: Partial<InsertVenture>): Promise<Venture | undefined> {
+    // If name is being updated and no custom slug provided, regenerate slug
+    if (updates.name && !updates.slug) {
+      const existingVenture = await this.getVenture(id);
+      if (existingVenture) {
+        let slug = generateSlug(updates.name);
+        // Check if slug is already taken by another venture
+        const slugOwner = await this.getVentureBySlug(slug);
+        if (slugOwner && slugOwner.id !== id) {
+          let counter = 1;
+          while (await this.getVentureBySlug(`${slug}-${counter}`)) {
+            counter++;
+          }
+          slug = `${slug}-${counter}`;
+        }
+        updates.slug = slug;
+      }
+    }
+
     const [updated] = await this.db
       .update(ventures)
       .set({ ...updates, updatedAt: new Date() })
