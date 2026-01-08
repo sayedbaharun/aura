@@ -1,15 +1,10 @@
 // SB-OS Service Worker
-const CACHE_NAME = 'sb-os-v3';
-const STATIC_CACHE = 'sbos-static-v3';
-const DYNAMIC_CACHE = 'sbos-dynamic-v3';
+const CACHE_NAME = 'sb-os-v4';
+const STATIC_CACHE = 'sbos-static-v4';
+const DYNAMIC_CACHE = 'sbos-dynamic-v4';
 
-// Assets to cache immediately on install
+// Assets to cache immediately on install (static assets only, NOT HTML routes)
 const STATIC_ASSETS = [
-  '/',
-  '/dashboard',
-  '/capture',
-  '/morning',
-  '/health-hub',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png'
@@ -28,7 +23,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and take control immediately
 self.addEventListener('activate', (event) => {
   const currentCaches = [STATIC_CACHE, DYNAMIC_CACHE];
   event.waitUntil(
@@ -47,7 +42,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - network first for API, cache first for assets
+// Fetch event - network first for HTML and API, cache first for static assets only
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -59,7 +54,6 @@ self.addEventListener('fetch', (event) => {
   if (url.protocol === 'chrome-extension:') return;
 
   // Skip external font requests (Google Fonts) - let browser handle directly
-  // This avoids CSP issues with service worker fetching cross-origin fonts
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return;
 
   // API requests - network first, fallback to cache
@@ -68,8 +62,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets - cache first, fallback to network
-  event.respondWith(cacheFirst(request));
+  // HTML navigation requests - ALWAYS network first to get latest app version
+  if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  // JS/CSS bundles with hash in filename - cache forever (immutable)
+  if (url.pathname.match(/\.[a-f0-9]{8,}\.(js|css)$/)) {
+    event.respondWith(cacheFirst(request));
+    return;
+  }
+
+  // Other static assets - network first with cache fallback
+  event.respondWith(networkFirst(request));
 });
 
 // Network first strategy (for API calls)
