@@ -133,6 +133,211 @@ const DAYS_OF_WEEK = [
   { value: 6, label: "Saturday" },
 ];
 
+// Pre-filled defaults based on legendary trader wisdom
+const DEFAULT_CONFIG = {
+  // Context
+  tradingStyle: "ICT/SMC Concepts - Order Blocks, Fair Value Gaps, Liquidity Sweeps, Market Structure",
+  instruments: "XAUUSD (Gold), EURUSD, GBPUSD, NAS100",
+  timeframes: "Daily/4H for bias, 1H for structure, 15m/5m for entries",
+  tradingHours: "London Session (3am-12pm EST), NY Session (8am-5pm EST) - Focus on London/NY overlap",
+  riskRules: `• Max 1% risk per trade (PTJ: "The most important rule is to play great defense")
+• Max 2 trades per day
+• No trading after 2 consecutive losses - take a break
+• Never move stop loss further from entry
+• Only trade A+ setups that meet all criteria
+• No revenge trading - accept losses as cost of business`,
+  focusAreas: ["Discipline", "Risk Management", "Emotional Control", "Strategy Adherence"],
+
+  // Account
+  accountBalance: "10000",
+  accountCurrency: "USD",
+  maxDrawdownPercent: "10",
+  riskPerTradePercent: "1",
+  brokerName: "",
+
+  // Goals
+  monthlyPnlTargetPercent: "5",
+  winRateTarget: "50",
+  averageRrTarget: "2",
+  maxTradesPerDay: "2",
+  maxTradesPerWeek: "8",
+  maxLossPerDay: "200",
+  maxLossPerDayPercent: "2",
+  maxConsecutiveLosses: "2",
+
+  // Setup Types
+  setupTypes: [
+    {
+      name: "Order Block Retest",
+      description: "Price returns to a validated order block after BOS/CHoCH",
+      validationRules: [
+        "HTF bias confirmed (Daily/4H)",
+        "Clear BOS or CHoCH on entry TF",
+        "OB has imbalance/FVG nearby",
+        "Price at premium/discount zone",
+        "No major news in next 2 hours",
+      ],
+      riskRewardMin: 2,
+    },
+    {
+      name: "FVG Fill",
+      description: "Price fills a fair value gap in direction of trend",
+      validationRules: [
+        "HTF trend aligned",
+        "FVG in premium/discount",
+        "Liquidity taken before entry",
+        "Clear invalidation level",
+      ],
+      riskRewardMin: 2,
+    },
+    {
+      name: "Liquidity Sweep",
+      description: "Price sweeps liquidity (equal highs/lows, swing points) then reverses",
+      validationRules: [
+        "Clear liquidity pool identified",
+        "Sweep confirmed with reaction",
+        "Entry TF shows reversal structure",
+        "Risk defined below/above sweep",
+      ],
+      riskRewardMin: 2.5,
+    },
+  ],
+
+  // Psychology - Mark Douglas & Brett Steenbarger
+  tradingPlan: `TRADING PLAN - Based on PTJ, Dalio, Douglas, Steenbarger
+
+CORE PHILOSOPHY:
+"The goal of a successful trader is to make the best trades. Money is secondary." - Alexander Elder
+
+ENTRY CRITERIA:
+1. Daily/4H bias established (trend direction)
+2. Wait for price to reach POI (Order Block, FVG, or liquidity level)
+3. Entry timeframe (15m/5m) shows confirming structure
+4. Risk:Reward minimum 2:1
+5. All checklist items confirmed
+
+EXIT STRATEGY:
+• Stop loss: Below/above structure that invalidates setup
+• Take profit: Next liquidity pool or opposing POI
+• Trail stop after 1:1 to breakeven
+• Partial at 2:1, let rest run
+
+DAILY ROUTINE:
+• Pre-market: Mark up HTF levels, identify POIs
+• During session: Wait for price to come to you
+• Post-session: Journal all trades, review decisions`,
+
+  tradingBeliefs: [
+    "I am a consistent trader who follows my plan",
+    "Every trade is simply one in a series of probabilities",
+    "The market doesn't owe me anything - I must earn every pip",
+    "Losses are the cost of doing business, not failures",
+    "I don't need to win every trade, I need to follow my process",
+    "The best trade might be no trade at all",
+    "I am responsible for every result I experience",
+    "Discipline and patience are my competitive edge",
+  ],
+
+  strengthsToLeverage: [
+    "Patient - can wait for A+ setups",
+    "Good at technical analysis",
+    "Disciplined risk management",
+    "Ability to accept losses",
+  ],
+
+  weaknessesToManage: [
+    "FOMO - tendency to chase price",
+    "Overtrading when bored",
+    "Moving stops to avoid small losses",
+    "Revenge trading after losses",
+  ],
+
+  emotionalTriggers: [
+    "Missing a good move - leads to FOMO entries",
+    "Back-to-back losses - leads to revenge trading",
+    "Being in drawdown - leads to overtrading",
+    "Winning streak - leads to overconfidence and larger position sizes",
+    "External stress - affects decision making",
+  ],
+
+  recoveryStrategies: [
+    "Step away from charts for at least 1 hour after 2 losses",
+    "Do breathing exercises before re-entering",
+    "Review trading plan and beliefs",
+    "Reduce position size by 50% after drawdown",
+    "Journal the emotional state before trading again",
+    "Physical exercise to reset mental state",
+    "Talk through the situation (rubber duck or mentor)",
+  ],
+
+  noTradeRules: [
+    "After 2 consecutive losses - done for the day",
+    "If tired, stressed, or emotionally compromised",
+    "During high-impact news (NFP, FOMC, CPI)",
+    "If daily loss limit reached",
+    "If no clear HTF bias",
+    "If setup doesn't meet ALL checklist criteria",
+    "Monday mornings (first 2 hours)",
+    "Friday afternoons (last 3 hours)",
+    "If I'm trading to 'make back' losses",
+  ],
+
+  preTradeChecklist: [
+    "HTF bias clear? (Daily/4H direction)",
+    "Price at valid POI? (OB, FVG, liquidity)",
+    "Entry TF confirms? (structure shift)",
+    "Risk:Reward min 2:1?",
+    "Stop loss at logical level?",
+    "No high-impact news next 2 hours?",
+    "Am I calm and focused?",
+    "Is this an A+ setup or am I forcing it?",
+    "Position size correct (1% risk)?",
+  ],
+
+  postTradeReview: [
+    "Did I follow my trading plan?",
+    "Was this an A+ setup or did I force it?",
+    "What was my emotional state during the trade?",
+    "What did I do well?",
+    "What could I improve?",
+    "Would I take this trade again?",
+  ],
+
+  // Reviews
+  weeklyReviewDay: 0, // Sunday
+  monthlyReviewDay: 1,
+  reviewQuestions: [
+    "What was my win rate this period?",
+    "Did I follow my trading plan consistently?",
+    "What patterns led to my best trades?",
+    "What patterns led to my worst trades?",
+    "How was my emotional management?",
+    "What is one thing I will improve next week?",
+  ],
+
+  tradingMentors: [
+    "Paul Tudor Jones - Risk management, capital preservation",
+    "Ray Dalio - Systematic thinking, radical transparency",
+    "Mark Douglas - Trading psychology, probabilistic thinking",
+    "Brett Steenbarger - Performance psychology, self-coaching",
+    "Chris Vermeulen - Technical analysis, trend following",
+  ],
+
+  keyLessons: [
+    { date: "2024-01-01", lesson: "The best trade is often no trade - patience pays", context: "Setup" },
+    { date: "2024-01-01", lesson: "Never move your stop further from entry", context: "Risk Management" },
+    { date: "2024-01-01", lesson: "Process over outcome - focus on execution", context: "Psychology" },
+  ],
+
+  quickActions: [
+    { label: "Pre-Trade Check", prompt: "Run through my pre-trade checklist for the setup I'm considering" },
+    { label: "Position Size", prompt: "Calculate position size for my current trade idea" },
+    { label: "Psychology Check", prompt: "Am I in the right mental state to trade right now?" },
+    { label: "Daily Review", prompt: "Help me review my trades from today" },
+    { label: "Weekly Review", prompt: "Generate my weekly trading review" },
+  ],
+};
+
 export default function TradingAgentConfig() {
   const { toast } = useToast();
 
@@ -219,60 +424,65 @@ export default function TradingAgentConfig() {
     },
   });
 
-  // Update form when config loads
+  // Update form when config loads - use defaults for empty values
   useEffect(() => {
     if (config) {
-      // Basic
+      // Check if config is essentially empty (only has id/userId/timestamps)
+      const isEmptyConfig = !config.tradingStyle && !config.instruments &&
+        (!config.setupTypes || config.setupTypes.length === 0) &&
+        (!config.tradingBeliefs || config.tradingBeliefs.length === 0);
+
+      // Basic - use defaults if empty
       setSystemPrompt(config.systemPrompt || "");
-      setTradingStyle(config.tradingStyle || "");
-      setInstruments(config.instruments || "");
-      setTimeframes(config.timeframes || "");
-      setRiskRules(config.riskRules || "");
-      setTradingHours(config.tradingHours || "");
+      setTradingStyle(config.tradingStyle || DEFAULT_CONFIG.tradingStyle);
+      setInstruments(config.instruments || DEFAULT_CONFIG.instruments);
+      setTimeframes(config.timeframes || DEFAULT_CONFIG.timeframes);
+      setRiskRules(config.riskRules || DEFAULT_CONFIG.riskRules);
+      setTradingHours(config.tradingHours || DEFAULT_CONFIG.tradingHours);
       setPreferredModel(config.preferredModel || "auto");
       setResearchModel(config.researchModel || "auto");
-      setFocusAreas(config.focusAreas || []);
-      setQuickActions(config.quickActions || []);
+      setFocusAreas(config.focusAreas?.length ? config.focusAreas : DEFAULT_CONFIG.focusAreas);
+      setQuickActions(config.quickActions?.length ? config.quickActions : DEFAULT_CONFIG.quickActions);
 
-      // Account Management
-      setAccountBalance(config.accountBalance?.toString() || "");
-      setAccountCurrency(config.accountCurrency || "USD");
-      setMaxDrawdownPercent(config.maxDrawdownPercent?.toString() || "");
-      setRiskPerTradePercent(config.riskPerTradePercent?.toString() || "1");
+      // Account Management - use defaults if empty
+      setAccountBalance(config.accountBalance?.toString() || DEFAULT_CONFIG.accountBalance);
+      setAccountCurrency(config.accountCurrency || DEFAULT_CONFIG.accountCurrency);
+      setMaxDrawdownPercent(config.maxDrawdownPercent?.toString() || DEFAULT_CONFIG.maxDrawdownPercent);
+      setRiskPerTradePercent(config.riskPerTradePercent?.toString() || DEFAULT_CONFIG.riskPerTradePercent);
       setRiskPerTradeAmount(config.riskPerTradeAmount?.toString() || "");
-      setBrokerName(config.brokerName || "");
+      setBrokerName(config.brokerName || DEFAULT_CONFIG.brokerName);
 
-      // Performance Goals
+      // Performance Goals - use defaults if empty
       setMonthlyPnlTarget(config.monthlyPnlTarget?.toString() || "");
-      setMonthlyPnlTargetPercent(config.monthlyPnlTargetPercent?.toString() || "");
-      setWinRateTarget(config.winRateTarget?.toString() || "");
-      setAverageRrTarget(config.averageRrTarget?.toString() || "");
-      setMaxTradesPerDay(config.maxTradesPerDay?.toString() || "");
-      setMaxTradesPerWeek(config.maxTradesPerWeek?.toString() || "");
-      setMaxLossPerDay(config.maxLossPerDay?.toString() || "");
-      setMaxLossPerDayPercent(config.maxLossPerDayPercent?.toString() || "");
-      setMaxConsecutiveLosses(config.maxConsecutiveLosses?.toString() || "");
+      setMonthlyPnlTargetPercent(config.monthlyPnlTargetPercent?.toString() || DEFAULT_CONFIG.monthlyPnlTargetPercent);
+      setWinRateTarget(config.winRateTarget ? (config.winRateTarget * 100).toString() : DEFAULT_CONFIG.winRateTarget);
+      setAverageRrTarget(config.averageRrTarget?.toString() || DEFAULT_CONFIG.averageRrTarget);
+      setMaxTradesPerDay(config.maxTradesPerDay?.toString() || DEFAULT_CONFIG.maxTradesPerDay);
+      setMaxTradesPerWeek(config.maxTradesPerWeek?.toString() || DEFAULT_CONFIG.maxTradesPerWeek);
+      setMaxLossPerDay(config.maxLossPerDay?.toString() || DEFAULT_CONFIG.maxLossPerDay);
+      setMaxLossPerDayPercent(config.maxLossPerDayPercent?.toString() || DEFAULT_CONFIG.maxLossPerDayPercent);
+      setMaxConsecutiveLosses(config.maxConsecutiveLosses?.toString() || DEFAULT_CONFIG.maxConsecutiveLosses);
 
-      // Setup Types
-      setSetupTypes(config.setupTypes || []);
+      // Setup Types - use defaults if empty
+      setSetupTypes(config.setupTypes?.length ? config.setupTypes : DEFAULT_CONFIG.setupTypes);
 
-      // Psychology
-      setNoTradeRules(config.noTradeRules || []);
-      setPreTradeChecklist(config.preTradeChecklist || []);
-      setPostTradeReview(config.postTradeReview || []);
-      setTradingPlan(config.tradingPlan || "");
-      setTradingBeliefs(config.tradingBeliefs || []);
-      setStrengthsToLeverage(config.strengthsToLeverage || []);
-      setWeaknessesToManage(config.weaknessesToManage || []);
-      setEmotionalTriggers(config.emotionalTriggers || []);
-      setRecoveryStrategies(config.recoveryStrategies || []);
+      // Psychology - use defaults if empty
+      setNoTradeRules(config.noTradeRules?.length ? config.noTradeRules : DEFAULT_CONFIG.noTradeRules);
+      setPreTradeChecklist(config.preTradeChecklist?.length ? config.preTradeChecklist : DEFAULT_CONFIG.preTradeChecklist);
+      setPostTradeReview(config.postTradeReview?.length ? config.postTradeReview : DEFAULT_CONFIG.postTradeReview);
+      setTradingPlan(config.tradingPlan || DEFAULT_CONFIG.tradingPlan);
+      setTradingBeliefs(config.tradingBeliefs?.length ? config.tradingBeliefs : DEFAULT_CONFIG.tradingBeliefs);
+      setStrengthsToLeverage(config.strengthsToLeverage?.length ? config.strengthsToLeverage : DEFAULT_CONFIG.strengthsToLeverage);
+      setWeaknessesToManage(config.weaknessesToManage?.length ? config.weaknessesToManage : DEFAULT_CONFIG.weaknessesToManage);
+      setEmotionalTriggers(config.emotionalTriggers?.length ? config.emotionalTriggers : DEFAULT_CONFIG.emotionalTriggers);
+      setRecoveryStrategies(config.recoveryStrategies?.length ? config.recoveryStrategies : DEFAULT_CONFIG.recoveryStrategies);
 
-      // Reviews
-      setWeeklyReviewDay(config.weeklyReviewDay ?? 0);
-      setMonthlyReviewDay(config.monthlyReviewDay ?? 1);
-      setReviewQuestions(config.reviewQuestions || []);
-      setTradingMentors(config.tradingMentors || []);
-      setKeyLessons(config.keyLessons || []);
+      // Reviews - use defaults if empty
+      setWeeklyReviewDay(config.weeklyReviewDay ?? DEFAULT_CONFIG.weeklyReviewDay);
+      setMonthlyReviewDay(config.monthlyReviewDay ?? DEFAULT_CONFIG.monthlyReviewDay);
+      setReviewQuestions(config.reviewQuestions?.length ? config.reviewQuestions : DEFAULT_CONFIG.reviewQuestions);
+      setTradingMentors(config.tradingMentors?.length ? config.tradingMentors : DEFAULT_CONFIG.tradingMentors);
+      setKeyLessons(config.keyLessons?.length ? config.keyLessons : DEFAULT_CONFIG.keyLessons);
     }
   }, [config]);
 
