@@ -1855,6 +1855,7 @@ export type TradingConversation = typeof tradingConversations.$inferSelect;
 export type InsertTradingConversation = z.infer<typeof insertTradingConversationSchema>;
 
 // Trading Agent Config: Configuration for the trading AI agent
+// Enhanced with wisdom from Paul Tudor Jones, Ray Dalio, Mark Douglas, Brett Steenbarger, Chris Vermeulen
 export const tradingAgentConfig = pgTable(
   "trading_agent_config",
   {
@@ -1876,6 +1877,65 @@ export const tradingAgentConfig = pgTable(
     preferredModel: text("preferred_model"), // e.g., "openai/gpt-4o" - used for main chat
     researchModel: text("research_model"), // e.g., "perplexity/sonar-pro" - used for web search
     focusAreas: jsonb("focus_areas").$type<string[]>().default([]), // e.g., ["discipline", "risk management", "journaling"]
+
+    // === ACCOUNT MANAGEMENT (Paul Tudor Jones: "The most important rule is to play great defense") ===
+    accountBalance: real("account_balance"), // Current account balance
+    accountCurrency: text("account_currency").default("USD"), // Account currency
+    maxDrawdownPercent: real("max_drawdown_percent"), // Maximum allowed drawdown % before stopping
+    riskPerTradePercent: real("risk_per_trade_percent"), // Risk per trade as % of account
+    riskPerTradeAmount: real("risk_per_trade_amount"), // Or fixed $ amount per trade
+    brokerName: text("broker_name"), // Broker name for reference
+
+    // === PERFORMANCE GOALS (Ray Dalio: "Pain + Reflection = Progress") ===
+    monthlyPnlTarget: real("monthly_pnl_target"), // Monthly P&L target in $
+    monthlyPnlTargetPercent: real("monthly_pnl_target_percent"), // Or as % of account
+    winRateTarget: real("win_rate_target"), // Target win rate (e.g., 0.55 for 55%)
+    averageRRTarget: real("average_rr_target"), // Target average R:R ratio
+    maxTradesPerDay: integer("max_trades_per_day"), // Maximum trades allowed per day
+    maxTradesPerWeek: integer("max_trades_per_week"), // Maximum trades per week
+    maxLossPerDay: real("max_loss_per_day"), // Max $ loss before stopping for day
+    maxLossPerDayPercent: real("max_loss_per_day_percent"), // Or as % of account
+    maxConsecutiveLosses: integer("max_consecutive_losses"), // Stop after N consecutive losses
+
+    // === SETUP LIBRARY (Chris Vermeulen: "Trade what you see, not what you think") ===
+    setupTypes: jsonb("setup_types").$type<Array<{
+      name: string;           // e.g., "FVG", "Order Block", "Breaker"
+      description: string;    // Setup description
+      rules: string[];        // Entry rules
+      invalidation: string;   // What invalidates the setup
+      targetRR: number;       // Typical R:R target
+      winRate?: number;       // Historical win rate for this setup
+    }>>().default([]),
+
+    // === PSYCHOLOGY & MENTAL RULES (Mark Douglas: "Trading is 80% mental") ===
+    noTradeRules: jsonb("no_trade_rules").$type<string[]>().default([]), // When NOT to trade
+    preTradeChecklist: jsonb("pre_trade_checklist").$type<string[]>().default([]), // Mental checklist before every trade
+    postTradeReview: jsonb("post_trade_review").$type<string[]>().default([]), // Questions after each trade
+    tradingPlan: text("trading_plan"), // Comprehensive trading plan document
+    tradingBeliefs: jsonb("trading_beliefs").$type<string[]>().default([]), // Core trading beliefs (Mark Douglas style)
+
+    // === PERFORMANCE PSYCHOLOGY (Brett Steenbarger: "Self-coaching") ===
+    strengthsToLeverage: jsonb("strengths_to_leverage").$type<string[]>().default([]), // What you do well
+    weaknessesToManage: jsonb("weaknesses_to_manage").$type<string[]>().default([]), // Areas to improve
+    emotionalTriggers: jsonb("emotional_triggers").$type<string[]>().default([]), // What causes tilt/FOMO
+    recoveryStrategies: jsonb("recovery_strategies").$type<string[]>().default([]), // How to recover from losses
+
+    // === REVIEW CONFIGURATION ===
+    weeklyReviewDay: text("weekly_review_day").default("sunday"), // Day for weekly review
+    monthlyReviewDay: integer("monthly_review_day").default(1), // Day of month for review
+    reviewQuestions: jsonb("review_questions").$type<{
+      daily: string[];
+      weekly: string[];
+      monthly: string[];
+    }>().default({ daily: [], weekly: [], monthly: [] }),
+
+    // === MENTORS & INFLUENCES ===
+    tradingMentors: jsonb("trading_mentors").$type<string[]>().default([]), // Who you learn from
+    keyLessons: jsonb("key_lessons").$type<Array<{
+      lesson: string;
+      source: string;
+      dateAdded: string;
+    }>>().default([]), // Key lessons learned
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
