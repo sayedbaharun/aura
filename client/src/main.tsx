@@ -11,23 +11,28 @@ if ('serviceWorker' in navigator) {
       .then((registration) => {
         console.log('[PWA] Service Worker registered:', registration.scope);
 
-        // Check for updates periodically
+        // Check for updates more frequently (every 5 minutes)
         setInterval(() => {
           registration.update();
-        }, 60 * 60 * 1000); // Check every hour
+        }, 5 * 60 * 1000);
 
-        // Handle updates
+        // Handle updates - auto-reload when new version is ready
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New version available
-                console.log('[PWA] New version available');
-                // Optionally show update notification to user
+                // New version available - reload to activate it
+                console.log('[PWA] New version available, reloading...');
+                window.location.reload();
               }
             });
           }
+        });
+
+        // Also listen for the controlling service worker to change
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('[PWA] Controller changed, app updated');
         });
       })
       .catch((error) => {
