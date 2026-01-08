@@ -23,6 +23,7 @@ import {
 interface Venture {
   id: string;
   name: string;
+  slug?: string;
   status: string;
   domain: string;
   icon?: string;
@@ -146,7 +147,7 @@ export default function VenturesNavSection({
             return (
               <Link
                 key={venture.id}
-                href={`/ventures/${venture.id}`}
+                href={`/ventures/${venture.slug || venture.id}`}
                 className={cn(
                   "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
                   "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",

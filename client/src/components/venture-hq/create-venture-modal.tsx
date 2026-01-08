@@ -84,6 +84,10 @@ export default function CreateVentureModal({ open, onOpenChange, venture }: Crea
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ventures"] });
+      // Also invalidate the specific venture detail query so the page refreshes
+      if (isEdit && venture?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/ventures", venture.id] });
+      }
       toast({
         title: "Success",
         description: `Venture ${isEdit ? "updated" : "created"} successfully`,

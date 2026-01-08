@@ -341,7 +341,7 @@ export default function CommandCenterV2() {
                                 ventures.map((v: any) => (
                                     <div
                                         key={v.id}
-                                        onClick={() => navigate(`/ventures/${v.id}`)}
+                                        onClick={() => navigate(`/ventures/${v.slug || v.id}`)}
                                         className="flex items-center justify-between p-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
                                     >
                                         <div className="flex items-center gap-2 min-w-0">

@@ -21,10 +21,10 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// Get single venture
-router.get("/:id", async (req: Request, res: Response) => {
+// Get single venture (supports both UUID and slug lookup)
+router.get("/:idOrSlug", async (req: Request, res: Response) => {
   try {
-    const venture = await storage.getVenture(req.params.id);
+    const venture = await storage.getVentureByIdOrSlug(req.params.idOrSlug);
     if (!venture) {
       return res.status(404).json({ error: "Venture not found" });
     }

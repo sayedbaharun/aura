@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 interface Venture {
   id: string;
   name: string;
+  slug?: string | null;
   status: string;
   oneLiner: string | null;
   domain: string;
@@ -158,7 +159,7 @@ export default function VenturesGrid({ viewMode, statusFilters }: VenturesGridPr
             key={venture.id}
             className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] border-l-4"
             style={{ borderLeftColor: venture.color || "#6366f1" }}
-            onClick={() => setLocation(`/ventures/${venture.id}`)}
+            onClick={() => setLocation(`/ventures/${venture.slug || venture.id}`)}
           >
             <CardHeader>
               <div className="flex items-start justify-between">
