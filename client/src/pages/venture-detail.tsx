@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRoute } from "wouter";
-import { Plus, Bot, Settings, Sparkles, Telescope } from "lucide-react";
+import { useRoute, useLocation } from "wouter";
+import { Plus, Bot, Settings, Sparkles, Telescope, ArrowRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,11 +29,16 @@ interface Venture {
 
 export default function VentureDetail() {
   const [, params] = useRoute("/ventures/:id");
+  const [, navigate] = useLocation();
   const ventureId = params?.id;
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [projectWizardOpen, setProjectWizardOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("projects");
   const [aiSubTab, setAiSubTab] = useState<"chat" | "config">("chat");
+
+  // Check if this is a trading venture
+  const isTradingVenture = (venture: Venture | undefined) =>
+    venture?.domain === "trading" || venture?.name?.toLowerCase().includes("trading");
 
   const { data: venture, isLoading } = useQuery<Venture>({
     queryKey: ["/api/ventures", ventureId],
@@ -137,38 +142,58 @@ export default function VentureDetail() {
         </TabsContent>
 
         <TabsContent value="ai-agent" className="space-y-4">
-          {/* Sub-tabs for AI Agent */}
-          <div className="flex items-center gap-2 border-b pb-4">
-            <Button
-              variant={aiSubTab === "chat" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAiSubTab("chat")}
-            >
-              <Bot className="h-4 w-4 mr-2" />
-              Chat with AI
-            </Button>
-            <Button
-              variant={aiSubTab === "config" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAiSubTab("config")}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Configure Agent
-            </Button>
-          </div>
-
-          {aiSubTab === "chat" ? (
-            <Card className="h-[600px]">
-              <CardContent className="p-6 h-full">
-                <VentureAiChat
-                  ventureId={venture.id}
-                  ventureName={venture.name}
-                  quickActions={aiAgentConfig?.quickActions || []}
-                />
+          {isTradingVenture(venture) ? (
+            /* Trading ventures use the specialized Trading Agent */
+            <Card>
+              <CardContent className="p-8 text-center space-y-4">
+                <Bot className="h-16 w-16 mx-auto text-muted-foreground" />
+                <h3 className="text-xl font-semibold">Specialized Trading Agent Available</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  For trading, use the dedicated Trading Agent with advanced features like position sizing,
+                  trade logging, performance analytics, and psychology coaching based on legendary traders.
+                </p>
+                <Button onClick={() => navigate("/trading")} size="lg">
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Go to Trading Agent
+                </Button>
               </CardContent>
             </Card>
           ) : (
-            <AiAgentConfig ventureId={venture.id} />
+            <>
+              {/* Sub-tabs for AI Agent */}
+              <div className="flex items-center gap-2 border-b pb-4">
+                <Button
+                  variant={aiSubTab === "chat" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAiSubTab("chat")}
+                >
+                  <Bot className="h-4 w-4 mr-2" />
+                  Chat with AI
+                </Button>
+                <Button
+                  variant={aiSubTab === "config" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAiSubTab("config")}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configure Agent
+                </Button>
+              </div>
+
+              {aiSubTab === "chat" ? (
+                <Card className="h-[600px]">
+                  <CardContent className="p-6 h-full">
+                    <VentureAiChat
+                      ventureId={venture.id}
+                      ventureName={venture.name}
+                      quickActions={aiAgentConfig?.quickActions || []}
+                    />
+                  </CardContent>
+                </Card>
+              ) : (
+                <AiAgentConfig ventureId={venture.id} />
+              )}
+            </>
           )}
         </TabsContent>
       </Tabs>
